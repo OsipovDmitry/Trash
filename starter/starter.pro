@@ -7,4 +7,5 @@ SOURCES += \
     src/main.cpp
 
 LIBS += \
-    -lcore
+    -lcore \
+    -lgame
