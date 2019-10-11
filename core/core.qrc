@@ -2,5 +2,6 @@
     <qresource prefix="/">
         <file>resources/shader.frag</file>
         <file>resources/shader.vert</file>
+        <file>resources/brick.jpg</file>
     </qresource>
 </RCC>
