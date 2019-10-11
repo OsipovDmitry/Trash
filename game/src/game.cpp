@@ -1,10 +1,14 @@
 #include <game/game.h>
 
-void Game::doUpdate(uint64_t time, uint64_t dt)
+void Game::doInitialize()
+{
+}
+
+void Game::doUpdate(uint64_t, uint64_t)
 {
 }
 
 Game::Game()
     : AbstractGame()
-{
+{ 
 }

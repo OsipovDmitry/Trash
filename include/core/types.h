@@ -13,6 +13,7 @@ ENUMCLASS(ControllerType, uint32_t,
           Audio)
 
 ENUMCLASS(ControllerMessageType, uint32_t,
+          RenderWidgetWasInitialized,
           RenderWidgetWasUpdated,
           RenderWidgetWasClicked,
           RenderWidgetWasClosed,

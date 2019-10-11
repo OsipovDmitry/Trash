@@ -1,7 +1,9 @@
 #include <QtGui/QOpenGLExtraFunctions>
+#include <QtCore/QFile>
 
 #include "renderer.h"
 
+#include <iostream>
 
 Renderer::Renderer(QOpenGLExtraFunctions& functions)
     : m_functions(functions)
@@ -11,6 +13,119 @@ Renderer::Renderer(QOpenGLExtraFunctions& functions)
 
 Renderer::~Renderer()
 {
+    m_functions.glDeleteBuffers(1, &m_vbo);
+    m_functions.glDeleteVertexArrays(1, &m_vao);
+}
+
+std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &vertexFile, const std::string &fragmentFile)
+{
+    static auto loadShader = [this](const std::string& filename, GLenum type, std::string& log) -> GLuint {
+        QFile file(QString::fromStdString(filename));
+
+        if (!file.open(QFile::ReadOnly))
+            return 0;
+
+        auto byteArray = file.readAll();
+        const char *data = byteArray.data();
+
+        GLuint id = m_functions.glCreateShader(type);
+        if (!id)
+            return 0;
+        m_functions.glShaderSource(id, 1, &data, nullptr);
+        m_functions.glCompileShader(id);
+        GLint compiled;
+        m_functions.glGetShaderiv(id, GL_COMPILE_STATUS, &compiled);
+        if (!compiled) {
+            GLint infoLen = 0;
+            m_functions.glGetShaderiv(id, GL_INFO_LOG_LENGTH, &infoLen);
+            if(infoLen > 1)
+            {
+                char *infoLog = static_cast<char*>(malloc(sizeof(char) * static_cast<unsigned int>(infoLen)));
+                m_functions.glGetShaderInfoLog(id, infoLen, nullptr, infoLog);
+                log = infoLog;
+                free(infoLog);
+            }
+            m_functions.glDeleteShader(id);
+            return 0;
+        }
+
+        file.close();
+        return id;
+    };
+
+    static auto deleteShader = [this](GLuint id) {
+        if (!id)
+            return;
+        m_functions.glDeleteShader(id);
+    };
+
+    static auto loadProgram = [this](GLuint vertexId, GLuint fragmentId, std::string& log) -> GLuint
+    {
+        if (!vertexId || !fragmentId)
+            return 0;
+        GLuint id = m_functions.glCreateProgram();
+        if (!id)
+            return 0;
+        m_functions.glAttachShader(id, vertexId);
+        m_functions.glAttachShader(id, fragmentId);
+        m_functions.glLinkProgram(id);
+        GLint linked;
+        m_functions.glGetProgramiv(id, GL_LINK_STATUS, &linked);
+        if (!linked) {
+            GLint infoLen = 0;
+            m_functions.glGetProgramiv(id, GL_INFO_LOG_LENGTH, &infoLen);
+            if(infoLen > 1) {
+                char *infoLog = static_cast<char*>(malloc(sizeof(char) * static_cast<unsigned int>(infoLen)));
+                m_functions.glGetProgramInfoLog(id, infoLen, nullptr, infoLog);
+                log = infoLog;
+                free(infoLog);
+            }
+            m_functions.glDeleteProgram(id);
+            return 0;
+        }
+        return id;
+    };
+
+    static auto deleteProgram = [this](GLuint id) {
+        if (!id)
+            return;
+        GLuint shaders[2];
+        GLsizei count = 0;
+        m_functions.glGetAttachedShaders(id, 2, &count, shaders);
+        m_functions.glDetachShader(id, shaders[0]);
+        deleteShader(shaders[0]);
+        m_functions.glDetachShader(id, shaders[1]);
+        deleteShader(shaders[1]);
+        m_functions.glDeleteProgram(id);
+    };
+
+    static auto deleter = [](RenderProgram* p) {
+        deleteProgram(p->id);
+        delete p;
+    };
+
+    const std::string key = vertexFile+fragmentFile;
+    auto object = ResourceStorage::instance().get(key);
+    if (!object)
+    {
+        std::string vertexLog, fragmentLog, programLog;
+        GLuint vertexId = loadShader(vertexFile, GL_VERTEX_SHADER, vertexLog);
+        GLuint fragmentId = loadShader(fragmentFile, GL_FRAGMENT_SHADER, fragmentLog);
+        GLuint programId = loadProgram(vertexId, fragmentId, programLog);
+        if (!vertexId || !fragmentId || !programId)
+        {
+            deleteShader(vertexId);
+            deleteShader(fragmentId);
+            std::cout <<
+                         "Vertex: " << vertexLog <<
+                         "Fragment: " << fragmentLog <<
+                         "Program: " << programLog << std::endl;
+        }
+        object = std::shared_ptr<RenderProgram>(new RenderProgram(programId), deleter);
+        ResourceStorage::instance().store(key, object);
+    }
+
+    return std::static_pointer_cast<RenderProgram>(object);
 }
 
 void Renderer::resize(int width, int height)
@@ -20,5 +135,41 @@ void Renderer::resize(int width, int height)
 
 void Renderer::render()
 {
-    m_functions.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    if (!m_renderProgram)
+        m_renderProgram = loadRenderProgram(":/resources/shader.vert", ":/resources/shader.frag");
+
+    if (!m_vao)
+    {
+        static const float vertices[] {
+            -0.7f, -0.7f, -1.0f, 1.0f, 0.0f, 0.0f,
+            +0.7f, -0.7f, -1.0f, 0.0f, 1.0f, 0.0f,
+            +0.0f, +0.7f, -1.0f, 0.0f, 0.0f, 1.0f,
+        };
+
+        m_functions.glGenVertexArrays(1, &m_vao);
+        m_functions.glBindVertexArray(m_vao);
+
+        m_functions.glGenBuffers(1, &m_vbo);
+        m_functions.glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
+        m_functions.glBufferData(GL_ARRAY_BUFFER, 3 * 6 * sizeof(float), vertices, GL_STATIC_DRAW);
+
+        m_functions.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<const GLvoid*>(0 * sizeof(float)));
+        m_functions.glEnableVertexAttribArray(0);
+
+        m_functions.glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 6 * sizeof(float), reinterpret_cast<const GLvoid*>(3 * sizeof(float)));
+        m_functions.glEnableVertexAttribArray(1);
+
+        m_functions.glBindVertexArray(0);
+    }
+
+    m_functions.glClear(GL_COLOR_BUFFER_BIT);
+
+    m_functions.glUseProgram(m_renderProgram->id);
+    m_functions.glBindVertexArray(m_vao);
+
+    m_functions.glDrawArrays(GL_TRIANGLES, 0, 3);
+
+    m_functions.glUseProgram(0);
+    m_functions.glBindVertexArray(0);
+
 }

@@ -1,13 +1,19 @@
 #ifndef RENDERER_H
 #define RENDERER_H
 
-#include <gl/GL.h>
 #include <string>
 
-#include <core/types.h>
+#include <QtOpenGL/QGL>
+
+#include "resourcestorage.h"
 
 class QOpenGLExtraFunctions;
-class Renderer;
+
+struct RenderProgram : public ResourceStorage::Object
+{
+    GLuint id;
+    RenderProgram(GLuint id_) : id(id_) {}
+};
 
 class Renderer
 {
@@ -15,12 +21,18 @@ public:
     Renderer(QOpenGLExtraFunctions&);
     ~Renderer();
 
+    std::shared_ptr<RenderProgram> loadRenderProgram(const std::string&, const std::string&);
+
+private:
     void resize(int, int);
     void render();
 
-private:
     QOpenGLExtraFunctions& m_functions;
-};
 
+    std::shared_ptr<RenderProgram> m_renderProgram;
+    GLuint m_vao = 0, m_vbo = 0;
+
+    friend class RenderWidget;
+};
 
 #endif // RENDERER_H

@@ -8,6 +8,7 @@
 class GAMESHARED_EXPORT Game : public AbstractGame
 {
 public:
+    void doInitialize() override;
     void doUpdate(uint64_t, uint64_t) override;
 
     Game();

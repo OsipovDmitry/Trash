@@ -40,6 +40,8 @@ void RenderWidget::initializeGL()
     m_timer->start();
 
     m_startTime = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
+
+    m_core.sendMessage(std::make_shared<RenderWidgetWasInitializedMessage>());
 }
 
 void RenderWidget::resizeGL(int w, int h)

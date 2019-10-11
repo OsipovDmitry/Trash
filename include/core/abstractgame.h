@@ -10,6 +10,7 @@ class AbstractGame
     NONCOPYBLE(AbstractGame)
 
 public:
+    virtual void doInitialize() {}
     virtual void doUpdate(uint64_t, uint64_t) {}
     virtual void doMouseClick(int, int) {}
 

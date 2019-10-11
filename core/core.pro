@@ -17,7 +17,8 @@ HEADERS += \
     ../include/core/abstractgame.h \
     src/renderwidget.h \
     src/coreprivate.h \
-    src/renderer.h
+    src/renderer.h \
+    src/resourcestorage.h
 
 SOURCES += \
     src/abstractcontroller.cpp \
@@ -25,5 +26,9 @@ SOURCES += \
     src/core.cpp \
     src/renderer.cpp \
     src/graphicscontroller.cpp \
-    src/audiocontroller.cpp
+    src/audiocontroller.cpp \
+    src/resourcestorage.cpp
+
+RESOURCES += \
+    core.qrc
 

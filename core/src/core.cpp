@@ -30,6 +30,19 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
 {
     switch (msg->type())
     {
+    case ControllerMessageType::RenderWidgetWasInitialized:
+    {
+        m_->controllers[castFromControllerType(ControllerType::Core)] = this;
+        m_->controllers[castFromControllerType(ControllerType::Graphics)] = new GraphicsController();
+        m_->controllers[castFromControllerType(ControllerType::Audio)] = new AudioController();
+
+        if (!m_->game.expired())
+        {
+            m_->game.lock()->doInitialize();
+        }
+
+        break;
+    }
     case ControllerMessageType::RenderWidgetWasUpdated:
     {
         auto message = msg_cast<RenderWidgetWasUpdatedMessage>(msg);
@@ -77,10 +90,6 @@ Core::Core()
     , m_(std::make_unique<CorePrivate>())
 {
     m_->renderWidget = new RenderWidget(*this);
-
-    m_->controllers[castFromControllerType(ControllerType::Core)] = this;
-    m_->controllers[castFromControllerType(ControllerType::Graphics)] = new GraphicsController();
-    m_->controllers[castFromControllerType(ControllerType::Audio)] = new AudioController();
 }
 
 Core::~Core()

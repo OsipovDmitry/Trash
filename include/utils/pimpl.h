@@ -3,7 +3,7 @@
 
 #define PIMPL(Class) \
     public: \
-    inline Class##Private& m() { return *m_; } \
-    inline const Class##Private& m() const { return *m_; }
+    template <typename T = Class##Private> inline T& m() { return dynamic_cast<T&>(*m_); } \
+    template <typename T = Class##Private> inline const T& m() const { return dynamic_cast<T&>(*m_); } \
 
 #endif // PIMPL_H

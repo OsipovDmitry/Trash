@@ -37,6 +37,13 @@ private:
     uint64_t m_startTime, m_lastUpdateTime;
 };
 
+class RenderWidgetWasInitializedMessage : public AbstractController::Message
+{
+    MESSAGE(ControllerMessageType::RenderWidgetWasInitialized)
+public:
+    RenderWidgetWasInitializedMessage() : AbstractController::Message(messageType()) {}
+};
+
 class RenderWidgetWasUpdatedMessage : public AbstractController::Message
 {
     MESSAGE(ControllerMessageType::RenderWidgetWasUpdated)

@@ -3,6 +3,7 @@
 
 #include <memory>
 
+#include <utils/pimpl.h>
 #include <utils/controller.h>
 
 #include "coreglobal.h"
