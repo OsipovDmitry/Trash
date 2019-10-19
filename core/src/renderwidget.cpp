@@ -59,6 +59,12 @@ void RenderWidget::paintGL()
     m_core.process();
 
     m_renderer->render();
+
+//    QPainter painter(this);
+//    painter.setPen(Qt::black);
+//    painter.setFont(QFont("Arial", 16));
+//    painter.drawText(0, 0, width(), height(), Qt::AlignCenter, "Hello World!");
+//    painter.end();
 }
 
 void RenderWidget::mousePressEvent(QMouseEvent *event)

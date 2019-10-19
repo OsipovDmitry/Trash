@@ -33,7 +33,7 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
     case ControllerMessageType::RenderWidgetWasInitialized:
     {
         m_->controllers[castFromControllerType(ControllerType::Core)] = this;
-        m_->controllers[castFromControllerType(ControllerType::Graphics)] = new GraphicsController();
+        m_->controllers[castFromControllerType(ControllerType::Graphics)] = new GraphicsController(m_->renderWidget->renderer());
         m_->controllers[castFromControllerType(ControllerType::Audio)] = new AudioController();
 
         if (!m_->game.expired())

@@ -2,6 +2,8 @@
 #include <QtGui/QImage>
 #include <QtCore/QFile>
 
+#include <glm/gtc/type_ptr.hpp>
+
 #include "renderer.h"
 
 #include <iostream>
@@ -10,12 +12,11 @@ Renderer::Renderer(QOpenGLExtraFunctions& functions)
     : m_functions(functions)
 {
     m_functions.glClearColor(.5f, .5f, 1.f, 1.f);
+    m_functions.glEnable(GL_DEPTH_TEST);
 }
 
 Renderer::~Renderer()
 {
-    m_functions.glDeleteBuffers(1, &m_vbo);
-    m_functions.glDeleteVertexArrays(1, &m_vao);
 }
 
 std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &vertexFile, const std::string &fragmentFile)
@@ -158,6 +159,43 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
     return std::static_pointer_cast<Texture>(object);
 }
 
+unsigned int Renderer::generateTriangle()
+{
+    static const float vertices[] {
+                -0.2f, -0.2f, -1.0f, 0.0f, 1.0f,
+                +0.2f, -0.2f, -1.0f, 1.0f, 1.0f,
+                +0.0f, +0.2f, -1.0f, 0.5f, 0.0f
+    };
+
+    static const unsigned int indices[] {0, 1, 2};
+
+    GLuint vao, vbo, ibo;
+
+    m_functions.glGenVertexArrays(1, &vao);
+    m_functions.glBindVertexArray(vao);
+
+    m_functions.glGenBuffers(1, &vbo);
+    m_functions.glBindBuffer(GL_ARRAY_BUFFER, vbo);
+    m_functions.glBufferData(GL_ARRAY_BUFFER, 5 * 3 * sizeof(float), vertices, GL_STATIC_DRAW);
+    m_functions.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
+    m_functions.glEnableVertexAttribArray(0);
+    m_functions.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<const void*>(3 * sizeof(float)));
+    m_functions.glEnableVertexAttribArray(1);
+
+    m_functions.glGenBuffers(1, &ibo);
+    m_functions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
+    m_functions.glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
+
+    m_functions.glBindVertexArray(vao);
+
+    return vao;
+}
+
+void Renderer::draw(std::shared_ptr<Drawable> drawable)
+{
+    m_drawData.insert(drawable);
+}
+
 void Renderer::resize(int width, int height)
 {
     m_functions.glViewport(0, 0, width, height);
@@ -165,48 +203,22 @@ void Renderer::resize(int width, int height)
 
 void Renderer::render()
 {
-    if (!m_renderProgram)
-        m_renderProgram = loadRenderProgram(":/resources/shader.vert", ":/resources/shader.frag");
+    m_functions.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    if (!m_texture)
-        m_texture = loadTexture(":/resources/brick.jpg");
-
-    if (!m_vao)
+    for (auto drawable : m_drawData)
     {
-        static const float vertices[] {
-            -0.7f, -0.7f, -1.0f, 0.0f, 1.0f,
-            +0.7f, -0.7f, -1.0f, 1.0f, 1.0f,
-            +0.0f, +0.7f, -1.0f, 0.5f, 0.0f,
-        };
+        auto renderProgram = drawable->renderProgram();
+        m_functions.glUseProgram(renderProgram->id);
 
-        m_functions.glGenVertexArrays(1, &m_vao);
-        m_functions.glBindVertexArray(m_vao);
+        m_functions.glUniformMatrix4fv(m_functions.glGetUniformLocation(renderProgram->id, "u_modelMatrix"), 1, false, glm::value_ptr(drawable->modelMatrix()));
 
-        m_functions.glGenBuffers(1, &m_vbo);
-        m_functions.glBindBuffer(GL_ARRAY_BUFFER, m_vbo);
-        m_functions.glBufferData(GL_ARRAY_BUFFER, 15 * sizeof(float), vertices, GL_STATIC_DRAW);
+        m_functions.glUniform1i(m_functions.glGetUniformLocation(renderProgram->id, "u_diffuseMap"), 0);
+        m_functions.glActiveTexture(GL_TEXTURE0);
+        m_functions.glBindTexture(GL_TEXTURE_2D, drawable->diffuseTexture()->id);
 
-        m_functions.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<const GLvoid*>(0 * sizeof(float)));
-        m_functions.glEnableVertexAttribArray(0);
+        m_functions.glBindVertexArray(drawable->vao());
+        m_functions.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(drawable->numIndices()), GL_UNSIGNED_INT, nullptr);
 
-        m_functions.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<const GLvoid*>(3 * sizeof(float)));
-        m_functions.glEnableVertexAttribArray(1);
-
-        m_functions.glBindVertexArray(0);
     }
-
-    m_functions.glClear(GL_COLOR_BUFFER_BIT);
-
-    m_functions.glUseProgram(m_renderProgram->id);
-    m_functions.glBindVertexArray(m_vao);
-
-    m_functions.glUniform1i(m_functions.glGetUniformLocation(m_renderProgram->id, "u_diffuseMap"), 0);
-    m_functions.glActiveTexture(GL_TEXTURE0);
-    m_functions.glBindTexture(GL_TEXTURE_2D, m_texture->id);
-
-    m_functions.glDrawArrays(GL_TRIANGLES, 0, 3);
-
-    m_functions.glUseProgram(0);
-    m_functions.glBindVertexArray(0);
-
+    m_drawData.clear();
 }
