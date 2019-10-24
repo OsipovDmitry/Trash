@@ -6,6 +6,7 @@
 
 #include <core/core.h>
 
+#include "coreprivate.h"
 #include "renderwidget.h"
 #include "renderer.h"
 

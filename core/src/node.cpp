@@ -1,9 +1,6 @@
 #include <utils/transform.h>
-#include <core/core.h>
-#include <core/graphicscontroller.h>
 #include <core/node.h>
 
-#include "graphicscontrollerprivate.h"
 #include "nodeprivate.h"
 
 Node::Node()

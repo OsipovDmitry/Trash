@@ -1,7 +1,6 @@
 #ifndef GRAPHICSCONTROLLER_H
 #define GRAPHICSCONTROLLER_H
 
-#include <memory>
 
 #include <utils/pimpl.h>
 #include <utils/controller.h>
@@ -29,8 +28,6 @@ protected:
 private:
     GraphicsController(Renderer&);
     ~GraphicsController() override;
-
-    std::unique_ptr<GraphicsControllerPrivate> m_;
 
     friend class Core;
 };

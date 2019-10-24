@@ -1,22 +1,25 @@
 #include <core/abstractcontroller.h>
 
+#include "abstractcontrollerprivate.h"
+
 void AbstractController::sendMessage(std::shared_ptr<AbstractController::Message> msg)
 {
-    m_messages.push_back(msg);
+    m_->messages.push_back(msg);
+}
+
+AbstractController::AbstractController(AbstractControllerPrivate *p)
+    : m_(std::unique_ptr<AbstractControllerPrivate>(p))
+{
 }
 
 void AbstractController::process()
 {
-    while (!m_messages.empty())
+    while (!m_->messages.empty())
     {
-        auto msg = m_messages.front();
-        m_messages.pop_front();
+        auto msg = m_->messages.front();
+        m_->messages.pop_front();
         doWork(msg);
     }
-}
-
-AbstractController::AbstractController()
-{
 }
 
 ControllerMessageType AbstractController::Message::type() const

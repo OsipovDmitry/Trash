@@ -5,22 +5,24 @@
 
 std::shared_ptr<const Node> GraphicsController::rootNode() const
 {
-    return m_->rootNode;
+    return m().rootNode;
 }
 
 std::shared_ptr<Node> GraphicsController::rootNode()
 {
-    return m_->rootNode;
+    return m().rootNode;
 }
 
 void GraphicsController::doWork(std::shared_ptr<AbstractController::Message> msg)
 {
+    auto& gcPrivate = m();
+
     switch (msg->type())
     {
     case ControllerMessageType::Update:
     {
         auto updateMessage = msg_cast<UpdateMessage>(msg);
-        m_->updateScene(updateMessage->time, updateMessage->dt);
+        gcPrivate.updateScene(updateMessage->time, updateMessage->dt);
         break;
     }
     default:
@@ -29,8 +31,7 @@ void GraphicsController::doWork(std::shared_ptr<AbstractController::Message> msg
 }
 
 GraphicsController::GraphicsController(Renderer& renderer)
-    : AbstractController()
-    , m_(std::make_unique<GraphicsControllerPrivate>(renderer))
+    : AbstractController(new GraphicsControllerPrivate(renderer))
 {
 }
 

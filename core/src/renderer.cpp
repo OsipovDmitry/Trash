@@ -5,23 +5,14 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "renderer.h"
+#include "model.inl"
 
 #include <iostream>
 
 Renderer::Renderer(QOpenGLExtraFunctions& functions)
     : m_functions(functions)
 {
-    m_functions.glClearColor(.5f, .5f, 1.f, 1.f);
-    m_functions.glEnable(GL_DEPTH_TEST);
-}
-
-Renderer::~Renderer()
-{
-}
-
-std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &vertexFile, const std::string &fragmentFile)
-{
-    static auto loadShader = [this](const std::string& filename, GLenum type, std::string& log) -> GLuint {
+    m_loadShader = [this](const std::string& filename, GLenum type, std::string& log) -> GLuint {
         QFile file(QString::fromStdString(filename));
 
         if (!file.open(QFile::ReadOnly))
@@ -55,13 +46,11 @@ std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &ve
         return id;
     };
 
-    static auto deleteShader = [this](GLuint id) {
-        if (!id)
-            return;
+    m_deleteShader = [this](GLuint id) {
         m_functions.glDeleteShader(id);
     };
 
-    static auto loadProgram = [this](GLuint vertexId, GLuint fragmentId, std::string& log) -> GLuint
+    m_loadProgram = [this](GLuint vertexId, GLuint fragmentId, std::string& log) -> GLuint
     {
         if (!vertexId || !fragmentId)
             return 0;
@@ -88,42 +77,67 @@ std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &ve
         return id;
     };
 
-    static auto deleteProgram = [this](GLuint id) {
+    m_deleteProgram = [this](GLuint id) {
         if (!id)
             return;
         GLuint shaders[2];
         GLsizei count = 0;
         m_functions.glGetAttachedShaders(id, 2, &count, shaders);
         m_functions.glDetachShader(id, shaders[0]);
-        deleteShader(shaders[0]);
+        m_deleteShader(shaders[0]);
         m_functions.glDetachShader(id, shaders[1]);
-        deleteShader(shaders[1]);
+        m_deleteShader(shaders[1]);
         m_functions.glDeleteProgram(id);
     };
 
-    static auto deleter = [](RenderProgram* p) {
-        deleteProgram(p->id);
+    m_renderProgramDeleter = [this](RenderProgram* p) {
+        m_deleteProgram(p->id);
         delete p;
     };
 
+    m_textureDeleter = [this](Texture* p) {
+        m_functions.glDeleteTextures(1, &(p->id));
+        delete p;
+    };
+
+    m_meshDeleter = [this](Model::Mesh* p) {
+        m_functions.glDeleteVertexArrays(1, &p->vao);
+        m_functions.glDeleteBuffers(1, &p->vbo);
+        m_functions.glDeleteBuffers(1, &p->ibo);
+        delete p;
+    };
+
+    m_standardTexture = loadTexture(":/res/chess.png");
+    generateMipmaps(m_standardTexture);
+
+    m_functions.glClearColor(.5f, .5f, 1.f, 1.f);
+    m_functions.glEnable(GL_DEPTH_TEST);
+}
+
+Renderer::~Renderer()
+{
+}
+
+std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &vertexFile, const std::string &fragmentFile)
+{
     const std::string key = vertexFile+fragmentFile;
     auto object = ResourceStorage::instance().get(key);
     if (!object)
     {
         std::string vertexLog, fragmentLog, programLog;
-        GLuint vertexId = loadShader(vertexFile, GL_VERTEX_SHADER, vertexLog);
-        GLuint fragmentId = loadShader(fragmentFile, GL_FRAGMENT_SHADER, fragmentLog);
-        GLuint programId = loadProgram(vertexId, fragmentId, programLog);
+        GLuint vertexId = m_loadShader(vertexFile, GL_VERTEX_SHADER, vertexLog);
+        GLuint fragmentId = m_loadShader(fragmentFile, GL_FRAGMENT_SHADER, fragmentLog);
+        GLuint programId = m_loadProgram(vertexId, fragmentId, programLog);
         if (!vertexId || !fragmentId || !programId)
         {
-            deleteShader(vertexId);
-            deleteShader(fragmentId);
+            m_deleteShader(vertexId);
+            m_deleteShader(fragmentId);
             std::cout <<
                          "Vertex: " << vertexLog <<
                          "Fragment: " << fragmentLog <<
                          "Program: " << programLog << std::endl;
         }
-        object = std::shared_ptr<RenderProgram>(new RenderProgram(programId), deleter);
+        object = std::shared_ptr<RenderProgram>(new RenderProgram(programId), m_renderProgramDeleter);
         ResourceStorage::instance().store(key, object);
     }
 
@@ -132,11 +146,6 @@ std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &ve
 
 std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
 {
-    static auto deleter = [this](Texture* p) {
-        m_functions.glDeleteTextures(1, &(p->id));
-        delete p;
-    };
-
     auto object = ResourceStorage::instance().get(filename);
     if (!object)
     {
@@ -152,73 +161,65 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
         m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
         m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
-        object = std::shared_ptr<Texture>(new Texture(id), deleter);
+        object = std::shared_ptr<Texture>(new Texture(id), m_textureDeleter);
         ResourceStorage::instance().store(filename, object);
     }
 
     return std::static_pointer_cast<Texture>(object);
 }
 
-unsigned int Renderer::generateTriangle()
+void Renderer::generateMipmaps(std::shared_ptr<Texture> texture)
 {
-    static const float vertices[] {
-                -0.2f, -0.2f, -1.0f, 0.0f, 1.0f,
-                +0.2f, -0.2f, -1.0f, 1.0f, 1.0f,
-                +0.0f, +0.2f, -1.0f, 0.5f, 0.0f
-    };
-
-    static const unsigned int indices[] {0, 1, 2};
-
-    GLuint vao, vbo, ibo;
-
-    m_functions.glGenVertexArrays(1, &vao);
-    m_functions.glBindVertexArray(vao);
-
-    m_functions.glGenBuffers(1, &vbo);
-    m_functions.glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    m_functions.glBufferData(GL_ARRAY_BUFFER, 5 * 3 * sizeof(float), vertices, GL_STATIC_DRAW);
-    m_functions.glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 5 * sizeof(float), nullptr);
-    m_functions.glEnableVertexAttribArray(0);
-    m_functions.glVertexAttribPointer(1, 2, GL_FLOAT, GL_FALSE, 5 * sizeof(float), reinterpret_cast<const void*>(3 * sizeof(float)));
-    m_functions.glEnableVertexAttribArray(1);
-
-    m_functions.glGenBuffers(1, &ibo);
-    m_functions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-    m_functions.glBufferData(GL_ELEMENT_ARRAY_BUFFER, 3 * sizeof(unsigned int), indices, GL_STATIC_DRAW);
-
-    m_functions.glBindVertexArray(vao);
-
-    return vao;
+    m_functions.glBindTexture(GL_TEXTURE_2D, texture->id);
+    m_functions.glGenerateMipmap(GL_TEXTURE_2D);
+    m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
-void Renderer::draw(std::shared_ptr<Drawable> drawable)
+void Renderer::draw(uint32_t layerId, std::shared_ptr<Drawable> drawable, const Transform& transform)
 {
-    m_drawData.insert(drawable);
+    m_drawData.insert({layerId, std::make_pair(drawable, transform)});
 }
 
 void Renderer::resize(int width, int height)
 {
     m_functions.glViewport(0, 0, width, height);
+    m_projMatrix = glm::perspective(glm::pi<float>() * 0.25f, (float)width/(float)height, 0.5f, 2000.0f);
 }
 
 void Renderer::render()
 {
     m_functions.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    for (auto drawable : m_drawData)
+    for (DrawDataType::iterator begin = m_drawData.begin(); begin != m_drawData.end(); )
     {
+        DrawDataType::iterator end = m_drawData.upper_bound(begin->first);
+        renderLayer(begin, end);
+        begin = end;
+    }
+    m_drawData.clear();
+}
+
+void Renderer::renderLayer(DrawDataType::iterator begin, DrawDataType::iterator end)
+{
+    //uint32_t layerId = begin->first;
+
+    for (; begin != end; ++begin)
+    {
+        auto drawable = begin->second.first;
+        const auto& transform = begin->second.second;
+
         auto renderProgram = drawable->renderProgram();
         m_functions.glUseProgram(renderProgram->id);
 
-        m_functions.glUniformMatrix4fv(m_functions.glGetUniformLocation(renderProgram->id, "u_modelMatrix"), 1, false, glm::value_ptr(drawable->modelMatrix()));
+        m_functions.glUniformMatrix4fv(m_functions.glGetUniformLocation(renderProgram->id, "u_projMatrix"), 1, false, glm::value_ptr(m_projMatrix));
+        m_functions.glUniformMatrix4fv(m_functions.glGetUniformLocation(renderProgram->id, "u_modelMatrix"), 1, false, glm::value_ptr(transform.operator glm::mat4x4()));
 
         m_functions.glUniform1i(m_functions.glGetUniformLocation(renderProgram->id, "u_diffuseMap"), 0);
         m_functions.glActiveTexture(GL_TEXTURE0);
-        m_functions.glBindTexture(GL_TEXTURE_2D, drawable->diffuseTexture()->id);
+        m_functions.glBindTexture(GL_TEXTURE_2D, drawable->diffuseTexture() ? drawable->diffuseTexture()->id : m_standardTexture->id);
 
         m_functions.glBindVertexArray(drawable->vao());
         m_functions.glDrawElements(GL_TRIANGLES, static_cast<GLsizei>(drawable->numIndices()), GL_UNSIGNED_INT, nullptr);
-
     }
-    m_drawData.clear();
 }

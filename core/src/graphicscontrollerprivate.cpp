@@ -5,10 +5,15 @@
 #include "graphicscontrollerprivate.h"
 #include "nodeprivate.h"
 
-GraphicsControllerPrivate::GraphicsControllerPrivate(Renderer &r)
-    : renderer(r)
+GraphicsControllerPrivate::GraphicsControllerPrivate(Renderer& r)
+    : AbstractControllerPrivate()
+    , renderer(r)
 {
     rootNode = std::make_shared<Node>();
+}
+
+GraphicsControllerPrivate::~GraphicsControllerPrivate()
+{
 }
 
 void GraphicsControllerPrivate::updateScene(uint64_t time, uint64_t dt)

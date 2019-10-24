@@ -35,8 +35,6 @@ protected:
 private:
     Core();
     ~Core() override;
-
-    std::unique_ptr<CorePrivate> m_;
 };
 
 class UpdateMessage : public AbstractController::Message

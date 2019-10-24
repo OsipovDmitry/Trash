@@ -1,6 +1,7 @@
 #ifndef GRAPH_H
 #define GRAPH_H
 
+#include <assert.h>
 #include <vector>
 #include <memory>
 #include <algorithm>
@@ -14,7 +15,14 @@ class TreeNode
 
 public:
     TreeNode() {}
-    virtual ~TreeNode() = default;
+    virtual ~TreeNode()
+    {
+        for (auto chld : m_children)
+        {
+            chld->TreeNode<T>::doDetach();
+            chld->m_parent = nullptr;
+        }
+    }
 
     void attach(std::shared_ptr<T> node)
     {
@@ -27,7 +35,7 @@ public:
 
     bool detach(std::shared_ptr<T> node)
     {
-        if (node->m_parent != dynamic_cast<T*>(this)) return false;
+        if (node->m_parent != this) return false;
         auto it = std::find(m_children.begin(), m_children.end(), node);
         if (it == m_children.end()) return false;
         node->TreeNode<T>::doDetach();

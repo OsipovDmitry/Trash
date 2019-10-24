@@ -16,13 +16,16 @@ HEADERS += \
     ../include/core/audiocontroller.h \
     ../include/core/abstractgame.h \
     ../include/core/node.h \
-    ../include/core/trianglenode.h \
+    ../include/core/modelnode.h \
     src/renderwidget.h \
     src/coreprivate.h \
     src/renderer.h \
     src/resourcestorage.h \
+    src/model.inl \
     src/nodeprivate.h \
-    src/graphicscontrollerprivate.h
+    src/graphicscontrollerprivate.h \
+    src/abstractcontrollerprivate.h \
+    src/modelnodeprivate.h
 
 SOURCES += \
     src/abstractcontroller.cpp \
@@ -35,7 +38,12 @@ SOURCES += \
     src/node.cpp \
     src/nodeprivate.cpp \
     src/graphicscontrollerprivate.cpp \
-    src/trianglenode.cpp
+    src/coreprivate.cpp \
+    src/modelnode.cpp \
+    src/modelnodeprivate.cpp
+
+LIBS += \
+    -lassimp-vc140-mt
 
 RESOURCES += \
     core.qrc

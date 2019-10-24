@@ -3,16 +3,18 @@
 
 #include <inttypes.h>
 #include <memory>
-#include <deque>
 
 #include <utils/noncopyble.h>
 #include <utils/pimpl.h>
 
 enum class ControllerMessageType : uint32_t;
 
+class AbstractControllerPrivate;
+
 class AbstractController
 {
     NONCOPYBLE(AbstractController)
+    PIMPL(AbstractController)
 
 public:
     class Message;
@@ -21,13 +23,12 @@ public:
     void process();
 
 protected:
-    AbstractController();
+    AbstractController(AbstractControllerPrivate *);
     virtual ~AbstractController() = default;
 
     virtual void doWork(std::shared_ptr<Message>) {}
 
-private:
-    std::deque<std::shared_ptr<AbstractController::Message>> m_messages;
+    std::unique_ptr<AbstractControllerPrivate> m_;
 };
 
 class AbstractController::Message

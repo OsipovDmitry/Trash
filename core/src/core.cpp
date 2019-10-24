@@ -8,37 +8,39 @@
 
 QWidget& Core::renderWidget()
 {
-    return *m_->renderWidget;
+    return *m().renderWidget;
 }
 
 GraphicsController& Core::graphicsController()
 {
-    return static_cast<GraphicsController&>(*m_->controllers[castFromControllerType(ControllerType::Graphics)]);
+    return static_cast<GraphicsController&>(*m().controllers[castFromControllerType(ControllerType::Graphics)]);
 }
 
 AudioController &Core::audioController()
 {
-    return static_cast<AudioController&>(*m_->controllers[castFromControllerType(ControllerType::Audio)]);
+    return static_cast<AudioController&>(*m().controllers[castFromControllerType(ControllerType::Audio)]);
 }
 
 void Core::setGame(std::shared_ptr<AbstractGame> game)
 {
-    m_->game = game;
+    m().game = game;
 }
 
 void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
 {
+    auto& corePrivate = m();
+
     switch (msg->type())
     {
     case ControllerMessageType::RenderWidgetWasInitialized:
     {
-        m_->controllers[castFromControllerType(ControllerType::Core)] = this;
-        m_->controllers[castFromControllerType(ControllerType::Graphics)] = new GraphicsController(m_->renderWidget->renderer());
-        m_->controllers[castFromControllerType(ControllerType::Audio)] = new AudioController();
+        corePrivate.controllers[castFromControllerType(ControllerType::Core)] = this;
+        corePrivate.controllers[castFromControllerType(ControllerType::Graphics)] = new GraphicsController(corePrivate.renderWidget->renderer());
+        corePrivate.controllers[castFromControllerType(ControllerType::Audio)] = new AudioController();
 
-        if (!m_->game.expired())
+        if (!corePrivate.game.expired())
         {
-            m_->game.lock()->doInitialize();
+            corePrivate.game.lock()->doInitialize();
         }
 
         break;
@@ -47,7 +49,7 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
     {
         auto message = msg_cast<RenderWidgetWasUpdatedMessage>(msg);
         auto updateMessage = std::make_shared<UpdateMessage>(message->time, message->dt);
-        for (auto controller : m_->controllers)
+        for (auto controller : corePrivate.controllers)
         {
             controller->sendMessage(updateMessage);
             controller->process();
@@ -57,26 +59,24 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
     case ControllerMessageType::RenderWidgetWasClicked:
     {
         auto message = msg_cast<RenderWidgetWasClickedMessage>(msg);
-        if (!m_->game.expired())
+        if (!corePrivate.game.expired())
         {
-            m_->game.lock()->doMouseClick(message->x, message->y);
+            corePrivate.game.lock()->doMouseClick(message->x, message->y);
         }
         break;
     }
     case ControllerMessageType::RenderWidgetWasClosed:
     {
-        delete static_cast<GraphicsController*>(m_->controllers[castFromControllerType(ControllerType::Graphics)]);
-        delete static_cast<AudioController*>(m_->controllers[castFromControllerType(ControllerType::Audio)]);
-        m_ = nullptr;
-
+        delete static_cast<GraphicsController*>(corePrivate.controllers[castFromControllerType(ControllerType::Graphics)]);
+        delete static_cast<AudioController*>(corePrivate.controllers[castFromControllerType(ControllerType::Audio)]);
         break;
     }
     case ControllerMessageType::Update:
     {
         auto updateMessage = msg_cast<UpdateMessage>(msg);
-        if (!m_->game.expired())
+        if (!corePrivate.game.expired())
         {
-            m_->game.lock()->doUpdate(updateMessage->time, updateMessage->dt);
+            corePrivate.game.lock()->doUpdate(updateMessage->time, updateMessage->dt);
         }
         break;
     }
@@ -86,10 +86,9 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
 }
 
 Core::Core()
-    : AbstractController()
-    , m_(std::make_unique<CorePrivate>())
+    : AbstractController(new CorePrivate())
 {
-    m_->renderWidget = new RenderWidget(*this);
+    m().renderWidget = new RenderWidget(*this);
 }
 
 Core::~Core()

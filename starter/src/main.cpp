@@ -6,6 +6,8 @@
 #include <core/core.h>
 #include <game/game.h>
 
+#include <iostream>
+
 int main(int argc, char *argv[])
 {
     QApplication a(argc, argv);
@@ -28,5 +30,6 @@ int main(int argc, char *argv[])
     Core::instance().renderWidget().show();
 
     int res = QApplication::exec();
+    std::cout << "finish!" << std::endl;
     return res;
 }

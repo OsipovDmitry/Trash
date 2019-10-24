@@ -1,8 +1,6 @@
 #ifndef AUDIOCONTROLLER_H
 #define AUDIOCONTROLLER_H
 
-#include <memory>
-
 #include <utils/pimpl.h>
 #include <utils/controller.h>
 

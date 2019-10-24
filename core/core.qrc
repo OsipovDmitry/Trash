@@ -1,7 +1,7 @@
 <RCC>
     <qresource prefix="/">
-        <file>resources/shader.frag</file>
-        <file>resources/shader.vert</file>
-        <file>resources/brick.jpg</file>
+        <file>res/chess.png</file>
+        <file>res/shader.frag</file>
+        <file>res/shader.vert</file>
     </qresource>
 </RCC>
