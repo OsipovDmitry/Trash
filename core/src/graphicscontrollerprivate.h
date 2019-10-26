@@ -14,6 +14,7 @@ class GraphicsControllerPrivate : public AbstractControllerPrivate
 public:
     Renderer& renderer;
     std::shared_ptr<Node> rootNode;
+    std::shared_ptr<AbstractCamera> camera;
 
     GraphicsControllerPrivate(Renderer&);
     ~GraphicsControllerPrivate();

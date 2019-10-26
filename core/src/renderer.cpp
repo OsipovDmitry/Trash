@@ -11,6 +11,8 @@
 
 Renderer::Renderer(QOpenGLExtraFunctions& functions)
     : m_functions(functions)
+    , m_projMatrix(1.0f)
+    , m_viewMatrix(1.0f)
 {
     m_loadShader = [this](const std::string& filename, GLenum type, std::string& log) -> GLuint {
         QFile file(QString::fromStdString(filename));
@@ -107,6 +109,11 @@ Renderer::Renderer(QOpenGLExtraFunctions& functions)
         delete p;
     };
 
+    m_uboDeleter = [this](UniformBuffer* p) {
+        m_functions.glDeleteBuffers(1, &(p->id));
+        delete p;
+    };
+
     m_standardTexture = loadTexture(":/res/chess.png");
     generateMipmaps(m_standardTexture);
 
@@ -168,6 +175,72 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
     return std::static_pointer_cast<Texture>(object);
 }
 
+GLuint Renderer::uniformBufferIndexByName(std::shared_ptr<RenderProgram> renderProgram, const std::string& name)
+{
+    return m_functions.glGetUniformBlockIndex(renderProgram->id, name.c_str());
+}
+
+GLint Renderer::uniformBufferDataSize(std::shared_ptr<RenderProgram> renderProgram, GLuint blockIndex)
+{
+    GLint val = -1;
+    m_functions.glGetActiveUniformBlockiv(renderProgram->id, blockIndex, GL_UNIFORM_BLOCK_DATA_SIZE, &val);
+    return val;
+}
+
+std::unordered_map<std::string, int32_t> Renderer::uniformBufferOffsets(std::shared_ptr<RenderProgram> renderProgram, GLuint blockIndex)
+{
+    std::unordered_map<std::string, int32_t> result;
+
+    GLint count = -1;
+    m_functions.glGetActiveUniformBlockiv(renderProgram->id, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS, &count);
+
+    if (count >= 0)
+    {
+        std::vector<GLuint> indices(static_cast<size_t>(count));
+        m_functions.glGetActiveUniformBlockiv(renderProgram->id, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES, reinterpret_cast<GLint*>(indices.data()));
+
+        std::vector<GLint> nameLengths(static_cast<size_t>(count));
+        std::string name;
+        std::vector<GLint> offsets(static_cast<size_t>(count));
+        GLsizei length;
+        GLint size;
+        GLenum type;
+        m_functions.glGetActiveUniformsiv(renderProgram->id, count, indices.data(), GL_UNIFORM_NAME_LENGTH, nameLengths.data());
+        m_functions.glGetActiveUniformsiv(renderProgram->id, count, indices.data(), GL_UNIFORM_OFFSET, offsets.data());
+
+        for (size_t i = 0; i < static_cast<size_t>(count); ++i)
+        {
+            name.resize(static_cast<size_t>(nameLengths[i]));
+            m_functions.glGetActiveUniform(renderProgram->id, indices[i], nameLengths[i], &length, &size, &type, &(name[0]));
+            name.resize(static_cast<size_t>(nameLengths[i])-1);
+            result[name] = offsets[i];
+        }
+    }
+
+    return result;
+}
+
+std::shared_ptr<UniformBuffer> Renderer::createUniformBuffer(GLsizeiptr size, GLenum usage)
+{
+    GLuint id;
+    m_functions.glGenBuffers(1, &id);
+    m_functions.glBindBuffer(GL_UNIFORM_BUFFER, id);
+    m_functions.glBufferData(GL_UNIFORM_BUFFER, size, nullptr, usage);
+
+    return std::shared_ptr<UniformBuffer>(new UniformBuffer(id), m_uboDeleter);
+}
+
+void *Renderer::mapUniformBuffer(std::shared_ptr<UniformBuffer> uniformBuffer, GLintptr offset, GLsizeiptr size, GLbitfield access)
+{
+    m_functions.glBindBuffer(GL_UNIFORM_BUFFER, uniformBuffer->id);
+    return m_functions.glMapBufferRange(GL_UNIFORM_BUFFER, offset, size, access);
+}
+
+void Renderer::unmapUniformBuffer()
+{
+    m_functions.glUnmapBuffer(GL_UNIFORM_BUFFER);
+}
+
 void Renderer::generateMipmaps(std::shared_ptr<Texture> texture)
 {
     m_functions.glBindTexture(GL_TEXTURE_2D, texture->id);
@@ -181,10 +254,21 @@ void Renderer::draw(uint32_t layerId, std::shared_ptr<Drawable> drawable, const 
     m_drawData.insert({layerId, std::make_pair(drawable, transform)});
 }
 
+void Renderer::setViewMatrix(const glm::mat4x4& value)
+{
+    m_viewMatrix = value;
+}
+
+void Renderer::setDepths(float znear, float zfar)
+{
+    m_zNear = znear;
+    m_zFar = zfar;
+}
+
 void Renderer::resize(int width, int height)
 {
     m_functions.glViewport(0, 0, width, height);
-    m_projMatrix = glm::perspective(glm::pi<float>() * 0.25f, (float)width/(float)height, 0.5f, 2000.0f);
+    m_projMatrix = glm::perspective(glm::pi<float>() * 0.25f, (float)width/(float)height, m_zNear, m_zFar);
 }
 
 void Renderer::render()
@@ -213,7 +297,10 @@ void Renderer::renderLayer(DrawDataType::iterator begin, DrawDataType::iterator 
         m_functions.glUseProgram(renderProgram->id);
 
         m_functions.glUniformMatrix4fv(m_functions.glGetUniformLocation(renderProgram->id, "u_projMatrix"), 1, false, glm::value_ptr(m_projMatrix));
+        m_functions.glUniformMatrix4fv(m_functions.glGetUniformLocation(renderProgram->id, "u_viewMatrix"), 1, false, glm::value_ptr(m_viewMatrix));
         m_functions.glUniformMatrix4fv(m_functions.glGetUniformLocation(renderProgram->id, "u_modelMatrix"), 1, false, glm::value_ptr(transform.operator glm::mat4x4()));
+
+        m_functions.glBindBufferBase(GL_UNIFORM_BUFFER, uniformBufferIndexByName(renderProgram, "u_ModelData"), drawable->bufferData()->id);
 
         m_functions.glUniform1i(m_functions.glGetUniformLocation(renderProgram->id, "u_diffuseMap"), 0);
         m_functions.glActiveTexture(GL_TEXTURE0);

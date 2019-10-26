@@ -16,3 +16,5 @@ SOURCES += \
 LIBS += \
     -lcore
 
+RESOURCES +=
+

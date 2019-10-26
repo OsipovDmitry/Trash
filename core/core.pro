@@ -17,6 +17,7 @@ HEADERS += \
     ../include/core/abstractgame.h \
     ../include/core/node.h \
     ../include/core/modelnode.h \
+    ../include/core/abstractcamera.h \
     src/renderwidget.h \
     src/coreprivate.h \
     src/renderer.h \

@@ -9,5 +9,6 @@ class GraphicsController;
 class AudioController;
 class AbstractGame;
 class Node;
+class AbstractCamera;
 
 #endif // COREFORWARDDECL_H

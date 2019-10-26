@@ -7,6 +7,7 @@
 
 struct RenderProgram;
 struct Model;
+struct UniformBuffer;
 
 class ModelNodePrivate : public NodePrivate
 {
@@ -18,8 +19,10 @@ public:
     std::string modelName;
     std::shared_ptr<Model> model;
     std::shared_ptr<RenderProgram> renderProgram;
+    std::shared_ptr<UniformBuffer> modelBuffer;
     std::string animationName;
     uint32_t timeOffset;
+    bool showBones;
 };
 
 #endif // MODELNODEPRIVATE_H

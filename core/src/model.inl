@@ -47,6 +47,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
             materials[m] = materialTo;
         }
 
+        std::unordered_map<std::string, int32_t> boneMapping;
         std::vector<std::shared_ptr<Model::Mesh>> meshes(scene->mNumMeshes);
         for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
         {
@@ -56,6 +57,9 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
             if (mesh->HasPositions()) { vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::Position)); }
             if (mesh->HasNormals()) { vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::Normal)); }
             if (mesh->HasTextureCoords(0)) { vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::TexCoord)); }
+            if (mesh->HasBones()) {
+                vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::BonesIDs));
+                vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::BonesWeights)); }
             if (mesh->HasTangentsAndBitangents()) { vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::TangentBinormal)); }
 
             uint32_t vdSize = vertexDeclarationSize(vertexDeclaration);
@@ -88,6 +92,73 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                     std::memcpy(vertices.data() + vdSize * i + offset,
                                 mesh->mTextureCoords[0] + i,
                                 numAttributeComponents(VertexAttribute::TexCoord) * sizeof(float));
+            }
+
+            if (mesh->HasBones())
+            {
+                const uint32_t offsetIds = vertexDeclarationOffset(vertexDeclaration, VertexAttribute::BonesIDs);
+                const uint32_t offsetWeights = vertexDeclarationOffset(vertexDeclaration, VertexAttribute::BonesWeights);
+                for (unsigned int i = 0; i < mesh->mNumBones; ++i)
+                {
+                    auto& bone = mesh->mBones[i];
+
+                    int32_t boneIndex;
+                    std::string boneName = bone->mName.C_Str();
+
+                    auto it = boneMapping.find(boneName);
+                    if (it == boneMapping.end())
+                    {
+                        boneIndex = static_cast<int32_t>(model->boneTransforms.size());
+                        boneMapping[boneName] = boneIndex;
+
+                        aiVector3D t, s;
+                        aiQuaternion r;
+                        bone->mOffsetMatrix.Decompose(s, r, t);
+
+                        model->boneNames.push_back(boneName);
+                        model->boneTransforms.push_back(Transform(glm::vec3(s.x, s.y, s.z), glm::quat(r.w, r.x, r.y, r.z), glm::vec3(t.x, t.y, t.z)));
+
+                    }
+                    else
+                    {
+                        boneIndex = it->second;
+                    }
+
+
+                    for (unsigned int j = 0; j < bone->mNumWeights; ++j)
+                    {
+                        auto& weight = bone->mWeights[j];
+                        float* vertexBoneId = vertices.data() + vdSize * weight.mVertexId + offsetIds;
+                        float* vertexBoneWeights = vertices.data() + vdSize * weight.mVertexId + offsetWeights;
+                        unsigned int k = 4;
+                        while (k > 0 && vertexBoneWeights[k-1] < weight.mWeight)
+                            --k;
+                        for (unsigned int t = 3; t > k; --t)
+                        {
+                            vertexBoneWeights[t] = vertexBoneWeights[t-1];
+                            vertexBoneId[t] = vertexBoneId[t-1];
+                        }
+                        if (k < 4)
+                        {
+                            vertexBoneWeights[k] = weight.mWeight;
+                            vertexBoneId[k] = static_cast<float>(boneIndex);
+                        }
+                    }
+                }
+                for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
+                {
+                    float weight = (vertices.data() + vdSize * i + offsetWeights)[0]
+                            + (vertices.data() + vdSize * i + offsetWeights)[1]
+                            + (vertices.data() + vdSize * i + offsetWeights)[2]
+                            + (vertices.data() + vdSize * i + offsetWeights)[3];
+                    if (weight > 0.0f)
+                    {
+                        (vertices.data() + vdSize * i + offsetWeights)[0] /= weight;
+                        (vertices.data() + vdSize * i + offsetWeights)[1] /= weight;
+                        (vertices.data() + vdSize * i + offsetWeights)[2] /= weight;
+                        (vertices.data() + vdSize * i + offsetWeights)[3] /= weight;
+                    }
+                }
             }
 
             if (mesh->HasTangentsAndBitangents())
@@ -153,6 +224,53 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
             meshes[m] = meshTo;
         }
 
+        for (unsigned int a = 0; a < scene->mNumAnimations; ++a)
+        {
+            auto animFrom = scene->mAnimations[a];
+            auto animTo = std::make_shared<Model::Animation>(static_cast<float>(animFrom->mTicksPerSecond),static_cast<float>(animFrom->mDuration));
+            model->animations[animFrom->mName.C_Str()] = animTo;
+
+            for (unsigned int c = 0; c < animFrom->mNumChannels; ++c)
+            {
+                auto animNode = animFrom->mChannels[c];
+                std::string boneName = animNode->mNodeName.C_Str();
+
+                auto iter = boneMapping.find(boneName);
+                if (iter == boneMapping.end())
+                    continue;
+
+                //auto boneIndex = iter->second;
+                auto& transformsTuple = animTo->transforms[boneName];
+
+                auto& scales = std::get<0>(transformsTuple);
+                scales.resize(static_cast<size_t>(animNode->mNumScalingKeys));
+                for (unsigned int i = 0; i < animNode->mNumScalingKeys; ++i)
+                {
+                    auto& key = animNode->mScalingKeys[i];
+                    scales[i] = std::make_pair(static_cast<float>(key.mTime),
+                                               glm::vec3(key.mValue.x, key.mValue.y, key.mValue.z));
+                }
+
+                auto& rotations = std::get<1>(transformsTuple);
+                rotations.resize(animNode->mNumRotationKeys);
+                for (unsigned int i = 0; i < animNode->mNumRotationKeys; ++i)
+                {
+                    auto& key = animNode->mRotationKeys[i];
+                    rotations[i] = std::make_pair(static_cast<float>(key.mTime),
+                                                  glm::quat(key.mValue.w, key.mValue.x, key.mValue.y, key.mValue.z));
+                }
+
+                auto& translations = std::get<2>(transformsTuple);
+                translations.resize(animNode->mNumPositionKeys);
+                for (unsigned int i = 0; i < animNode->mNumPositionKeys; ++i)
+                {
+                    auto& key = animNode->mPositionKeys[i];
+                    translations[i] = std::make_pair(static_cast<float>(key.mTime),
+                                                     glm::vec3(key.mValue.x, key.mValue.y, key.mValue.z));
+                }
+            }
+        }
+
         auto copyNode = [&meshes](aiNode* node) -> std::shared_ptr<Model::Node> {
             aiVector3D t, s;
             aiQuaternion r;
@@ -176,6 +294,10 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
             auto nodeTo = nodes.front().second;
             nodes.pop();
 
+            auto iter = boneMapping.find(nodeFrom->mName.C_Str());
+            if (iter != boneMapping.end())
+                nodeTo->boneIndex = iter->second;
+
             for (unsigned int i = 0; i < nodeFrom->mNumChildren; ++i)
             {
                 auto childFrom = nodeFrom->mChildren[i];
@@ -190,4 +312,98 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
     }
 
     return std::static_pointer_cast<Model>(object);
+}
+
+uint32_t Model::numBones() const
+{
+    return static_cast<uint32_t>(boneTransforms.size());
+}
+
+bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, std::vector<Transform>& transforms)
+{
+    transforms.resize(numBones());
+
+    auto iter = animations.find(animName);
+    if (iter == animations.end())
+    {
+        for (auto& transform : transforms)
+            transform = Transform();
+        return false;
+    }
+
+    auto animation = iter->second;
+
+    float ticksPerSecond = animation->framesPerSecond > 0.0f ? animation->framesPerSecond : 25.0f;
+    float timeInTicks = timeInSecs * ticksPerSecond;
+    float animTime = std::fmod(timeInTicks, animation->duration);
+
+    std::queue<std::pair<std::shared_ptr<Node>, Transform>> nodes;
+    if (rootNode)
+        nodes.push(std::make_pair(rootNode, Transform()));
+    while (!nodes.empty())
+    {
+        auto node = nodes.front().first;
+        auto parentTransform = nodes.front().second;
+        nodes.pop();
+
+        Transform globalTransform = parentTransform;
+        if (node->boneIndex >= 0)
+        {
+            Transform boneTransform = node->transform;
+            auto& transformTuple = animation->transforms[boneNames[node->boneIndex]];
+
+            auto& scales = std::get<0>(transformTuple);
+            if (scales.size() == 1)
+                boneTransform.scale = scales.front().second;
+            else if (scales.size() > 1)
+            {
+                for (unsigned int i = 0; i < scales.size() - 1; ++i)
+                    if (animTime < scales[i+1].first)
+                    {
+                        float factor = (animTime - scales[i].first) / (scales[i+1].first - scales[i].first);
+                        boneTransform.scale = glm::mix(scales[i].second, scales[i+1].second, factor);
+                        break;
+                    }
+            }
+
+            auto& rotations = std::get<1>(transformTuple);
+            if (rotations.size() == 1)
+                boneTransform.rotation = rotations.front().second;
+            else if (rotations.size() > 1)
+            {
+                for (unsigned int i = 0; i < rotations.size() - 1; ++i)
+                    if (animTime < rotations[i+1].first)
+                    {
+                        float factor = (animTime - rotations[i].first) / (rotations[i+1].first - rotations[i].first);
+                        boneTransform.rotation = glm::slerp(rotations[i].second, rotations[i+1].second, factor);
+                        break;
+                    }
+            }
+
+            auto& translations = std::get<2>(transformTuple);
+            if (translations.size() == 1)
+                boneTransform.translation = translations.front().second;
+            else if (translations.size() > 1)
+            {
+                for (unsigned int i = 0; i < translations.size() - 1; ++i)
+                    if (animTime < translations[i+1].first)
+                    {
+                        float factor = (animTime - translations[i].first) / (translations[i+1].first - translations[i].first);
+                        boneTransform.translation = glm::mix(translations[i].second, translations[i+1].second, factor);
+                        break;
+                    }
+            }
+
+            globalTransform *= boneTransform;
+            transforms[node->boneIndex] = globalTransform * boneTransforms[node->boneIndex];
+        }
+        else {
+            globalTransform *= node->transform;
+        }
+
+        for (auto child: node->children())
+            nodes.push(std::make_pair(child, globalTransform));
+    }
+
+    return true;
 }
