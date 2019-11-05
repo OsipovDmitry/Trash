@@ -1,8 +1,10 @@
 #include <core/core.h>
 #include <core/graphicscontroller.h>
 
-#include "renderer.h"
+#include "coreprivate.h"
 #include "graphicscontrollerprivate.h"
+#include "renderwidget.h"
+#include "renderer.h"
 
 std::shared_ptr<const Node> GraphicsController::rootNode() const
 {
@@ -26,7 +28,13 @@ void GraphicsController::setCamera(std::shared_ptr<AbstractCamera> value)
 
 void GraphicsController::setViewMatrix(const glm::mat4x4& value)
 {
-    m().renderer.setViewMatrix(value);
+    m().viewMatrix = value;
+    Renderer::instance().setViewMatrix(value);
+}
+
+void GraphicsController::setProjectionMatrix(float fov, float zNear, float zFar)
+{
+    Renderer::instance().setProjectionMatrix(fov, zNear, zFar);
 }
 
 void GraphicsController::doWork(std::shared_ptr<AbstractController::Message> msg)
@@ -46,9 +54,11 @@ void GraphicsController::doWork(std::shared_ptr<AbstractController::Message> msg
     }
 }
 
-GraphicsController::GraphicsController(Renderer& renderer)
-    : AbstractController(new GraphicsControllerPrivate(renderer))
+GraphicsController::GraphicsController()
+    : AbstractController(new GraphicsControllerPrivate())
 {
+    setViewMatrix(glm::mat4x4(1.0f));
+    setProjectionMatrix(glm::pi<float>() * 0.5f, 0.5f, 10000.0f);
 }
 
 GraphicsController::~GraphicsController()

@@ -2,6 +2,7 @@
 #define COREFORWARDDECL_H
 
 struct Transform;
+struct BoundingSphere;
 
 class AbstractController;
 class Core;

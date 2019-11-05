@@ -20,6 +20,7 @@ out vec2 v_texCoord;
 
 void main(void)
 {
+    //vec3 pos = a_position;
     vec3 pos = vec4(a_position, 1.0) * (u_bones[int(a_boneIDs[0])] * a_boneWeights[0] +
                u_bones[int(a_boneIDs[1])] * a_boneWeights[1] +
                u_bones[int(a_boneIDs[2])] * a_boneWeights[2] + 

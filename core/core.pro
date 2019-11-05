@@ -26,7 +26,8 @@ HEADERS += \
     src/nodeprivate.h \
     src/graphicscontrollerprivate.h \
     src/abstractcontrollerprivate.h \
-    src/modelnodeprivate.h
+    src/modelnodeprivate.h \
+    src/drawables.h
 
 SOURCES += \
     src/abstractcontroller.cpp \
@@ -41,10 +42,12 @@ SOURCES += \
     src/graphicscontrollerprivate.cpp \
     src/coreprivate.cpp \
     src/modelnode.cpp \
-    src/modelnodeprivate.cpp
+    src/modelnodeprivate.cpp \
+    src/drawables.cpp
 
 LIBS += \
-    -lassimp-vc140-mt
+#    -lassimp-vc140-mt
+    -lassimp
 
 RESOURCES += \
     core.qrc

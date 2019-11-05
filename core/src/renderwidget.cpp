@@ -6,7 +6,6 @@
 
 #include <core/core.h>
 
-#include "coreprivate.h"
 #include "renderwidget.h"
 #include "renderer.h"
 
@@ -34,13 +33,14 @@ Renderer &RenderWidget::renderer()
 void RenderWidget::initializeGL()
 {
     m_renderer = std::make_unique<Renderer>(*context()->extraFunctions());
+    m_renderer->initializeResources();
 
     m_timer = std::make_unique<QTimer>(this);
     connect(m_timer.get(), SIGNAL(timeout()), SLOT(update()));
     m_timer->setInterval(16);
     m_timer->start();
 
-    m_startTime = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
+    m_startTime = m_lastUpdateTime = m_lastFpsTime = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
 
     m_core.sendMessage(std::make_shared<RenderWidgetWasInitializedMessage>());
 }
@@ -56,16 +56,25 @@ void RenderWidget::paintGL()
     uint64_t dt = time - m_lastUpdateTime;
     m_lastUpdateTime = time;
 
+    static const uint64_t deltaFps = 300;
+    ++m_fpsCounter;
+    if (time - m_lastFpsTime >= deltaFps)
+    {
+        m_lastFps = m_fpsCounter / (0.001f * deltaFps);
+        m_fpsCounter = 0;
+        m_lastFpsTime = time;
+    }
+
     m_core.sendMessage(std::make_shared<RenderWidgetWasUpdatedMessage>(time, dt));
     m_core.process();
 
     m_renderer->render();
 
-//    QPainter painter(this);
-//    painter.setPen(Qt::black);
-//    painter.setFont(QFont("Arial", 16));
-//    painter.drawText(0, 0, width(), height(), Qt::AlignCenter, "Hello World!");
-//    painter.end();
+    QPainter painter(this);
+    painter.setPen(Qt::black);
+    painter.setFont(QFont("Arial", 16));
+    painter.drawText(10, 10, width(), height(), Qt::AlignTop | Qt::AlignLeft, "FPS: " + QString::number(static_cast<double>(m_lastFps), 'f', 1));
+    painter.end();
 }
 
 void RenderWidget::mousePressEvent(QMouseEvent *event)

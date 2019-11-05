@@ -14,7 +14,8 @@ class ModelNodePrivate : public NodePrivate
 public:
     ModelNodePrivate(Node&, const std::string&);
 
-    void doUpdate(Renderer&, uint64_t, uint64_t) override;
+    void doUpdate(uint64_t, uint64_t) override;
+    BoundingSphere calcLocalBoundingSphere() override;
 
     std::string modelName;
     std::shared_ptr<Model> model;

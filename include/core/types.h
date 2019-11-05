@@ -34,18 +34,11 @@ constexpr uint32_t numAttributeComponents(VertexAttribute attrib)
     };
     return data[castFromVertexAttribute(attrib)];
 }
-
-using VertexDeclaration = std::bitset<numElementsVertexAttribute()>;
-inline uint32_t vertexDeclarationOffset(VertexDeclaration decl, VertexAttribute attrib)
+namespace std
 {
-    uint32_t offs = 0;
-    for (unsigned int i = 0; i < castFromVertexAttribute(attrib); ++i)
-        offs += decl.test(i) ? numAttributeComponents(castToVertexAttribute(i)) : 0;
-    return offs;
-}
-inline uint32_t vertexDeclarationSize(VertexDeclaration decl)
-{
-    return vertexDeclarationOffset(decl, VertexAttribute::Count);
+template<> struct hash<VertexAttribute> {
+    std::size_t operator()(VertexAttribute const& key) const noexcept { return castFromVertexAttribute(key); }
+};
 }
 
 #endif // TYPES_H

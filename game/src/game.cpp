@@ -8,38 +8,32 @@
 
 #include <game/game.h>
 
+static const float dist = 300.0f;
+static const int n = 20;
+
 void Game::doInitialize()
 {
-    const float dist = 250.0f;
-
-    auto node1 = std::make_shared<ModelNode>("dance1.dae");
-    node1->setTransform(Transform(glm::vec3(1.0f, 1.0f, 1.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)));
-
-    auto node2 = std::make_shared<ModelNode>("dance2.dae");
-    node2->setTransform(Transform(glm::vec3(1.0f, 1.0f, 1.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(-dist, 0.0f, -dist)));
-
-    auto node3 = std::make_shared<ModelNode>("dance3.dae");
-    node3->setTransform(Transform(glm::vec3(1.0f, 1.0f, 1.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(-dist, 0.0f, +dist)));
-
-    auto node4 = std::make_shared<ModelNode>("dance4.dae");
-    node4->setTransform(Transform(glm::vec3(1.0f, 1.0f, 1.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(+dist, 0.0f, +dist)));
-
-    auto node5 = std::make_shared<ModelNode>("dance5.dae");
-    node5->setTransform(Transform(glm::vec3(1.0f, 1.0f, 1.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(+dist, 0.0f, -dist)));
+    static const std::array<std::string, 5> filenames { "dance1.dae", "dance2.dae", "dance3.dae", "dance4.dae", "dance5.dae" };
 
     auto rootNode = Core::instance().graphicsController().rootNode();
-    rootNode->attach(node1);
-    rootNode->attach(node2);
-    rootNode->attach(node3);
-    rootNode->attach(node4);
-    rootNode->attach(node5);
+    for (int i = 0; i < n; ++i)
+        for (int j = 0; j < n; ++j)
+        {
+            auto node = std::make_shared<ModelNode>(filenames[rand() % filenames.size()]);
+            node->setTransform(Transform(glm::vec3(1.f, 1.f, 1.f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3((i - .5f*n) * dist, 0.0f, (j - .5f*n) * dist)));
+            rootNode->attach(node);
+
+            node->playAnimation("", rand() % 10000);
+        }
+
+    Core::instance().graphicsController().setProjectionMatrix(glm::pi<float>() * 0.25f, 10.0f, dist * n * 10);
 }
 
 void Game::doUpdate(uint64_t time, uint64_t dt)
 {
-    const float angle = (time - m_resetTime) * 0.00006f + 0.8f;
-    const float radius = 1000.0f;
-    const float height = 500.0f;
+    const float angle = (time - m_resetTime) * 0.00003f + 0.8f;
+    const float radius = dist * n * 1.3f;
+    const float height = dist*3;
 
     Core::instance().graphicsController().setViewMatrix(
     glm::lookAt(radius * glm::vec3(cos(angle), 0.0f, sin(angle)) + glm::vec3(0.0f, height, 0.0f),

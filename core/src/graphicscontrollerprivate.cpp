@@ -5,9 +5,8 @@
 #include "graphicscontrollerprivate.h"
 #include "nodeprivate.h"
 
-GraphicsControllerPrivate::GraphicsControllerPrivate(Renderer& r)
+GraphicsControllerPrivate::GraphicsControllerPrivate()
     : AbstractControllerPrivate()
-    , renderer(r)
 {
     rootNode = std::make_shared<Node>();
 }
@@ -26,7 +25,7 @@ void GraphicsControllerPrivate::updateScene(uint64_t time, uint64_t dt)
         auto node = nodes.front();
         nodes.pop();
 
-        node->m().doUpdate(renderer, time, dt);
+        node->m().doUpdate(time, dt);
 
         for (auto child : node->children())
             nodes.push(child);

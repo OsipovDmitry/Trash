@@ -11,8 +11,6 @@
 #include "abstractcontroller.h"
 #include "types.h"
 
-class Renderer;
-
 class GraphicsControllerPrivate;
 class CORESHARED_EXPORT GraphicsController : public AbstractController
 {
@@ -27,12 +25,13 @@ public:
     void setCamera(std::shared_ptr<AbstractCamera>);
 
     void setViewMatrix(const glm::mat4x4&);
+    void setProjectionMatrix(float, float, float);
 
 protected:
     void doWork(std::shared_ptr<Message>) override;
 
 private:
-    GraphicsController(Renderer&);
+    GraphicsController();
     ~GraphicsController() override;
 
     friend class Core;

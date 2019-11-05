@@ -3,6 +3,7 @@
 
 #include <string>
 #include <unordered_map>
+#include <unordered_set>
 #include <functional>
 
 #include <QtOpenGL/QGL>
@@ -13,40 +14,85 @@
 #include <core/types.h>
 #include <utils/tree.h>
 #include <utils/transform.h>
+#include <utils/boundingsphere.h>
 #include <utils/enumclass.h>
+#include <utils/noncopyble.h>
 
 #include "resourcestorage.h"
 
 class QOpenGLExtraFunctions;
+class Drawable;
+class BoundingSphere;
 
 struct RenderProgram : public ResourceStorage::Object
 {
     GLuint id;
     RenderProgram(GLuint id_) : id(id_) {}
+    ~RenderProgram() override;
+
+    GLuint uniformBufferIndexByName(const std::string&);
+    GLint uniformBufferDataSize(GLuint);
+    std::unordered_map<std::string, GLint> uniformBufferOffsets(GLuint); // it works but don't use it better
+
+    GLint uniformLocation(const std::string&);
+
+    void setUniform(GLint, GLint);
+    void setUniform(GLint, const glm::vec4&);
+    void setUniform(GLint, const glm::mat4x4&);
 };
 
 struct Texture : public ResourceStorage::Object
 {
+    GLenum target;
     GLuint id;
-    Texture(GLuint id_) : id(id_) {}
+
+    Texture(GLuint id_) : target(GL_TEXTURE_2D), id(id_) {}
+    ~Texture() override;
+
+    void generateMipmaps();
 };
 
-struct UniformBuffer
+struct GLBuffer
 {
+    GLenum target;
     GLuint id;
-    UniformBuffer(GLuint id_) : id(id_) {}
+
+    GLBuffer(GLenum, GLsizeiptr, GLvoid*, GLenum);
+    virtual ~GLBuffer();
+
+    void *map(GLintptr, GLsizeiptr, GLbitfield);
+    void unmap();
 };
 
-class Drawable
+struct VertexBuffer : public GLBuffer
 {
-public:
-    virtual ~Drawable() = default;
-    virtual std::shared_ptr<RenderProgram> renderProgram() const { return nullptr; }
-    virtual std::shared_ptr<UniformBuffer> bufferData() const { return nullptr; }
-    virtual std::shared_ptr<Texture> diffuseTexture() const { return nullptr; }
+    VertexBuffer(GLsizeiptr, GLvoid*, GLenum);
+};
 
-    virtual GLuint vao() const { return 0; }
-    virtual uint32_t numIndices() const { return 0; }
+struct IndexBuffer : public GLBuffer
+{
+    GLsizei numIndices;
+    GLenum primitiveType;
+
+    IndexBuffer(GLenum, GLsizei, GLvoid*, GLenum);
+};
+
+struct UniformBuffer : public GLBuffer
+{
+    UniformBuffer(GLsizeiptr, GLvoid*, GLenum);
+};
+
+struct Mesh
+{
+    GLuint id;
+    std::unordered_map<VertexAttribute, std::tuple<std::shared_ptr<VertexBuffer>, GLint, GLsizei, GLsizei>> attributes;
+    std::unordered_set<std::shared_ptr<IndexBuffer>> indexBuffers;
+
+    Mesh();
+    ~Mesh();
+
+    void attachVertexBuffer(VertexAttribute, std::shared_ptr<VertexBuffer>, GLint, GLsizei, GLsizei);
+    void attachIndexBuffer(std::shared_ptr<IndexBuffer>);
 };
 
 struct Model : public ResourceStorage::Object
@@ -62,7 +108,8 @@ struct Model : public ResourceStorage::Object
     std::vector<std::string> boneNames;
 
     uint32_t numBones() const;
-    bool calcBoneTransforms(const std::string&, float, std::vector<Transform>&);
+    bool calcBoneTransforms(const std::string&, float, std::vector<Transform>&) const;
+    BoundingSphere calcBoundingSphere() const;
 };
 
 struct Model::Material
@@ -72,17 +119,14 @@ struct Model::Material
 
 struct Model::Mesh
 {
-    GLuint vao, vbo, ibo;
-    uint32_t numIndices;
-    VertexDeclaration vertexDeclaration;
+    std::shared_ptr<::Mesh> mesh;
     std::shared_ptr<Material> material;
+    BoundingSphere boundingSphere;
 
-    Mesh(GLuint vao_, GLuint vbo_, GLuint ibo_, uint32_t numIndices_, const VertexDeclaration& vertexDeclaration_)
-        : vao(vao_)
-        , vbo(vbo_)
-        , ibo(ibo_)
-        , numIndices(numIndices_)
-        , vertexDeclaration(vertexDeclaration_)
+    Mesh(std::shared_ptr<::Mesh> msh, std::shared_ptr<Material> mtl, const BoundingSphere& bs)
+        : mesh(msh)
+        , material(mtl)
+        , boundingSphere(bs)
     {}
 };
 
@@ -119,35 +163,34 @@ struct Model::Node : public TreeNode<Node>
 
 class Renderer
 {
+    NONCOPYBLE(Renderer)
+
 public:
     Renderer(QOpenGLExtraFunctions&);
-    ~Renderer();
+    void initializeResources();
+
+    static Renderer& instance();
+    QOpenGLExtraFunctions& functions();
 
     std::shared_ptr<RenderProgram> loadRenderProgram(const std::string&, const std::string&);
     std::shared_ptr<Texture> loadTexture(const std::string&);
     std::shared_ptr<Model> loadModel(const std::string&);
 
-    // render programs
-    GLuint uniformBufferIndexByName(std::shared_ptr<RenderProgram>, const std::string&);
-    GLint uniformBufferDataSize(std::shared_ptr<RenderProgram>, GLuint);
-    // it works but don't use it better
-    std::unordered_map<std::string, int32_t> uniformBufferOffsets(std::shared_ptr<RenderProgram>, GLuint);
+    // binding
+    void bindTexture(std::shared_ptr<Texture>, GLint);
+    void bindUniformBuffer(std::shared_ptr<UniformBuffer>, GLuint);
 
-    // uniform buffers
-    std::shared_ptr<UniformBuffer> createUniformBuffer(GLsizeiptr, GLenum);
-    void *mapUniformBuffer(std::shared_ptr<UniformBuffer>, GLintptr, GLsizeiptr, GLbitfield);
-    void unmapUniformBuffer();
-
-    // textures
-    void generateMipmaps(std::shared_ptr<Texture>);
+    // rendering
+    std::shared_ptr<Drawable> createSkeletalMeshDrawable(std::shared_ptr<RenderProgram>, std::shared_ptr<Model::Mesh>, std::shared_ptr<UniformBuffer>) const;
+    std::shared_ptr<Drawable> createSphereDrawable(uint32_t, const BoundingSphere&, const glm::vec4&) const;
 
     void draw(uint32_t, std::shared_ptr<Drawable>, const Transform&);
 
     void setViewMatrix(const glm::mat4x4&);
-    void setDepths(float, float);
+    void setProjectionMatrix(float, float, float);
 
 private:
-    using DrawDataType = std::unordered_multimap<uint32_t, std::pair<std::shared_ptr<Drawable>, Transform>>;
+    using DrawDataType = std::multimap<uint32_t, std::pair<std::shared_ptr<Drawable>, Transform>>;
 
     void resize(int, int);
     void render();
@@ -156,18 +199,12 @@ private:
     QOpenGLExtraFunctions& m_functions;
     glm::mat4x4 m_projMatrix;
     glm::mat4x4 m_viewMatrix;
-    float m_zNear = 0.5f, m_zFar = 10000.0f;
+    float m_fov = glm::pi<float>() * 0.25f, m_zNear = 0.5f, m_zFar = 10000.0f;
+    int32_t m_windowWidth, m_windowHeight;
     DrawDataType m_drawData;
-    std::shared_ptr<Texture> m_standardTexture;
 
-    std::function<GLuint(const std::string&, GLenum, std::string&)> m_loadShader;
-    std::function<void(GLuint)> m_deleteShader;
-    std::function<GLuint(GLuint, GLuint, std::string&)> m_loadProgram;
-    std::function<void(GLuint)> m_deleteProgram;
-    std::function<void(RenderProgram*)> m_renderProgramDeleter;
-    std::function<void(Texture*)> m_textureDeleter;
-    std::function<void(UniformBuffer*)> m_uboDeleter;
-    std::function<void(Model::Mesh*)> m_meshDeleter;
+    std::shared_ptr<Texture> m_standardTexture;
+    std::shared_ptr<RenderProgram> m_coloredRenderProgram;
 
     friend class RenderWidget;
 };

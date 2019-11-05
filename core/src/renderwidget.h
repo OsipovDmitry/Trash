@@ -34,7 +34,9 @@ private:
     std::unique_ptr<Renderer> m_renderer;
     std::unique_ptr<QTimer> m_timer;
     Core& m_core;
-    uint64_t m_startTime, m_lastUpdateTime;
+    uint64_t m_startTime, m_lastUpdateTime, m_lastFpsTime;
+    uint32_t m_fpsCounter;
+    float m_lastFps;
 };
 
 class RenderWidgetWasInitializedMessage : public AbstractController::Message

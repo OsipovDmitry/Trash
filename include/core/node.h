@@ -24,6 +24,8 @@ public:
     const Transform& transform() const;
     const Transform& globalTransform() const;
 
+    const BoundingSphere& boundingSphere() const;
+
 protected:
     void doAttach() override;
     void doDetach() override;

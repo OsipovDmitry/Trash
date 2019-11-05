@@ -51,56 +51,85 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         std::vector<std::shared_ptr<Model::Mesh>> meshes(scene->mNumMeshes);
         for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
         {
-            auto mesh = scene->mMeshes[m];
-            std::bitset<numElementsVertexAttribute()> vertexDeclaration;
+            auto meshFrom = scene->mMeshes[m];
 
-            if (mesh->HasPositions()) { vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::Position)); }
-            if (mesh->HasNormals()) { vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::Normal)); }
-            if (mesh->HasTextureCoords(0)) { vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::TexCoord)); }
-            if (mesh->HasBones()) {
-                vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::BonesIDs));
-                vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::BonesWeights)); }
-            if (mesh->HasTangentsAndBitangents()) { vertexDeclaration.set(castFromVertexAttribute(VertexAttribute::TangentBinormal)); }
+            std::vector<std::pair<bool, VertexAttribute>> attribsInfo {
+                std::make_pair(meshFrom->HasPositions(), VertexAttribute::Position),
+                std::make_pair(meshFrom->HasNormals(), VertexAttribute::Normal),
+                std::make_pair(meshFrom->HasTextureCoords(0), VertexAttribute::TexCoord),
+                std::make_pair(meshFrom->HasBones(), VertexAttribute::BonesIDs),
+                std::make_pair(meshFrom->HasBones(), VertexAttribute::BonesWeights),
+                std::make_pair(meshFrom->HasTangentsAndBitangents(), VertexAttribute::TangentBinormal),
+            };
 
-            uint32_t vdSize = vertexDeclarationSize(vertexDeclaration);
+            std::unordered_map<VertexAttribute, uint32_t> offsets;
+            uint32_t vdSize = 0;
 
-            std::vector<float> vertices(vdSize * mesh->mNumVertices);
-            std::vector<uint32_t> indices(3 * mesh->mNumFaces);
-
-            if (mesh->HasPositions())
+            for (size_t i = 0; i < attribsInfo.size(); ++i)
             {
-                const uint32_t offset = vertexDeclarationOffset(vertexDeclaration, VertexAttribute::Position);
-                for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
-                    std::memcpy(vertices.data() + vdSize * i + offset,
-                                mesh->mVertices + i,
-                                numAttributeComponents(VertexAttribute::Position) * sizeof(float));
+                auto& attribInfo = attribsInfo.at(i);
+                if (attribInfo.first)
+                {
+                    offsets[attribInfo.second] = vdSize;
+                    vdSize += numAttributeComponents(attribInfo.second);
+                }
             }
 
-            if (mesh->HasNormals())
+            std::vector<float> vertices(static_cast<size_t>(vdSize * meshFrom->mNumVertices));
+            std::vector<uint32_t> indices(3 * meshFrom->mNumFaces);
+            BoundingSphere boundingSphere;
+
+            if (meshFrom->HasPositions())
             {
-                const uint32_t offset = vertexDeclarationOffset(vertexDeclaration, VertexAttribute::Normal);
-                for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
+                const uint32_t offset = offsets[VertexAttribute::Position];
+                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
                     std::memcpy(vertices.data() + vdSize * i + offset,
-                                mesh->mNormals + i,
+                                meshFrom->mVertices + i,
+                                numAttributeComponents(VertexAttribute::Position) * sizeof(float));
+
+                aiVector3D center(0.f, 0.f, 0.f);
+                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
+                    center += meshFrom->mVertices[i];
+                if (meshFrom->mNumVertices)
+                    center /= static_cast<float>(meshFrom->mNumVertices);
+
+                float radius = -1.f;
+                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
+                {
+                    const float curRadius = (meshFrom->mVertices[i] - center).SquareLength();
+                    if (curRadius > radius)
+                        radius = curRadius;
+                }
+
+                boundingSphere.setCenter(glm::vec3(center.x, center.y, center.z));
+                boundingSphere.setRadius(glm::sqrt(radius));
+            }
+
+            if (meshFrom->HasNormals())
+            {
+                const uint32_t offset = offsets[VertexAttribute::Normal];
+                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
+                    std::memcpy(vertices.data() + vdSize * i + offset,
+                                meshFrom->mNormals + i,
                                 numAttributeComponents(VertexAttribute::Normal) * sizeof(float));
             }
 
-            if (mesh->HasTextureCoords(0))
+            if (meshFrom->HasTextureCoords(0))
             {
-                const uint32_t offset = vertexDeclarationOffset(vertexDeclaration, VertexAttribute::TexCoord);
-                for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
+                const uint32_t offset = offsets[VertexAttribute::TexCoord];
+                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
                     std::memcpy(vertices.data() + vdSize * i + offset,
-                                mesh->mTextureCoords[0] + i,
+                                meshFrom->mTextureCoords[0] + i,
                                 numAttributeComponents(VertexAttribute::TexCoord) * sizeof(float));
             }
 
-            if (mesh->HasBones())
+            if (meshFrom->HasBones())
             {
-                const uint32_t offsetIds = vertexDeclarationOffset(vertexDeclaration, VertexAttribute::BonesIDs);
-                const uint32_t offsetWeights = vertexDeclarationOffset(vertexDeclaration, VertexAttribute::BonesWeights);
-                for (unsigned int i = 0; i < mesh->mNumBones; ++i)
+                const uint32_t offsetIds = offsets[VertexAttribute::BonesIDs];
+                const uint32_t offsetWeights = offsets[VertexAttribute::BonesWeights];
+                for (unsigned int i = 0; i < meshFrom->mNumBones; ++i)
                 {
-                    auto& bone = mesh->mBones[i];
+                    auto& bone = meshFrom->mBones[i];
 
                     int32_t boneIndex;
                     std::string boneName = bone->mName.C_Str();
@@ -145,7 +174,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                         }
                     }
                 }
-                for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
+                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
                 {
                     float weight = (vertices.data() + vdSize * i + offsetWeights)[0]
                             + (vertices.data() + vdSize * i + offsetWeights)[1]
@@ -161,14 +190,14 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                 }
             }
 
-            if (mesh->HasTangentsAndBitangents())
+            if (meshFrom->HasTangentsAndBitangents())
             {
-                const uint32_t offset = vertexDeclarationOffset(vertexDeclaration, VertexAttribute::TangentBinormal);
-                for (unsigned int i = 0; i < mesh->mNumVertices; ++i)
+                const uint32_t offset = offsets[VertexAttribute::TangentBinormal];
+                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
                 {
-                    auto& t = mesh->mTangents[i];
-                    auto& b = mesh->mBitangents[i];
-                    auto& n = mesh->mNormals[i];
+                    auto& t = meshFrom->mTangents[i];
+                    auto& b = meshFrom->mBitangents[i];
+                    auto& n = meshFrom->mNormals[i];
                     float sign = ((n ^ t) * b > 0.0f) ? +1.0f : -1.0f;
 
                     std::memcpy(vertices.data() + vdSize * i + offset,
@@ -179,49 +208,28 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                 }
             }
 
-            for (unsigned int i = 0; i < mesh->mNumFaces; ++i)
+            for (unsigned int i = 0; i < meshFrom->mNumFaces; ++i)
             {
-                auto& face = mesh->mFaces[i];
+                auto& face = meshFrom->mFaces[i];
                 memcpy(indices.data() + 3 * i,
                        face.mIndices,
                        3 * sizeof(unsigned int));
             }
 
-            GLuint vao;
-            m_functions.glGenVertexArrays(1, &vao);
-            m_functions.glBindVertexArray(vao);
+            auto vbo = std::make_shared<VertexBuffer>(vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+            auto ibo = std::make_shared<IndexBuffer>(GL_TRIANGLES, indices.size(), indices.data(), GL_STATIC_DRAW);
+            auto glMesh = std::make_shared<::Mesh>();
 
-            GLuint vbo, ibo;
-            m_functions.glGenBuffers(1, &vbo);
-            m_functions.glBindBuffer(GL_ARRAY_BUFFER, vbo);
-            m_functions.glBufferData(GL_ARRAY_BUFFER, vdSize * mesh->mNumVertices * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+            for (auto& offset : offsets)
+                glMesh->attachVertexBuffer(offset.first,
+                                           vbo,
+                                           static_cast<GLint>(numAttributeComponents(offset.first)),
+                                           static_cast<GLsizei>(vdSize * sizeof(float)),
+                                           static_cast<GLsizei>(offset.second * sizeof(float)));
 
-            for (uint32_t i = 0; i < numElementsVertexAttribute(); ++i)
-            {
-                if (vertexDeclaration.test(i)) {
-                    VertexAttribute attrib = castToVertexAttribute(i);
-                    m_functions.glVertexAttribPointer(i,
-                                                      static_cast<GLint>(numAttributeComponents(attrib)),
-                                                      GL_FLOAT,
-                                                      GL_FALSE,
-                                                      static_cast<GLsizei>(vdSize * sizeof(float)),
-                                                      reinterpret_cast<const GLvoid*>(vertexDeclarationOffset(vertexDeclaration, attrib) * sizeof(float)));
-                    m_functions.glEnableVertexAttribArray(i);
-                }
-                else {
-                    m_functions.glDisableVertexAttribArray(i);
-                }
-            }
+            glMesh->attachIndexBuffer(ibo);
 
-            m_functions.glGenBuffers(1, &ibo);
-            m_functions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ibo);
-            m_functions.glBufferData(GL_ELEMENT_ARRAY_BUFFER, mesh->mNumFaces * 3 * sizeof(unsigned int), indices.data(), GL_STATIC_DRAW);
-
-            m_functions.glBindVertexArray(0);
-
-            auto meshTo = std::shared_ptr<Model::Mesh>(new Model::Mesh(vao, vbo, ibo, mesh->mNumFaces * 3, vertexDeclaration), m_meshDeleter);
-            meshTo->material = materials[mesh->mMaterialIndex];
-            meshes[m] = meshTo;
+            meshes[m] = std::shared_ptr<Model::Mesh>(new Model::Mesh(glMesh, materials[meshFrom->mMaterialIndex], boundingSphere));
         }
 
         for (unsigned int a = 0; a < scene->mNumAnimations; ++a)
@@ -239,7 +247,6 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                 if (iter == boneMapping.end())
                     continue;
 
-                //auto boneIndex = iter->second;
                 auto& transformsTuple = animTo->transforms[boneName];
 
                 auto& scales = std::get<0>(transformsTuple);
@@ -319,17 +326,13 @@ uint32_t Model::numBones() const
     return static_cast<uint32_t>(boneTransforms.size());
 }
 
-bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, std::vector<Transform>& transforms)
+bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, std::vector<Transform>& transforms) const
 {
-    transforms.resize(numBones());
+    transforms.resize(numBones(), Transform());
 
     auto iter = animations.find(animName);
     if (iter == animations.end())
-    {
-        for (auto& transform : transforms)
-            transform = Transform();
         return false;
-    }
 
     auto animation = iter->second;
 
@@ -350,7 +353,7 @@ bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, st
         if (node->boneIndex >= 0)
         {
             Transform boneTransform = node->transform;
-            auto& transformTuple = animation->transforms[boneNames[node->boneIndex]];
+            auto& transformTuple = animation->transforms[boneNames[static_cast<size_t>(node->boneIndex)]];
 
             auto& scales = std::get<0>(transformTuple);
             if (scales.size() == 1)
@@ -395,7 +398,7 @@ bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, st
             }
 
             globalTransform *= boneTransform;
-            transforms[node->boneIndex] = globalTransform * boneTransforms[node->boneIndex];
+            transforms[static_cast<size_t>(node->boneIndex)] = globalTransform * boneTransforms[static_cast<size_t>(node->boneIndex)];
         }
         else {
             globalTransform *= node->transform;
@@ -406,4 +409,30 @@ bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, st
     }
 
     return true;
+}
+
+BoundingSphere Model::calcBoundingSphere() const
+{
+    BoundingSphere boundingSphere;
+
+    std::queue<std::pair<std::shared_ptr<Node>, Transform>> nodes;
+    if (rootNode)
+        nodes.push(std::make_pair(rootNode, Transform()));
+    while (!nodes.empty())
+    {
+        auto node = nodes.front().first;
+        auto parentTransform = nodes.front().second;
+        nodes.pop();
+
+        auto thisTransform = parentTransform * node->transform;
+
+        for (auto mesh : node->meshes)
+            boundingSphere += thisTransform * mesh->boundingSphere;
+
+        for (auto child : node->children())
+            nodes.push(std::make_pair(child, thisTransform));
+
+    }
+
+    return boundingSphere;
 }
