@@ -273,7 +273,7 @@ VertexBuffer::VertexBuffer(GLsizeiptr size, GLvoid *data, GLenum usage)
 {
 }
 
-IndexBuffer::IndexBuffer(GLenum primitiveType_, GLsizei numIndices_, GLvoid *data, GLenum usage)
+IndexBuffer::IndexBuffer(GLenum primitiveType_, GLsizei numIndices_, uint32_t *data, GLenum usage)
     : GLBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(numIndices_ * sizeof(uint32_t)), data, usage)
     , numIndices(numIndices_)
     , primitiveType(primitiveType_)
@@ -349,6 +349,11 @@ std::shared_ptr<Drawable> Renderer::createSphereDrawable(uint32_t segs, const Bo
     return std::make_shared<SphereDrawable>(m_coloredRenderProgram, segs, sphere, color);
 }
 
+std::shared_ptr<Drawable> Renderer::createFrustumDrawable(const Frustum& frustum, const glm::vec4& color) const
+{
+    return std::make_shared<FrustumDrawable>(m_coloredRenderProgram, frustum, color);
+}
+
 void Renderer::draw(uint32_t layerId, std::shared_ptr<Drawable> drawable, const Transform& transform)
 {
     m_drawData.insert({layerId, std::make_pair(drawable, transform)});
@@ -364,6 +369,11 @@ void Renderer::setProjectionMatrix(float fov, float znear, float zfar)
     m_fov = fov;
     m_zNear = znear;
     m_zFar = zfar;
+}
+
+const glm::mat4x4 &Renderer::projectionMatrix() const
+{
+    return m_projMatrix;
 }
 
 void Renderer::resize(int width, int height)

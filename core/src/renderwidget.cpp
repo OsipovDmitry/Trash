@@ -56,7 +56,7 @@ void RenderWidget::paintGL()
     uint64_t dt = time - m_lastUpdateTime;
     m_lastUpdateTime = time;
 
-    static const uint64_t deltaFps = 300;
+    static const uint64_t deltaFps = 1000;
     ++m_fpsCounter;
     if (time - m_lastFpsTime >= deltaFps)
     {

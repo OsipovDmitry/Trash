@@ -1,9 +1,11 @@
 #include <queue>
 
+#include <utils/frustum.h>
 #include <core/node.h>
 
 #include "graphicscontrollerprivate.h"
 #include "nodeprivate.h"
+#include "renderer.h"
 
 GraphicsControllerPrivate::GraphicsControllerPrivate()
     : AbstractControllerPrivate()
@@ -17,6 +19,9 @@ GraphicsControllerPrivate::~GraphicsControllerPrivate()
 
 void GraphicsControllerPrivate::updateScene(uint64_t time, uint64_t dt)
 {
+    auto& renderer = Renderer::instance();
+    Frustum frustum(renderer.projectionMatrix() * viewMatrix);
+
     std::queue<std::shared_ptr<Node>> nodes;
     nodes.push(rootNode);
 
@@ -24,6 +29,11 @@ void GraphicsControllerPrivate::updateScene(uint64_t time, uint64_t dt)
     {
         auto node = nodes.front();
         nodes.pop();
+
+        if (!frustum.contain(node->globalTransform() * node->boundingSphere()))
+            continue;
+
+        node->isVisible = frustum.contain(node->globalTransform() * node->boundingSphere());
 
         node->m().doUpdate(time, dt);
 

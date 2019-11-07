@@ -48,11 +48,16 @@ const BoundingSphere &Node::boundingSphere() const
 {
     if (m_->isBoundingSphereDirty)
     {
-        m_->boundingSphere = m_->calcLocalBoundingSphere();
-        for (auto child : children())
-            m_->boundingSphere += child->transform() * child->boundingSphere();
+        std::vector<BoundingSphere> boundingSpheres;
+        boundingSpheres.reserve(children().size()+1);
 
-        m_->bSphereDrawable = Renderer::instance().createSphereDrawable(8, m_->boundingSphere, glm::vec4(1.0f, .0f, .0f, 1.0f));
+        boundingSpheres.push_back(m_->calcLocalBoundingSphere());
+
+        for (auto child : children())
+            boundingSpheres.push_back(child->transform() * child->boundingSphere());
+
+        m_->boundingSphere = BoundingSphere::unite(boundingSpheres);
+        m_->bSphereDrawable = Renderer::instance().createSphereDrawable(4, m_->boundingSphere, glm::vec4(0.8f, .0f, .0f, 1.0f));
 
         m_->isBoundingSphereDirty = false;   
     }

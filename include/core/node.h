@@ -26,11 +26,13 @@ public:
 
     const BoundingSphere& boundingSphere() const;
 
+    bool isVisible = true;
+
 protected:
     void doAttach() override;
     void doDetach() override;
 
-    std::unique_ptr<NodePrivate> m_;
+    std::unique_ptr<NodePrivate> m_; 
 };
 
 #endif // NODE_H

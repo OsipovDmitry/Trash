@@ -22,7 +22,8 @@
 
 class QOpenGLExtraFunctions;
 class Drawable;
-class BoundingSphere;
+struct BoundingSphere;
+struct Frustum;
 
 struct RenderProgram : public ResourceStorage::Object
 {
@@ -74,7 +75,7 @@ struct IndexBuffer : public GLBuffer
     GLsizei numIndices;
     GLenum primitiveType;
 
-    IndexBuffer(GLenum, GLsizei, GLvoid*, GLenum);
+    IndexBuffer(GLenum, GLsizei, uint32_t*, GLenum);
 };
 
 struct UniformBuffer : public GLBuffer
@@ -183,11 +184,14 @@ public:
     // rendering
     std::shared_ptr<Drawable> createSkeletalMeshDrawable(std::shared_ptr<RenderProgram>, std::shared_ptr<Model::Mesh>, std::shared_ptr<UniformBuffer>) const;
     std::shared_ptr<Drawable> createSphereDrawable(uint32_t, const BoundingSphere&, const glm::vec4&) const;
+    std::shared_ptr<Drawable> createFrustumDrawable(const Frustum&, const glm::vec4&) const;
 
     void draw(uint32_t, std::shared_ptr<Drawable>, const Transform&);
 
     void setViewMatrix(const glm::mat4x4&);
     void setProjectionMatrix(float, float, float);
+
+    const glm::mat4x4& projectionMatrix() const;
 
 private:
     using DrawDataType = std::multimap<uint32_t, std::pair<std::shared_ptr<Drawable>, Transform>>;

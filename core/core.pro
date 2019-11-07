@@ -7,6 +7,7 @@ DEFINES += \
     CORE_LIBRARY
 
 HEADERS += \
+    ../include/utils/*.h \
     ../include/core/coreglobal.h \
     ../include/core/forwarddecl.h \
     ../include/core/types.h \

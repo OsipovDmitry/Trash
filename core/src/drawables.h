@@ -3,7 +3,8 @@
 
 #include "renderer.h"
 
-class BoundingSphere;
+struct BoundingSphere;
+struct Frustum;
 
 class Drawable
 {
@@ -35,6 +36,21 @@ class SphereDrawable : public Drawable
 {
 public:
     SphereDrawable(std::shared_ptr<RenderProgram>, uint32_t, const BoundingSphere&, const glm::vec4&);
+
+    std::shared_ptr<RenderProgram> renderProgram() const override;
+    std::shared_ptr<Mesh> mesh() const override;
+
+    void setup() override;
+
+    std::shared_ptr<RenderProgram> renderProgram_;
+    std::shared_ptr<Mesh> mesh_;
+    glm::vec4 color_;
+};
+
+class FrustumDrawable : public Drawable
+{
+public:
+    FrustumDrawable(std::shared_ptr<RenderProgram>, const Frustum&, const glm::vec4&);
 
     std::shared_ptr<RenderProgram> renderProgram() const override;
     std::shared_ptr<Mesh> mesh() const override;

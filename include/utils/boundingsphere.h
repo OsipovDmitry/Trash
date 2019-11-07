@@ -1,6 +1,8 @@
 #ifndef BOUNDINGSPHERE_H
 #define BOUNDINGSPHERE_H
 
+#include <vector>
+
 #include "../glm/vec4.hpp"
 #include "../glm/gtc/vec1.hpp"
 
@@ -30,6 +32,18 @@ struct BoundingSphere : public glm::vec4
     bool contain(const BoundingSphere& second) const { return contain(*this, second); }
 
     BoundingSphere& operator += (const BoundingSphere& s) { *this = *this + s; return *this; }
+
+    static BoundingSphere unite(const std::vector<BoundingSphere>& spheres) {
+        glm::vec3 c(0.f, 0.f, 0.f);
+        size_t numNonNullSpheres = 0;
+        for (const auto& bs : spheres)
+            if (!bs.empty()) { c += bs.center(); ++numNonNullSpheres; }
+        if (numNonNullSpheres)  c /= static_cast<float>(numNonNullSpheres);
+        float r = -1.0f;
+        for (const auto& bs : spheres)
+            if (!bs.empty()) r = glm::max(r, glm::distance(c, bs.center()) + bs.radius());
+        return BoundingSphere(c, r);
+    }
 };
 
 inline BoundingSphere operator +(const BoundingSphere& s1, const BoundingSphere& s2)

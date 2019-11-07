@@ -8,8 +8,8 @@
 
 #include <game/game.h>
 
-static const float dist = 300.0f;
-static const int n = 20;
+static const float dist = 700.0f;
+static const int n = 10;
 
 void Game::doInitialize()
 {
@@ -26,18 +26,18 @@ void Game::doInitialize()
             node->playAnimation("", rand() % 10000);
         }
 
-    Core::instance().graphicsController().setProjectionMatrix(glm::pi<float>() * 0.25f, 10.0f, dist * n * 10);
+    Core::instance().graphicsController().setProjectionMatrix(glm::pi<float>() * 0.25f, 500.0f, 400000.0f);
 }
 
 void Game::doUpdate(uint64_t time, uint64_t dt)
 {
     const float angle = (time - m_resetTime) * 0.00003f + 0.8f;
-    const float radius = dist * n * 1.3f;
-    const float height = dist*3;
+    const float radius = dist * n * 1.8f;
+    const float height = dist * 8;
 
     Core::instance().graphicsController().setViewMatrix(
     glm::lookAt(radius * glm::vec3(cos(angle), 0.0f, sin(angle)) + glm::vec3(0.0f, height, 0.0f),
-                glm::vec3(0.0f, height*0.33f, 0.0f),
+                glm::vec3(0.0f, 0.0f, 0.0f),
                 glm::vec3(0.0f, 1.0f, 0.0f))
     );
 
