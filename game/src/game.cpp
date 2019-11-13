@@ -44,9 +44,11 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
     m_currTime = time;
 }
 
-void Game::doMouseClick(int, int)
+void Game::doMouseClick(int x, int y)
 {
-    m_resetTime = m_currTime;
+    Core::instance().graphicsController().pickNode(x, y);
+
+    //m_resetTime = m_currTime;
 }
 
 Game::Game()

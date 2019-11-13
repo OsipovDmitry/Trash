@@ -27,6 +27,8 @@ public:
     void setViewMatrix(const glm::mat4x4&);
     void setProjectionMatrix(float, float, float);
 
+    std::shared_ptr<Node> pickNode(int32_t, int32_t);
+
 protected:
     void doWork(std::shared_ptr<Message>) override;
 
