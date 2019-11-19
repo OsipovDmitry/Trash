@@ -36,5 +36,5 @@ std::shared_ptr<Drawable> NodePrivate::boundingSphereDrawable()
 
 void NodePrivate::doUpdate(uint64_t, uint64_t)
 {
-    Renderer::instance().draw(0, boundingSphereDrawable(), thisNode.globalTransform());
+    //Renderer::instance().draw(0, boundingSphereDrawable(), thisNode.globalTransform());
 }

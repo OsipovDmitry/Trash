@@ -17,10 +17,10 @@ public:
     virtual void setup() {}
 };
 
-class SkeletalMeshDrawable : public Drawable
+class MeshDrawable : public Drawable
 {
 public:
-    SkeletalMeshDrawable(std::shared_ptr<RenderProgram>, std::shared_ptr<Model::Mesh>, std::shared_ptr<UniformBuffer>);
+    MeshDrawable(std::shared_ptr<RenderProgram>, std::shared_ptr<Model::Mesh>, std::shared_ptr<VertexBuffer>);
 
     std::shared_ptr<RenderProgram> renderProgram() const override;
     std::shared_ptr<Mesh> mesh() const override;
@@ -28,8 +28,8 @@ public:
     void setup() override;
 
     std::shared_ptr<RenderProgram> program;
-    std::shared_ptr<Model::Mesh> skeletalMesh;
-    std::shared_ptr<UniformBuffer> bufferData;
+    std::shared_ptr<Model::Mesh> mesh_;
+    std::shared_ptr<VertexBuffer> animatedAttributesBuffer;
 };
 
 class SphereDrawable : public Drawable

@@ -78,6 +78,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
             std::vector<float> vertices(static_cast<size_t>(vdSize * meshFrom->mNumVertices));
             std::vector<uint32_t> indices(3 * meshFrom->mNumFaces);
             BoundingSphere boundingSphere;
+            bool hasAnimatedAttributes = false;
 
             if (meshFrom->HasPositions())
             {
@@ -125,6 +126,14 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
 
             if (meshFrom->HasBones())
             {
+                // We have animated model if we have bones for its. We replace Position attribute to TPosition.
+                if (meshFrom->HasPositions())
+                {
+                    offsets[VertexAttribute::TPosition] = offsets[VertexAttribute::Position];
+                    offsets.erase(VertexAttribute::Position);
+                    hasAnimatedAttributes = true;
+                }
+
                 const uint32_t offsetIds = offsets[VertexAttribute::BonesIDs];
                 const uint32_t offsetWeights = offsets[VertexAttribute::BonesWeights];
                 for (unsigned int i = 0; i < meshFrom->mNumBones; ++i)
@@ -216,20 +225,17 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                        3 * sizeof(unsigned int));
             }
 
-            auto vbo = std::make_shared<VertexBuffer>(vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+            auto vbo = std::make_shared<VertexBuffer>(meshFrom->mNumVertices, vdSize, vertices.data(), GL_STATIC_DRAW);
+            for (auto& offset : offsets)
+                vbo->declareAttribute(offset.first, offset.second);
+
             auto ibo = std::make_shared<IndexBuffer>(GL_TRIANGLES, indices.size(), indices.data(), GL_STATIC_DRAW);
             auto glMesh = std::make_shared<::Mesh>();
 
-            for (auto& offset : offsets)
-                glMesh->attachVertexBuffer(offset.first,
-                                           vbo,
-                                           static_cast<GLint>(numAttributeComponents(offset.first)),
-                                           static_cast<GLsizei>(vdSize * sizeof(float)),
-                                           static_cast<GLsizei>(offset.second * sizeof(float)));
-
+            glMesh->attachVertexBuffer(vbo);
             glMesh->attachIndexBuffer(ibo);
 
-            meshes[m] = std::shared_ptr<Model::Mesh>(new Model::Mesh(glMesh, materials[meshFrom->mMaterialIndex], boundingSphere));
+            meshes[m] = std::shared_ptr<Model::Mesh>(new Model::Mesh(glMesh, materials[meshFrom->mMaterialIndex], boundingSphere, hasAnimatedAttributes));
         }
 
         for (unsigned int a = 0; a < scene->mNumAnimations; ++a)

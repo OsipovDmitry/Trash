@@ -16,8 +16,8 @@ public:
         if (bs.empty())
             return false;
 
-        float t;
-        return glm::intersectRaySphere(pos, dir, bs.center(), bs.radius(), t);
+        glm::vec3 p, n;
+        return glm::intersectRaySphere(pos, dir, bs.center(), bs.radius(), p, n);
     }
 };
 

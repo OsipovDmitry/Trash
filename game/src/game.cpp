@@ -5,28 +5,30 @@
 #include <core/modelnode.h>
 
 #include <utils/transform.h>
+#include <utils/boundingsphere.h>
 
 #include <game/game.h>
 
 static const float dist = 700.0f;
-static const int n = 10;
+static const int n = 3;
 
 void Game::doInitialize()
 {
-    static const std::array<std::string, 5> filenames { "dance1.dae", "dance2.dae", "dance3.dae", "dance4.dae", "dance5.dae" };
+    static const std::vector<std::string> filenames { "dance1.dae", "dance2.dae", "dance3.dae", "dance4.dae", "dance5.dae" };
 
     auto rootNode = Core::instance().graphicsController().rootNode();
-    for (int i = 0; i < n; ++i)
-        for (int j = 0; j < n; ++j)
+    for (int i = -n; i <= n; ++i)
+        for (int j = -n; j <= n; ++j)
         {
             auto node = std::make_shared<ModelNode>(filenames[rand() % filenames.size()]);
-            node->setTransform(Transform(glm::vec3(1.f, 1.f, 1.f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3((i - .5f*n) * dist, 0.0f, (j - .5f*n) * dist)));
+            node->setTransform(Transform(glm::vec3(1.f, 1.f, 1.f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(i * dist, 0.0f, j * dist)));
             rootNode->attach(node);
 
             node->playAnimation("", rand() % 10000);
         }
 
     Core::instance().graphicsController().setProjectionMatrix(glm::pi<float>() * 0.25f, 500.0f, 400000.0f);
+    Core::instance().graphicsController().setViewMatrix(glm::lookAt(glm::vec3(0.f, 0.f, 2 * dist * n * 3.0f), glm::vec3(), glm::vec3(0.0f, 1.0f, 0.0f)));
 }
 
 void Game::doUpdate(uint64_t time, uint64_t dt)
@@ -46,9 +48,9 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
 
 void Game::doMouseClick(int x, int y)
 {
-    Core::instance().graphicsController().pickNode(x, y);
+    //Core::instance().graphicsController().pickNode(x, y);
 
-    //m_resetTime = m_currTime;
+    m_resetTime = m_currTime;
 }
 
 Game::Game()

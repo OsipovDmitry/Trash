@@ -2,44 +2,41 @@
 
 #include "drawables.h"
 
-SkeletalMeshDrawable::SkeletalMeshDrawable(std::shared_ptr<RenderProgram> rp, std::shared_ptr<Model::Mesh> m, std::shared_ptr<UniformBuffer> mb)
+MeshDrawable::MeshDrawable(std::shared_ptr<RenderProgram> rp, std::shared_ptr<Model::Mesh> m, std::shared_ptr<VertexBuffer> ab)
     : program(rp)
-    , skeletalMesh(m)
-    , bufferData(mb)
-{
+    , mesh_(m)
+    , animatedAttributesBuffer(ab)
+{ 
 }
 
-std::shared_ptr<RenderProgram> SkeletalMeshDrawable::renderProgram() const
+std::shared_ptr<RenderProgram> MeshDrawable::renderProgram() const
 {
     return program;
 }
 
-std::shared_ptr<Mesh> SkeletalMeshDrawable::mesh() const
+std::shared_ptr<Mesh> MeshDrawable::mesh() const
 {
-    return skeletalMesh->mesh;
+    return mesh_->mesh;
 }
 
-void SkeletalMeshDrawable::setup()
+void MeshDrawable::setup()
 {
     auto& renderer = Renderer::instance();
 
-    if (skeletalMesh->material && skeletalMesh->material->diffuseTexture)
+    if (mesh_->material && mesh_->material->diffuseTexture)
     {
         program->setUniform(program->uniformLocation("u_diffuseMap"), 0);
-        renderer.bindTexture(skeletalMesh->material->diffuseTexture, 0);
+        renderer.bindTexture(mesh_->material->diffuseTexture, 0);
     }
 
-    if (bufferData)
-    {
-        renderer.bindUniformBuffer(bufferData, program->uniformBufferIndexByName("u_ModelData"));
-    }
+    mesh_->mesh->tmp(animatedAttributesBuffer);
 }
 
 SphereDrawable::SphereDrawable(std::shared_ptr<RenderProgram> rp, uint32_t segs, const BoundingSphere &bs, const glm::vec4& color)
     : renderProgram_(rp)
     , color_(color)
 {
-    std::vector<float> vertices(3 * (segs+1) * (segs * segs));
+    std::vector<glm::vec3> vertices((segs+1) * (segs * segs));
     std::vector<uint32_t> indices(4 * (segs * segs * segs));
 
     for (uint32_t a = 0; a <= segs; ++a)
@@ -54,9 +51,9 @@ SphereDrawable::SphereDrawable(std::shared_ptr<RenderProgram> rp, uint32_t segs,
             float sinB = glm::sin(angleB);
             float cosB = glm::cos(angleB);
 
-            vertices[3 * (a * segs * segs + b) + 0] = bs.w * cosA * sinB + bs.x;
-            vertices[3 * (a * segs * segs + b) + 1] = bs.w * sinA + bs.y;
-            vertices[3 * (a * segs * segs + b) + 2] = bs.w * cosA * cosB + bs.z;
+            vertices[a * segs * segs + b] = glm::vec3(bs.w * cosA * sinB + bs.x,
+                                                      bs.w * sinA + bs.y,
+                                                      bs.w * cosA * cosB + bs.z);
 
             if ((a < segs) && (b < (segs*segs - 1)))
             {
@@ -68,11 +65,14 @@ SphereDrawable::SphereDrawable(std::shared_ptr<RenderProgram> rp, uint32_t segs,
         }
     }
 
-    auto vbo = std::make_shared<VertexBuffer>(vertices.size() * sizeof(float), vertices.data(), GL_STATIC_DRAW);
+    const GLsizei numComponents = numAttributeComponents(VertexAttribute::Position);
+
+    auto vbo = std::make_shared<VertexBuffer>(vertices.size(), numComponents, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW);
+    vbo->declareAttribute(VertexAttribute::Position, 0);
     auto ibo = std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW);
 
     mesh_ = std::make_shared<Mesh>();
-    mesh_->attachVertexBuffer(VertexAttribute::Position, vbo, 3, 3 * sizeof(float), 0);
+    mesh_->attachVertexBuffer(vbo);
     mesh_->attachIndexBuffer(ibo);
 }
 
@@ -115,11 +115,14 @@ FrustumDrawable::FrustumDrawable(std::shared_ptr<RenderProgram> rp, const Frustu
 
     std::vector<uint32_t> indices({ 0,1, 1,2, 2,3, 3,0, 4,5, 5,6, 6,7, 7,4, 0,4, 1,5, 2,6, 3,7 });
 
-    auto vbo = std::make_shared<VertexBuffer>(vertices.size() * sizeof(glm::vec3), vertices.data(), GL_STATIC_DRAW);
+    const GLsizei numComponents = numAttributeComponents(VertexAttribute::Position);
+
+    auto vbo = std::make_shared<VertexBuffer>(vertices.size(), numComponents, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW);
+    vbo->declareAttribute(VertexAttribute::Position, 0);
     auto ibo = std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW);
 
     mesh_ = std::make_shared<Mesh>();
-    mesh_->attachVertexBuffer(VertexAttribute::Position, vbo, 3, sizeof(glm::vec3), 0);
+    mesh_->attachVertexBuffer(vbo);
     mesh_->attachIndexBuffer(ibo);
 }
 

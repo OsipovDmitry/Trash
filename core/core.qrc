@@ -3,8 +3,9 @@
         <file>res/chess.png</file>
         <file>res/shader.frag</file>
         <file>res/shader.vert</file>
-        <file>res/shader_anim.vert</file>
         <file>res/color.frag</file>
         <file>res/color.vert</file>
+        <file>res/skeletal_animation.frag</file>
+        <file>res/skeletal_animation.vert</file>
     </qresource>
 </RCC>

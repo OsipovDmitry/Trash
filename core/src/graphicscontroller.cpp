@@ -43,12 +43,13 @@ void GraphicsController::setProjectionMatrix(float fov, float zNear, float zFar)
 #include "drawables.h"
 std::shared_ptr<Node> GraphicsController::pickNode(int32_t xi, int32_t yi)
 {
-    auto& widget = Core::instance().renderWidget();
+    auto& renderer = Renderer::instance();
+    const auto& vp = renderer.viewport();
 
-    const float x = static_cast<float>(xi) / widget.width() * 2.0f - 1.0f;
-    const float y = static_cast<float>(yi) / widget.height() * 2.0f - 1.0f;
+    const float x = static_cast<float>(xi - vp.x) / static_cast<float>(vp.z) * 2.0f - 1.0f;
+    const float y = (1.0f - static_cast<float>(yi - vp.y) / static_cast<float>(vp.w)) * 2.0f - 1.0f;
 
-    auto modelViewMatrixInverse = glm::inverse(Renderer::instance().projectionMatrix() * m().viewMatrix);
+    auto modelViewMatrixInverse = glm::inverse(renderer.projectionMatrix() * m().viewMatrix);
 
     glm::vec4 p0 = modelViewMatrixInverse * glm::vec4(x, y, -1.0f, 1.0f);
     glm::vec4 p1 = modelViewMatrixInverse * glm::vec4(x, y, 1.0f, 1.0f);
@@ -57,6 +58,8 @@ std::shared_ptr<Node> GraphicsController::pickNode(int32_t xi, int32_t yi)
     p1 /= p1.w;
 
     Ray ray(p0, p1-p0);
+
+
 
     std::dynamic_pointer_cast<SphereDrawable>(rootNode()->m().bSphereDrawable)->color_ =
             ray.intersect(rootNode()->globalTransform() * rootNode()->boundingSphere()) ?

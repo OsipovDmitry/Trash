@@ -14,6 +14,255 @@
 
 #include <iostream>
 
+RenderProgram::~RenderProgram()
+{
+    auto& functions = Renderer::instance().functions();
+
+    GLuint shaders[2];
+    GLsizei count = 0;
+    functions.glGetAttachedShaders(id, 2, &count, shaders);
+    functions.glDetachShader(id, shaders[0]);
+    functions.glDeleteShader(shaders[0]);
+    functions.glDetachShader(id, shaders[1]);
+    functions.glDeleteShader(shaders[1]);
+    functions.glDeleteProgram(id);
+}
+
+void RenderProgram::setupTransformFeedback(const std::vector<std::string>& varyings, GLenum mode)
+{
+    std::vector<const char*> names;
+    names.reserve(varyings.size());
+    for (const auto& varying : varyings)
+        names.push_back(varying.c_str());
+
+    auto& functions = Renderer::instance().functions();
+
+    functions.glTransformFeedbackVaryings(id, static_cast<GLsizei>(names.size()), names.data(), mode);
+    functions.glLinkProgram(id);
+
+    GLint linked;
+    functions.glGetProgramiv(id, GL_LINK_STATUS, &linked);
+    if (!linked) {
+        GLint infoLen = 0;
+        functions.glGetProgramiv(id, GL_INFO_LOG_LENGTH, &infoLen);
+        if(infoLen > 1) {
+            char *infoLog = static_cast<char*>(malloc(sizeof(char) * static_cast<unsigned int>(infoLen)));
+            functions.glGetProgramInfoLog(id, infoLen, nullptr, infoLog);
+            std::cout << "Transform feedback link: " << infoLog << std::endl;
+            free(infoLog);
+        }
+    }
+}
+
+GLuint RenderProgram::uniformBufferIndexByName(const std::string& name)
+{
+    return Renderer::instance().functions().glGetUniformBlockIndex(id, name.c_str());
+}
+
+GLint RenderProgram::uniformBufferDataSize(GLuint blockIndex)
+{
+    GLint val = -1;
+    Renderer::instance().functions().glGetActiveUniformBlockiv(id, blockIndex, GL_UNIFORM_BLOCK_DATA_SIZE, &val);
+    return val;
+}
+
+std::unordered_map<std::string, GLint> RenderProgram::uniformBufferOffsets(GLuint blockIndex)
+{
+    auto& functions = Renderer::instance().functions();
+
+    std::unordered_map<std::string, int32_t> result;
+
+    GLint count = -1;
+    functions.glGetActiveUniformBlockiv(id, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS, &count);
+
+    if (count >= 0)
+    {
+        std::vector<GLuint> indices(static_cast<size_t>(count));
+        functions.glGetActiveUniformBlockiv(id, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES, reinterpret_cast<GLint*>(indices.data()));
+
+        std::vector<GLint> nameLengths(static_cast<size_t>(count));
+        std::string name;
+        std::vector<GLint> offsets(static_cast<size_t>(count));
+        GLsizei length;
+        GLint size;
+        GLenum type;
+        functions.glGetActiveUniformsiv(id, count, indices.data(), GL_UNIFORM_NAME_LENGTH, nameLengths.data());
+        functions.glGetActiveUniformsiv(id, count, indices.data(), GL_UNIFORM_OFFSET, offsets.data());
+
+        for (size_t i = 0; i < static_cast<size_t>(count); ++i)
+        {
+            name.resize(static_cast<size_t>(nameLengths[i]));
+            functions.glGetActiveUniform(id, indices[i], nameLengths[i], &length, &size, &type, &(name[0]));
+            name.resize(static_cast<size_t>(nameLengths[i])-1);
+            result[name] = offsets[i];
+        }
+    }
+
+    return result;
+}
+
+GLint RenderProgram::uniformLocation(const std::string& name)
+{
+    return Renderer::instance().functions().glGetUniformLocation(id, name.c_str());
+}
+
+void RenderProgram::setUniform(GLint loc, GLint value)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glUseProgram(id);
+    functions.glUniform1i(loc, value);
+}
+
+void RenderProgram::setUniform(GLint loc, const glm::vec4& value)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glUseProgram(id);
+    functions.glUniform4fv(loc, 1, glm::value_ptr(value));
+}
+
+void RenderProgram::setUniform(GLint loc, const glm::mat4x4& value)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glUseProgram(id);
+    functions.glUniformMatrix4fv(loc, 1, false, glm::value_ptr(value));
+}
+
+Texture::~Texture()
+{
+    Renderer::instance().functions().glDeleteTextures(1, &id);
+}
+
+void Texture::generateMipmaps()
+{
+    auto& functions = Renderer::instance().functions();
+
+    functions.glBindTexture(GL_TEXTURE_2D, id);
+    functions.glGenerateMipmap(GL_TEXTURE_2D);
+    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+}
+
+Buffer::Buffer(GLsizeiptr size, GLvoid *data, GLenum usage)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glGenBuffers(1, &id);
+    functions.glBindBuffer(GL_ARRAY_BUFFER, id);
+    functions.glBufferData(GL_ARRAY_BUFFER, size, data, usage);
+}
+
+Buffer::~Buffer()
+{
+    Renderer::instance().functions().glDeleteBuffers(1, &id);
+}
+
+void *Buffer::map(GLintptr offset, GLsizeiptr size, GLbitfield access)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glBindBuffer(GL_ARRAY_BUFFER, id);
+    return functions.glMapBufferRange(GL_ARRAY_BUFFER, offset, size, access);
+}
+
+void Buffer::unmap()
+{
+    Renderer::instance().functions().glUnmapBuffer(GL_ARRAY_BUFFER);
+}
+
+VertexBuffer::VertexBuffer(GLsizei nv, GLsizei nc, float *data, GLenum usage)
+    : Buffer(static_cast<GLsizeiptr>(nv*nc*sizeof(float)), data, usage)
+    , numVertices(nv)
+    , numComponents(nc)
+{
+}
+
+void VertexBuffer::declareAttribute(VertexAttribute attrib, GLsizei offset)
+{
+    declaration.insert({attrib, offset});
+}
+
+IndexBuffer::IndexBuffer(GLenum primitiveType_, GLsizei numIndices_, uint32_t *data, GLenum usage)
+    : Buffer(static_cast<GLsizeiptr>(numIndices_ * sizeof(uint32_t)), data, usage)
+    , numIndices(numIndices_)
+    , primitiveType(primitiveType_)
+{
+}
+
+Mesh::Mesh()
+{
+    Renderer::instance().functions().glGenVertexArrays(1, &id);
+}
+
+Mesh::~Mesh()
+{
+    Renderer::instance().functions().glDeleteVertexArrays(1, &id);
+}
+
+void Mesh::attachVertexBuffer(std::shared_ptr<VertexBuffer> b)
+{
+    std::unordered_set<VertexAttribute> attribs;
+    attribs.reserve(b->declaration.size());
+    for (const auto& attrib : b->declaration)
+        attribs.insert(attrib.first);
+
+    attachVertexBuffer(b, attribs);
+}
+
+void Mesh::attachVertexBuffer(std::shared_ptr<VertexBuffer> b, const std::unordered_set<VertexAttribute>& attribs)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glBindVertexArray(id);
+    functions.glBindBuffer(GL_ARRAY_BUFFER, b->id);
+
+    GLsizei stride = static_cast<GLsizei>(b->numComponents * sizeof(float));
+
+    for (const auto& attrib : attribs)
+    {
+        functions.glVertexAttribPointer(castFromVertexAttribute(attrib),
+                                        static_cast<GLint>(numAttributeComponents(attrib)),
+                                        GL_FLOAT,
+                                        GL_FALSE,
+                                        stride,
+                                        reinterpret_cast<const GLvoid*>(b->declaration[attrib] * sizeof(float)));
+        functions.glEnableVertexAttribArray(castFromVertexAttribute(attrib));
+    }
+
+    functions.glBindVertexArray(0);
+
+    vertexBuffers.insert(b);
+}
+
+void Mesh::attachIndexBuffer(std::shared_ptr<IndexBuffer> b)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glBindVertexArray(id);
+    functions.glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, b->id);
+    functions.glBindVertexArray(0);
+
+    indexBuffers.insert(b);
+}
+
+void Mesh::tmp(std::shared_ptr<VertexBuffer> b)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glBindVertexArray(id);
+    functions.glBindBuffer(GL_ARRAY_BUFFER, b->id);
+
+    GLsizei stride = static_cast<GLsizei>(b->numComponents * sizeof(float));
+
+    for (const auto& attrib : b->declaration)
+    {
+        functions.glVertexAttribPointer(castFromVertexAttribute(attrib.first),
+                                        static_cast<GLint>(numAttributeComponents(attrib.first)),
+                                        GL_FLOAT,
+                                        GL_FALSE,
+                                        stride,
+                                        reinterpret_cast<const GLvoid*>(attrib.second * sizeof(float)));
+        functions.glEnableVertexAttribArray(castFromVertexAttribute(attrib.first));
+    }
+
+    functions.glBindVertexArray(0);
+
+}
+
 Renderer::Renderer(QOpenGLExtraFunctions& functions)
     : m_functions(functions)
     , m_projMatrix(1.0f)
@@ -23,10 +272,15 @@ Renderer::Renderer(QOpenGLExtraFunctions& functions)
 
 void Renderer::initializeResources()
 {
+    m_standardLayer = std::make_shared<Layer>();
+
     m_standardTexture = loadTexture(":/res/chess.png");
     m_standardTexture->generateMipmaps();
 
     m_coloredRenderProgram = loadRenderProgram(":/res/color.vert", ":/res/color.frag");
+
+    m_skeletalAnimationProgram = loadRenderProgram(":/res/skeletal_animation.vert", ":/res/skeletal_animation.frag");
+    m_skeletalAnimationProgram->setupTransformFeedback({"v_position"}, GL_INTERLEAVED_ATTRIBS);
 }
 
 Renderer &Renderer::instance()
@@ -140,190 +394,33 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
     return std::static_pointer_cast<Texture>(object);
 }
 
-RenderProgram::~RenderProgram()
+std::shared_ptr<Layer> Renderer::getOrCreateLayer(int32_t layerId)
+{
+    std::shared_ptr<Layer> layer;
+
+    auto it = m_layers.find(layerId);
+    if (it != m_layers.end())
+        layer = it->second;
+    else
+        m_layers.insert({layerId, layer});
+
+    return layer;
+}
+
+void Renderer::beginTransformFeedback(GLenum mode)
 {
     auto& functions = Renderer::instance().functions();
 
-    GLuint shaders[2];
-    GLsizei count = 0;
-    functions.glGetAttachedShaders(id, 2, &count, shaders);
-    functions.glDetachShader(id, shaders[0]);
-    functions.glDeleteShader(shaders[0]);
-    functions.glDetachShader(id, shaders[1]);
-    functions.glDeleteShader(shaders[1]);
-    functions.glDeleteProgram(id);
+    functions.glEnable(GL_RASTERIZER_DISCARD);
+    functions.glBeginTransformFeedback(mode);
 }
 
-GLuint RenderProgram::uniformBufferIndexByName(const std::string& name)
-{
-    return Renderer::instance().functions().glGetUniformBlockIndex(id, name.c_str());
-}
-
-GLint RenderProgram::uniformBufferDataSize(GLuint blockIndex)
-{
-    GLint val = -1;
-    Renderer::instance().functions().glGetActiveUniformBlockiv(id, blockIndex, GL_UNIFORM_BLOCK_DATA_SIZE, &val);
-    return val;
-}
-
-std::unordered_map<std::string, GLint> RenderProgram::uniformBufferOffsets(GLuint blockIndex)
+void Renderer::endTransformFeedback()
 {
     auto& functions = Renderer::instance().functions();
 
-    std::unordered_map<std::string, int32_t> result;
-
-    GLint count = -1;
-    functions.glGetActiveUniformBlockiv(id, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS, &count);
-
-    if (count >= 0)
-    {
-        std::vector<GLuint> indices(static_cast<size_t>(count));
-        functions.glGetActiveUniformBlockiv(id, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES, reinterpret_cast<GLint*>(indices.data()));
-
-        std::vector<GLint> nameLengths(static_cast<size_t>(count));
-        std::string name;
-        std::vector<GLint> offsets(static_cast<size_t>(count));
-        GLsizei length;
-        GLint size;
-        GLenum type;
-        functions.glGetActiveUniformsiv(id, count, indices.data(), GL_UNIFORM_NAME_LENGTH, nameLengths.data());
-        functions.glGetActiveUniformsiv(id, count, indices.data(), GL_UNIFORM_OFFSET, offsets.data());
-
-        for (size_t i = 0; i < static_cast<size_t>(count); ++i)
-        {
-            name.resize(static_cast<size_t>(nameLengths[i]));
-            functions.glGetActiveUniform(id, indices[i], nameLengths[i], &length, &size, &type, &(name[0]));
-            name.resize(static_cast<size_t>(nameLengths[i])-1);
-            result[name] = offsets[i];
-        }
-    }
-
-    return result;
-}
-
-GLint RenderProgram::uniformLocation(const std::string& name)
-{
-    return Renderer::instance().functions().glGetUniformLocation(id, name.c_str());
-}
-
-void RenderProgram::setUniform(GLint loc, GLint value)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glUseProgram(id);
-    functions.glUniform1i(loc, value);
-}
-
-void RenderProgram::setUniform(GLint loc, const glm::vec4& value)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glUseProgram(id);
-    functions.glUniform4fv(loc, 1, glm::value_ptr(value));
-}
-
-void RenderProgram::setUniform(GLint loc, const glm::mat4x4& value)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glUseProgram(id);
-    functions.glUniformMatrix4fv(loc, 1, false, glm::value_ptr(value));
-}
-
-Texture::~Texture()
-{
-    Renderer::instance().functions().glDeleteTextures(1, &id);
-}
-
-void Texture::generateMipmaps()
-{
-    auto& functions = Renderer::instance().functions();
-
-    functions.glBindTexture(GL_TEXTURE_2D, id);
-    functions.glGenerateMipmap(GL_TEXTURE_2D);
-    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-}
-
-GLBuffer::GLBuffer(GLenum target_, GLsizeiptr size, GLvoid *data, GLenum usage)
-    : target(target_)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glGenBuffers(1, &id);
-    functions.glBindBuffer(target, id);
-    functions.glBufferData(target, size, data, usage);
-}
-
-GLBuffer::~GLBuffer()
-{
-    Renderer::instance().functions().glDeleteBuffers(1, &id);
-}
-
-void *GLBuffer::map(GLintptr offset, GLsizeiptr size, GLbitfield access)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glBindBuffer(target, id);
-    return functions.glMapBufferRange(target, offset, size, access);
-}
-
-void GLBuffer::unmap()
-{
-    Renderer::instance().functions().glUnmapBuffer(target);
-}
-
-VertexBuffer::VertexBuffer(GLsizeiptr size, GLvoid *data, GLenum usage)
-    : GLBuffer(GL_ARRAY_BUFFER, size, data, usage)
-{
-}
-
-IndexBuffer::IndexBuffer(GLenum primitiveType_, GLsizei numIndices_, uint32_t *data, GLenum usage)
-    : GLBuffer(GL_ELEMENT_ARRAY_BUFFER, static_cast<GLsizeiptr>(numIndices_ * sizeof(uint32_t)), data, usage)
-    , numIndices(numIndices_)
-    , primitiveType(primitiveType_)
-{
-}
-
-UniformBuffer::UniformBuffer(GLsizeiptr size, GLvoid *data, GLenum usage)
-    : GLBuffer(GL_UNIFORM_BUFFER, size, data, usage)
-{
-}
-
-Mesh::Mesh()
-{
-    Renderer::instance().functions().glGenVertexArrays(1, &id);
-}
-
-Mesh::~Mesh()
-{
-    Renderer::instance().functions().glDeleteVertexArrays(1, &id);
-}
-
-void Mesh::attachVertexBuffer(VertexAttribute va, std::shared_ptr<VertexBuffer> b, GLint nc, GLsizei stride, GLsizei offset)
-{
-    assert(b->target == GL_ARRAY_BUFFER);
-
-    auto& functions = Renderer::instance().functions();
-    functions.glBindVertexArray(id);
-    functions.glBindBuffer(b->target, b->id);
-    functions.glVertexAttribPointer(castFromVertexAttribute(va),
-                                    nc,
-                                    GL_FLOAT,
-                                    GL_FALSE,
-                                    stride,
-                                    reinterpret_cast<const GLvoid*>(offset));
-    functions.glEnableVertexAttribArray(castFromVertexAttribute(va));
-    functions.glBindVertexArray(0);
-
-    attributes[va] = std::make_tuple(b, nc, stride, offset);
-}
-
-void Mesh::attachIndexBuffer(std::shared_ptr<IndexBuffer> b)
-{
-    assert(b->target == GL_ELEMENT_ARRAY_BUFFER);
-
-    auto& functions = Renderer::instance().functions();
-    functions.glBindVertexArray(id);
-    functions.glBindBuffer(b->target, b->id);
-    functions.glBindVertexArray(0);
-
-    indexBuffers.insert(b);
+    functions.glEndTransformFeedback();
+    functions.glDisable(GL_RASTERIZER_DISCARD);
 }
 
 void Renderer::bindTexture(std::shared_ptr<Texture> texture, GLint unit)
@@ -333,28 +430,34 @@ void Renderer::bindTexture(std::shared_ptr<Texture> texture, GLint unit)
     functions.glBindTexture(texture->target, texture->id);
 }
 
-void Renderer::bindUniformBuffer(std::shared_ptr<UniformBuffer> buffer, GLuint unit)
+void Renderer::bindUniformBuffer(std::shared_ptr<Buffer> buffer, GLuint unit)
 {
     auto& functions = Renderer::instance().functions();
     functions.glBindBufferBase(GL_UNIFORM_BUFFER, unit, buffer->id);
 }
 
-std::shared_ptr<Drawable> Renderer::createSkeletalMeshDrawable(std::shared_ptr<RenderProgram> rp, std::shared_ptr<Model::Mesh> m, std::shared_ptr<UniformBuffer> ub) const
+void Renderer::bindTransformFeedbackBuffer(std::shared_ptr<Buffer> buffer, GLuint unit)
 {
-    return std::make_shared<SkeletalMeshDrawable>(rp, m, ub);
+    auto& functions = Renderer::instance().functions();
+    functions.glBindBufferBase(GL_TRANSFORM_FEEDBACK_BUFFER, unit, buffer->id);
 }
 
-std::shared_ptr<Drawable> Renderer::createSphereDrawable(uint32_t segs, const BoundingSphere &sphere, const glm::vec4& color) const
+std::shared_ptr<MeshDrawable> Renderer::createMeshDrawable(std::shared_ptr<RenderProgram> rp, std::shared_ptr<Model::Mesh> m, std::shared_ptr<VertexBuffer> ab) const
+{
+    return std::make_shared<MeshDrawable>(rp, m, ab);
+}
+
+std::shared_ptr<SphereDrawable> Renderer::createSphereDrawable(uint32_t segs, const BoundingSphere &sphere, const glm::vec4& color) const
 {
     return std::make_shared<SphereDrawable>(m_coloredRenderProgram, segs, sphere, color);
 }
 
-std::shared_ptr<Drawable> Renderer::createFrustumDrawable(const Frustum& frustum, const glm::vec4& color) const
+std::shared_ptr<FrustumDrawable> Renderer::createFrustumDrawable(const Frustum& frustum, const glm::vec4& color) const
 {
     return std::make_shared<FrustumDrawable>(m_coloredRenderProgram, frustum, color);
 }
 
-void Renderer::draw(uint32_t layerId, std::shared_ptr<Drawable> drawable, const Transform& transform)
+void Renderer::draw(int32_t layerId, std::shared_ptr<Drawable> drawable, const Transform& transform)
 {
     m_drawData.insert({layerId, std::make_pair(drawable, transform)});
 }
@@ -376,10 +479,24 @@ const glm::mat4x4 &Renderer::projectionMatrix() const
     return m_projMatrix;
 }
 
+const glm::ivec4 Renderer::viewport() const
+{
+    return m_viewport;
+}
+
+void Renderer::drawMesh(std::shared_ptr<Mesh> mesh, std::shared_ptr<RenderProgram> p)
+{
+    m_functions.glUseProgram(p->id);
+
+    m_functions.glBindVertexArray(mesh->id);
+    for (auto ibo : mesh->indexBuffers)
+        m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
+    m_functions.glBindVertexArray(0);
+}
+
 void Renderer::resize(int width, int height)
 {
-    m_windowWidth = width;
-    m_windowHeight = height;
+    m_viewport = glm::ivec4(0, 0, width, height);
 }
 
 void Renderer::render()
@@ -389,8 +506,8 @@ void Renderer::render()
     m_functions.glClearColor(.5f, .5f, 1.f, 1.f);
     m_functions.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
-    m_functions.glViewport(0, 0, m_windowWidth, m_windowHeight);
-    m_projMatrix = glm::perspective(m_fov, (float)m_windowWidth/(float)m_windowHeight, m_zNear, m_zFar);
+    m_functions.glViewport(m_viewport.x, m_viewport.y, m_viewport.z, m_viewport.w);
+    m_projMatrix = glm::perspective(m_fov, static_cast<float>(m_viewport.z)/static_cast<float>(m_viewport.w), m_zNear, m_zFar);
 
     for (DrawDataType::iterator begin = m_drawData.begin(); begin != m_drawData.end(); )
     {
@@ -403,7 +520,11 @@ void Renderer::render()
 
 void Renderer::renderLayer(DrawDataType::iterator begin, DrawDataType::iterator end)
 {
-    //uint32_t layerId = begin->first;
+    auto layer = m_standardLayer;
+
+    auto it = m_layers.find(begin->first);
+    if (it != m_layers.end())
+        layer = it->second;
 
     for (; begin != end; ++begin)
     {
@@ -421,10 +542,6 @@ void Renderer::renderLayer(DrawDataType::iterator begin, DrawDataType::iterator 
 
         auto mesh = drawable->mesh();
         if (mesh)
-        {
-            m_functions.glBindVertexArray(mesh->id);
-            for (auto ibo : mesh->indexBuffers)
-                m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
-        }
+            drawMesh(mesh, renderProgram);
     }
 }

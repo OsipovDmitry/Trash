@@ -33,8 +33,6 @@ void GraphicsControllerPrivate::updateScene(uint64_t time, uint64_t dt)
         if (!frustum.contain(node->globalTransform() * node->boundingSphere()))
             continue;
 
-        node->isVisible = frustum.contain(node->globalTransform() * node->boundingSphere());
-
         node->m().doUpdate(time, dt);
 
         for (auto child : node->children())

@@ -26,8 +26,6 @@ public:
 
     const BoundingSphere& boundingSphere() const;
 
-    bool isVisible = true;
-
 protected:
     void doAttach() override;
     void doDetach() override;

@@ -57,7 +57,7 @@ const BoundingSphere &Node::boundingSphere() const
             boundingSpheres.push_back(child->transform() * child->boundingSphere());
 
         m_->boundingSphere = BoundingSphere::unite(boundingSpheres);
-        m_->bSphereDrawable = Renderer::instance().createSphereDrawable(4, m_->boundingSphere, glm::vec4(0.8f, .0f, .0f, 1.0f));
+        //m_->bSphereDrawable = Renderer::instance().createSphereDrawable(8, m_->boundingSphere, glm::vec4(0.8f, .0f, .0f, 1.0f));
 
         m_->isBoundingSphereDirty = false;   
     }
