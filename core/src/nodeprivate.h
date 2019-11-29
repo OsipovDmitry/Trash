@@ -2,6 +2,7 @@
 #define NODEPRIVATE_H
 
 #include <memory>
+#include <unordered_set>
 
 #include <utils/transform.h>
 #include <utils/boundingsphere.h>
@@ -17,15 +18,19 @@ public:
 
     void dirtyGlobalTransform();
     void dirtyBoundingSphere();
-    std::shared_ptr<Drawable> boundingSphereDrawable();
 
     virtual void doUpdate(uint64_t, uint64_t);
-    virtual BoundingSphere calcLocalBoundingSphere() { return BoundingSphere(); }
+    virtual void doPick(uint32_t);
+
+    virtual const BoundingSphere& getBoundingSphere();
+
+    void addDrawable(std::shared_ptr<Drawable>);
+    void removeDrawable(std::shared_ptr<Drawable>);
 
     Node& thisNode;
-    Transform transform;
-    Transform globalTransform;
-    BoundingSphere boundingSphere;
+    std::unordered_set<std::shared_ptr<Drawable>> drawables;
+    Transform transform, globalTransform;
+    BoundingSphere minimalBoundingSphere, boundingSphere;
 
     std::shared_ptr<Drawable> bSphereDrawable;
 

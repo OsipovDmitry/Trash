@@ -1,11 +1,11 @@
 <RCC>
     <qresource prefix="/">
         <file>res/chess.png</file>
-        <file>res/shader.frag</file>
-        <file>res/shader.vert</file>
-        <file>res/color.frag</file>
-        <file>res/color.vert</file>
-        <file>res/skeletal_animation.frag</file>
-        <file>res/skeletal_animation.vert</file>
+        <file>res/textured_mesh.frag</file>
+        <file>res/textured_mesh.vert</file>
+        <file>res/textured_static_mesh.vert</file>
+        <file>res/colored_mesh.frag</file>
+        <file>res/colored_mesh.vert</file>
+        <file>res/colored_static_mesh.vert</file>
     </qresource>
 </RCC>

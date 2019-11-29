@@ -10,6 +10,8 @@
 
 int main(int argc, char *argv[])
 {
+    static const int widgetHeight = 200;
+
     QApplication a(argc, argv);
 
     QSurfaceFormat surfaceFormat;
@@ -27,7 +29,7 @@ int main(int argc, char *argv[])
 
     auto game = std::make_shared<Game>();
     Core::instance().setGame(game);
-    Core::instance().renderWidget().resize(1280, 720);
+    Core::instance().renderWidget().resize(widgetHeight * 16 / 9, widgetHeight);
     Core::instance().renderWidget().show();
 
     int res = QApplication::exec();

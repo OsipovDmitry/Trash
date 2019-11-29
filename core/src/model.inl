@@ -11,7 +11,7 @@
 
 std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
 {
-    auto object = ResourceStorage::instance().get(filename);
+    auto object = m_resourceStorage->get(filename);
     if (!object)
     {
         QFile file(QString::fromStdString(filename));
@@ -52,90 +52,50 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
         {
             auto meshFrom = scene->mMeshes[m];
-
-            std::vector<std::pair<bool, VertexAttribute>> attribsInfo {
-                std::make_pair(meshFrom->HasPositions(), VertexAttribute::Position),
-                std::make_pair(meshFrom->HasNormals(), VertexAttribute::Normal),
-                std::make_pair(meshFrom->HasTextureCoords(0), VertexAttribute::TexCoord),
-                std::make_pair(meshFrom->HasBones(), VertexAttribute::BonesIDs),
-                std::make_pair(meshFrom->HasBones(), VertexAttribute::BonesWeights),
-                std::make_pair(meshFrom->HasTangentsAndBitangents(), VertexAttribute::TangentBinormal),
-            };
-
-            std::unordered_map<VertexAttribute, uint32_t> offsets;
-            uint32_t vdSize = 0;
-
-            for (size_t i = 0; i < attribsInfo.size(); ++i)
-            {
-                auto& attribInfo = attribsInfo.at(i);
-                if (attribInfo.first)
-                {
-                    offsets[attribInfo.second] = vdSize;
-                    vdSize += numAttributeComponents(attribInfo.second);
-                }
-            }
-
-            std::vector<float> vertices(static_cast<size_t>(vdSize * meshFrom->mNumVertices));
-            std::vector<uint32_t> indices(3 * meshFrom->mNumFaces);
-            BoundingSphere boundingSphere;
-            bool hasAnimatedAttributes = false;
+            auto meshTo = std::make_shared<::Mesh>();
 
             if (meshFrom->HasPositions())
             {
-                const uint32_t offset = offsets[VertexAttribute::Position];
-                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
-                    std::memcpy(vertices.data() + vdSize * i + offset,
-                                meshFrom->mVertices + i,
-                                numAttributeComponents(VertexAttribute::Position) * sizeof(float));
-
-                aiVector3D center(0.f, 0.f, 0.f);
-                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
-                    center += meshFrom->mVertices[i];
-                if (meshFrom->mNumVertices)
-                    center /= static_cast<float>(meshFrom->mNumVertices);
-
-                float radius = -1.f;
-                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
-                {
-                    const float curRadius = (meshFrom->mVertices[i] - center).SquareLength();
-                    if (curRadius > radius)
-                        radius = curRadius;
-                }
-
-                boundingSphere.setCenter(glm::vec3(center.x, center.y, center.z));
-                boundingSphere.setRadius(glm::sqrt(radius));
+                meshTo->declareVertexAttribute(VertexAttribute::Position,
+                                               std::make_shared<VertexBuffer>(meshFrom->mNumVertices, 3, reinterpret_cast<float*>(meshFrom->mVertices), GL_STATIC_DRAW));
             }
 
             if (meshFrom->HasNormals())
             {
-                const uint32_t offset = offsets[VertexAttribute::Normal];
-                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
-                    std::memcpy(vertices.data() + vdSize * i + offset,
-                                meshFrom->mNormals + i,
-                                numAttributeComponents(VertexAttribute::Normal) * sizeof(float));
+                meshTo->declareVertexAttribute(VertexAttribute::Normal,
+                                               std::make_shared<VertexBuffer>(meshFrom->mNumVertices, 3, reinterpret_cast<float*>(meshFrom->mNormals), GL_STATIC_DRAW));
             }
 
             if (meshFrom->HasTextureCoords(0))
             {
-                const uint32_t offset = offsets[VertexAttribute::TexCoord];
+                meshTo->declareVertexAttribute(VertexAttribute::TexCoord,
+                                               std::make_shared<VertexBuffer>(meshFrom->mNumVertices, 3, reinterpret_cast<float*>(meshFrom->mTextureCoords[0]), GL_STATIC_DRAW));
+            }
+
+            if (meshFrom->HasTangentsAndBitangents())
+            {
+                std::vector<float> tangents(4 * meshFrom->mNumVertices);
+
                 for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
-                    std::memcpy(vertices.data() + vdSize * i + offset,
-                                meshFrom->mTextureCoords[0] + i,
-                                numAttributeComponents(VertexAttribute::TexCoord) * sizeof(float));
+                {
+                    auto& t = meshFrom->mTangents[i];
+                    auto& b = meshFrom->mBitangents[i];
+                    auto& n = meshFrom->mNormals[i];
+                    float sign = ((n ^ t) * b > 0.0f) ? +1.0f : -1.0f;
+
+                    std::memcpy(tangents.data() + 4 * i, &t, 3 * sizeof(float));
+                    std::memcpy(tangents.data() + 4 * i + 3, &sign, sizeof(float));
+                }
+
+                meshTo->declareVertexAttribute(VertexAttribute::TangentBinormal,
+                                               std::make_shared<VertexBuffer>(meshFrom->mNumVertices, 4, tangents.data(), GL_STATIC_DRAW));
             }
 
             if (meshFrom->HasBones())
             {
-                // We have animated model if we have bones for its. We replace Position attribute to TPosition.
-                if (meshFrom->HasPositions())
-                {
-                    offsets[VertexAttribute::TPosition] = offsets[VertexAttribute::Position];
-                    offsets.erase(VertexAttribute::Position);
-                    hasAnimatedAttributes = true;
-                }
+                std::vector<float> boneIds(4 * meshFrom->mNumVertices);
+                std::vector<float> boneWeights(4 * meshFrom->mNumVertices);
 
-                const uint32_t offsetIds = offsets[VertexAttribute::BonesIDs];
-                const uint32_t offsetWeights = offsets[VertexAttribute::BonesWeights];
                 for (unsigned int i = 0; i < meshFrom->mNumBones; ++i)
                 {
                     auto& bone = meshFrom->mBones[i];
@@ -162,12 +122,11 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                         boneIndex = it->second;
                     }
 
-
                     for (unsigned int j = 0; j < bone->mNumWeights; ++j)
                     {
                         auto& weight = bone->mWeights[j];
-                        float* vertexBoneId = vertices.data() + vdSize * weight.mVertexId + offsetIds;
-                        float* vertexBoneWeights = vertices.data() + vdSize * weight.mVertexId + offsetWeights;
+                        float* vertexBoneId = boneIds.data() + 4 * weight.mVertexId;
+                        float* vertexBoneWeights = boneWeights.data() + 4 * weight.mVertexId;
                         unsigned int k = 4;
                         while (k > 0 && vertexBoneWeights[k-1] < weight.mWeight)
                             --k;
@@ -182,41 +141,29 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                             vertexBoneId[k] = static_cast<float>(boneIndex);
                         }
                     }
-                }
-                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
-                {
-                    float weight = (vertices.data() + vdSize * i + offsetWeights)[0]
-                            + (vertices.data() + vdSize * i + offsetWeights)[1]
-                            + (vertices.data() + vdSize * i + offsetWeights)[2]
-                            + (vertices.data() + vdSize * i + offsetWeights)[3];
-                    if (weight > 0.0f)
+
+                    for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
                     {
-                        (vertices.data() + vdSize * i + offsetWeights)[0] /= weight;
-                        (vertices.data() + vdSize * i + offsetWeights)[1] /= weight;
-                        (vertices.data() + vdSize * i + offsetWeights)[2] /= weight;
-                        (vertices.data() + vdSize * i + offsetWeights)[3] /= weight;
+                        float* wights = boneWeights.data() + 4 * i;
+                        float weight = wights[0] + wights[1] + wights[2] + wights[3];
+                        if (weight > 0.0f)
+                        {
+                            wights[0] /= weight;
+                            wights[1] /= weight;
+                            wights[2] /= weight;
+                            wights[3] /= weight;
+                        }
                     }
                 }
+
+                meshTo->declareVertexAttribute(VertexAttribute::BonesIDs,
+                                               std::make_shared<VertexBuffer>(meshFrom->mNumVertices, 4, boneIds.data(), GL_STATIC_DRAW));
+
+                meshTo->declareVertexAttribute(VertexAttribute::BonesWeights,
+                                               std::make_shared<VertexBuffer>(meshFrom->mNumVertices, 4, boneWeights.data(), GL_STATIC_DRAW));
             }
 
-            if (meshFrom->HasTangentsAndBitangents())
-            {
-                const uint32_t offset = offsets[VertexAttribute::TangentBinormal];
-                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
-                {
-                    auto& t = meshFrom->mTangents[i];
-                    auto& b = meshFrom->mBitangents[i];
-                    auto& n = meshFrom->mNormals[i];
-                    float sign = ((n ^ t) * b > 0.0f) ? +1.0f : -1.0f;
-
-                    std::memcpy(vertices.data() + vdSize * i + offset,
-                                &t, 3 * sizeof(float));
-                    std::memcpy(vertices.data() + vdSize * i + offset + 3,
-                                &sign, sizeof(float));
-
-                }
-            }
-
+            std::vector<uint32_t> indices(3 * meshFrom->mNumFaces);
             for (unsigned int i = 0; i < meshFrom->mNumFaces; ++i)
             {
                 auto& face = meshFrom->mFaces[i];
@@ -224,18 +171,9 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                        face.mIndices,
                        3 * sizeof(unsigned int));
             }
+            meshTo->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_TRIANGLES, indices.size(), indices.data(), GL_STATIC_DRAW));
 
-            auto vbo = std::make_shared<VertexBuffer>(meshFrom->mNumVertices, vdSize, vertices.data(), GL_STATIC_DRAW);
-            for (auto& offset : offsets)
-                vbo->declareAttribute(offset.first, offset.second);
-
-            auto ibo = std::make_shared<IndexBuffer>(GL_TRIANGLES, indices.size(), indices.data(), GL_STATIC_DRAW);
-            auto glMesh = std::make_shared<::Mesh>();
-
-            glMesh->attachVertexBuffer(vbo);
-            glMesh->attachIndexBuffer(ibo);
-
-            meshes[m] = std::shared_ptr<Model::Mesh>(new Model::Mesh(glMesh, materials[meshFrom->mMaterialIndex], boundingSphere, hasAnimatedAttributes));
+            meshes[m] = std::shared_ptr<Model::Mesh>(new Model::Mesh(meshTo, materials[meshFrom->mMaterialIndex]));
         }
 
         for (unsigned int a = 0; a < scene->mNumAnimations; ++a)
@@ -321,7 +259,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         }
 
         importer.FreeScene();
-        ResourceStorage::instance().store(filename, object);
+        m_resourceStorage->store(filename, object);
     }
 
     return std::static_pointer_cast<Model>(object);
@@ -415,30 +353,4 @@ bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, st
     }
 
     return true;
-}
-
-BoundingSphere Model::calcBoundingSphere() const
-{
-    BoundingSphere boundingSphere;
-
-    std::queue<std::pair<std::shared_ptr<Node>, Transform>> nodes;
-    if (rootNode)
-        nodes.push(std::make_pair(rootNode, Transform()));
-    while (!nodes.empty())
-    {
-        auto node = nodes.front().first;
-        auto parentTransform = nodes.front().second;
-        nodes.pop();
-
-        auto thisTransform = parentTransform * node->transform;
-
-        for (auto mesh : node->meshes)
-            boundingSphere += thisTransform * mesh->boundingSphere;
-
-        for (auto child : node->children())
-            nodes.push(std::make_pair(child, thisTransform));
-
-    }
-
-    return boundingSphere;
 }

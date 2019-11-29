@@ -5,6 +5,7 @@
 
 #include "coreprivate.h"
 #include "renderwidget.h"
+#include "importexport.h"
 
 QWidget& Core::renderWidget()
 {
@@ -69,6 +70,7 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
     {
         delete static_cast<GraphicsController*>(corePrivate.controllers[castFromControllerType(ControllerType::Graphics)]);
         delete static_cast<AudioController*>(corePrivate.controllers[castFromControllerType(ControllerType::Audio)]);
+
         break;
     }
     case ControllerMessageType::Update:

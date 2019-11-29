@@ -4,3 +4,7 @@ CorePrivate::CorePrivate()
     : AbstractControllerPrivate()
 {
 }
+
+CorePrivate::~CorePrivate()
+{
+}

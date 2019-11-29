@@ -26,15 +26,8 @@ ENUMCLASS(VertexAttribute, uint32_t,
           TexCoord,
           BonesIDs,
           BonesWeights,
-          TangentBinormal,
-          TPosition)
-constexpr uint32_t numAttributeComponents(VertexAttribute attrib)
-{
-    constexpr std::array<uint32_t, numElementsVertexAttribute()> data {
-        3, 3, 2, 4, 4, 4, 3
-    };
-    return data[castFromVertexAttribute(attrib)];
-}
+          TangentBinormal)
+
 namespace std
 {
 template<> struct hash<VertexAttribute> {

@@ -10,7 +10,7 @@
 #include <game/game.h>
 
 static const float dist = 700.0f;
-static const int n = 3;
+static const int n = 6;
 
 void Game::doInitialize()
 {
@@ -48,9 +48,13 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
 
 void Game::doMouseClick(int x, int y)
 {
-    //Core::instance().graphicsController().pickNode(x, y);
-
-    m_resetTime = m_currTime;
+    //m_resetTime = m_currTime;
+//    auto p = Core::instance().graphicsController().pickNode(x, y);
+//    if (p)
+//    {
+//        if (auto *m = dynamic_cast<ModelNode*>(p->parent()))
+//            m->playAnimation("", rand() % 10000);
+//    }
 }
 
 Game::Game()

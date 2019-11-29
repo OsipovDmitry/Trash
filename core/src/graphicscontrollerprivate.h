@@ -21,7 +21,8 @@ public:
     GraphicsControllerPrivate();
     ~GraphicsControllerPrivate();
 
-    void updateScene(uint64_t time, uint64_t dt);
+    void updateScene(uint64_t, uint64_t);
+    std::shared_ptr<Node> pickNode(int32_t, int32_t);
 };
 
 

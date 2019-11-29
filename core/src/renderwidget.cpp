@@ -1,8 +1,10 @@
 #include <QtGui/QOpenGLContext>
 #include <QtGui/QMouseEvent>
 #include <QtGui/QCloseEvent>
+#include <QtGui/QStaticText>
 #include <QtCore/QTimer>
 #include <QtCore/QDateTime>
+
 
 #include <core/core.h>
 
@@ -47,6 +49,7 @@ void RenderWidget::initializeGL()
 
 void RenderWidget::resizeGL(int w, int h)
 {
+    context()->makeCurrent(context()->surface());
     m_renderer->resize(w, h);
 }
 
@@ -70,11 +73,13 @@ void RenderWidget::paintGL()
 
     m_renderer->render();
 
+    int textSize = static_cast<int>(static_cast<float>(height()) / 720 * 28);
+    int textXY = static_cast<int>(static_cast<float>(height()) / 720 * 10);
+
     QPainter painter(this);
     painter.setPen(Qt::black);
-    painter.setFont(QFont("Arial", 16));
-    painter.drawText(10, 10, width(), height(), Qt::AlignTop | Qt::AlignLeft, "FPS: " + QString::number(static_cast<double>(m_lastFps), 'f', 1));
-    painter.end();
+    painter.setFont(QFont("Arial", textSize));
+    painter.drawStaticText(QPoint(textXY, textXY), QStaticText("FPS: " + QString::number(static_cast<double>(m_lastFps), 'f', 1)));
 }
 
 void RenderWidget::mousePressEvent(QMouseEvent *event)

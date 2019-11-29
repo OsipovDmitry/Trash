@@ -8,10 +8,12 @@ DEFINES += \
 
 HEADERS += \
     ../include/game/game.h \
-    ../include/game/gameglobal.h
+    ../include/game/gameglobal.h \
+    src/object.h
 
 SOURCES += \
-    src/game.cpp
+    src/game.cpp \
+    src/object.cpp
 
 LIBS += \
     -lcore

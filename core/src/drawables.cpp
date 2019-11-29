@@ -1,12 +1,29 @@
 #include <utils/frustum.h>
 
+#include "renderer.h"
 #include "drawables.h"
+#include "resources.h"
 
-MeshDrawable::MeshDrawable(std::shared_ptr<RenderProgram> rp, std::shared_ptr<Model::Mesh> m, std::shared_ptr<VertexBuffer> ab)
-    : program(rp)
-    , mesh_(m)
-    , animatedAttributesBuffer(ab)
-{ 
+SelectionDrawable::SelectionDrawable(uint32_t id_)
+    : id(id_)
+{
+}
+
+uint32_t SelectionDrawable::colorToId(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
+{
+    return static_cast<uint32_t>(r | (g << 8) | (b << 16) | (a << 24));
+}
+
+glm::vec4 SelectionDrawable::idToColor(uint32_t id)
+{
+    return glm::vec4((id & 0xff) / 255.f, ((id >> 8) & 0xff) / 255.f, ((id >> 16) & 0xff) / 255.f, ((id >> 24) & 0xff) / 255.f);
+}
+
+MeshDrawable::MeshDrawable(std::shared_ptr<RenderProgram> p, std::shared_ptr<Mesh> m, std::shared_ptr<Buffer> bb)
+    : program(p)
+    , geometry(m)
+    , bonesBuffer(bb)
+{
 }
 
 std::shared_ptr<RenderProgram> MeshDrawable::renderProgram() const
@@ -16,25 +33,109 @@ std::shared_ptr<RenderProgram> MeshDrawable::renderProgram() const
 
 std::shared_ptr<Mesh> MeshDrawable::mesh() const
 {
-    return mesh_->mesh;
+    return geometry;
 }
 
-void MeshDrawable::setup()
+std::shared_ptr<SelectionDrawable> MeshDrawable::selectionDrawable(uint32_t id) const
+{
+    return std::make_shared<SelectionMeshDrawable>(geometry, bonesBuffer, id);
+}
+
+void MeshDrawable::prerender() const
+{
+    Drawable::prerender();
+
+    auto& renderer = Renderer::instance();
+
+    if (bonesBuffer)
+        renderer.bindUniformBuffer(bonesBuffer, program->uniformBufferIndexByName("u_bonesBuffer"));
+}
+
+SelectionMeshDrawable::SelectionMeshDrawable(std::shared_ptr<Mesh> m, std::shared_ptr<Buffer> bb, uint32_t id)
+    : SelectionDrawable(id)
+    , geometry(m)
+    , bonesBuffer(bb)
+
 {
     auto& renderer = Renderer::instance();
 
-    if (mesh_->material && mesh_->material->diffuseTexture)
-    {
-        program->setUniform(program->uniformLocation("u_diffuseMap"), 0);
-        renderer.bindTexture(mesh_->material->diffuseTexture, 0);
-    }
-
-    mesh_->mesh->tmp(animatedAttributesBuffer);
+    if (bonesBuffer)
+        program = renderer.loadRenderProgram(coloreredMeshRenderProgramName.first, coloreredMeshRenderProgramName.second);
+    else
+        program = renderer.loadRenderProgram(coloreredStaticMeshRenderProgramName.first, coloreredStaticMeshRenderProgramName.second);
 }
 
-SphereDrawable::SphereDrawable(std::shared_ptr<RenderProgram> rp, uint32_t segs, const BoundingSphere &bs, const glm::vec4& color)
-    : renderProgram_(rp)
-    , color_(color)
+std::shared_ptr<RenderProgram> SelectionMeshDrawable::renderProgram() const
+{
+    return program;
+}
+
+std::shared_ptr<Mesh> SelectionMeshDrawable::mesh() const
+{
+    return geometry;
+}
+
+std::shared_ptr<SelectionDrawable> SelectionMeshDrawable::selectionDrawable(uint32_t) const
+{
+    return nullptr;
+}
+
+void SelectionMeshDrawable::prerender() const
+{
+    auto& renderer = Renderer::instance();
+
+    if (bonesBuffer)
+        renderer.bindUniformBuffer(bonesBuffer, program->uniformBufferIndexByName("u_bonesBuffer"));
+
+    program->setUniform(program->uniformLocation("u_color"), idToColor(id));
+}
+
+ColoredMeshDrawable::ColoredMeshDrawable(std::shared_ptr<Mesh> m, const glm::vec4& c, std::shared_ptr<Buffer> bb)
+    : MeshDrawable(nullptr, m, bb)
+    , color(c)
+{
+    auto& renderer = Renderer::instance();
+
+    if (bonesBuffer)
+        program = renderer.loadRenderProgram(coloreredMeshRenderProgramName.first, coloreredMeshRenderProgramName.second);
+    else
+        program = renderer.loadRenderProgram(coloreredStaticMeshRenderProgramName.first, coloreredStaticMeshRenderProgramName.second);
+}
+
+void ColoredMeshDrawable::prerender() const
+{
+    MeshDrawable::prerender();
+
+    program->setUniform(program->uniformLocation("u_color"), color);
+}
+
+TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m, std::shared_ptr<Texture> df, std::shared_ptr<Buffer> bb)
+    : MeshDrawable(nullptr, m, bb)
+    , diffuseTexture(df)
+{
+    auto& renderer = Renderer::instance();
+
+    if (bonesBuffer)
+        program = renderer.loadRenderProgram(texturedMeshRenderProgramName.first, texturedMeshRenderProgramName.second);
+    else
+        program = renderer.loadRenderProgram(texturedStaticMeshRenderProgramName.first, texturedStaticMeshRenderProgramName.second);
+
+    if (!diffuseTexture)
+        diffuseTexture = renderer.loadTexture(standardTextureName);
+}
+
+void TexturedMeshDrawable::prerender() const
+{
+    MeshDrawable::prerender();
+
+    auto& renderer = Renderer::instance();
+
+    program->setUniform(program->uniformLocation("u_diffuseMap"), 0);
+    renderer.bindTexture(diffuseTexture, 0);
+}
+
+SphereDrawable::SphereDrawable(uint32_t segs, const BoundingSphere &bs, const glm::vec4& c)
+    : ColoredMeshDrawable(nullptr, c, nullptr)
 {
     std::vector<glm::vec3> vertices((segs+1) * (segs * segs));
     std::vector<uint32_t> indices(4 * (segs * segs * segs));
@@ -65,35 +166,13 @@ SphereDrawable::SphereDrawable(std::shared_ptr<RenderProgram> rp, uint32_t segs,
         }
     }
 
-    const GLsizei numComponents = numAttributeComponents(VertexAttribute::Position);
-
-    auto vbo = std::make_shared<VertexBuffer>(vertices.size(), numComponents, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW);
-    vbo->declareAttribute(VertexAttribute::Position, 0);
-    auto ibo = std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW);
-
-    mesh_ = std::make_shared<Mesh>();
-    mesh_->attachVertexBuffer(vbo);
-    mesh_->attachIndexBuffer(ibo);
+    geometry = std::make_shared<Mesh>();
+    geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 3, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW));
+    geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
 }
 
-std::shared_ptr<RenderProgram> SphereDrawable::renderProgram() const
-{
-    return renderProgram_;
-}
-
-std::shared_ptr<Mesh> SphereDrawable::mesh() const
-{
-    return mesh_;
-}
-
-void SphereDrawable::setup()
-{
-    renderProgram_->setUniform(renderProgram_->uniformLocation("u_color"), color_);
-}
-
-FrustumDrawable::FrustumDrawable(std::shared_ptr<RenderProgram> rp, const Frustum &frustum, const glm::vec4& color)
-    : renderProgram_(rp)
-    , color_(color)
+FrustumDrawable::FrustumDrawable(const Frustum &frustum, const glm::vec4& c)
+    : ColoredMeshDrawable(nullptr, c, nullptr)
 {
     static auto intersectPlanes = [](const Plane& p0, const Plane& p1, const Plane& p2) -> glm::vec3 {
         glm::vec3 bxc = glm::cross(p1.normal(), p2.normal());
@@ -115,28 +194,7 @@ FrustumDrawable::FrustumDrawable(std::shared_ptr<RenderProgram> rp, const Frustu
 
     std::vector<uint32_t> indices({ 0,1, 1,2, 2,3, 3,0, 4,5, 5,6, 6,7, 7,4, 0,4, 1,5, 2,6, 3,7 });
 
-    const GLsizei numComponents = numAttributeComponents(VertexAttribute::Position);
-
-    auto vbo = std::make_shared<VertexBuffer>(vertices.size(), numComponents, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW);
-    vbo->declareAttribute(VertexAttribute::Position, 0);
-    auto ibo = std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW);
-
-    mesh_ = std::make_shared<Mesh>();
-    mesh_->attachVertexBuffer(vbo);
-    mesh_->attachIndexBuffer(ibo);
-}
-
-std::shared_ptr<RenderProgram> FrustumDrawable::renderProgram() const
-{
-    return renderProgram_;
-}
-
-std::shared_ptr<Mesh> FrustumDrawable::mesh() const
-{
-    return mesh_;
-}
-
-void FrustumDrawable::setup()
-{
-    renderProgram_->setUniform(renderProgram_->uniformLocation("u_color"), color_);
+    geometry = std::make_shared<Mesh>();
+    geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 3, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW));
+    geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
 }

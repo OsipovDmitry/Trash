@@ -15,10 +15,9 @@ class CorePrivate : public AbstractControllerPrivate
 {
 public:
     CorePrivate();
-    ~CorePrivate() = default;
+    ~CorePrivate();
 
     RenderWidget* renderWidget;
-
     std::array<AbstractController*, numElementsControllerType()> controllers;
     std::weak_ptr<AbstractGame> game;
 

@@ -6,24 +6,23 @@
 #include <memory>
 
 #include <utils/noncopyble.h>
-#include <utils/singletoon.h>
 
 class ResourceStorage
 {
-    SINGLETON(ResourceStorage)
     NONCOPYBLE(ResourceStorage)
 
 public:
     class Object;
 
+    ResourceStorage();
+    ~ResourceStorage();
+
     void store(const std::string&, std::shared_ptr<Object>);
     std::shared_ptr<Object> get(const std::string&) const;
 
 private:
-    ResourceStorage();
-    ~ResourceStorage() = default;
+    std::unordered_map<std::string, std::shared_ptr<Object>> m_storage;
 
-    std::unordered_map<std::string, std::weak_ptr<Object>> m_storage;
 };
 
 class ResourceStorage::Object
