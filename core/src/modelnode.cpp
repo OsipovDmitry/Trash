@@ -34,7 +34,7 @@ ModelNode::ModelNode(const std::string &filename)
 
             if (mesh->material)
             {
-                diffuseTexture = mesh->material->diffuseTexture;
+                diffuseTexture = mesh->material->diffuseTexture.second;
                 //normalTexture = ...;
             }
 

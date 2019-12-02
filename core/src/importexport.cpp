@@ -1,16 +1,22 @@
+#include <queue>
+#include <stack>
 #include "importexport.h"
 
 void push(std::ofstream& stream, float f)
 {
-    stream.write(reinterpret_cast<const char*>(&f), sizeof(f));
+    stream.write(reinterpret_cast<const char*>(&f), sizeof(float));
 }
 void push(std::ofstream& stream, uint16_t f)
 {
-    stream.write(reinterpret_cast<const char*>(&f), sizeof(f));
+    stream.write(reinterpret_cast<const char*>(&f), sizeof(uint16_t));
+}
+void push(std::ofstream& stream, int32_t f)
+{
+    stream.write(reinterpret_cast<const char*>(&f), sizeof(int32_t));
 }
 void push(std::ofstream& stream, uint32_t f)
 {
-    stream.write(reinterpret_cast<const char*>(&f), sizeof(f));
+    stream.write(reinterpret_cast<const char*>(&f), sizeof(uint32_t));
 }
 void push(std::ofstream& stream, const std::string& f)
 {
@@ -24,6 +30,10 @@ void push(std::ofstream& stream, const glm::vec3& f)
 void push(std::ofstream& stream, const glm::quat& f)
 {
     push(stream, f.x); push(stream, f.y); push(stream, f.z); push(stream, f.w);
+}
+void push(std::ofstream& stream, const Transform& f)
+{
+    push(stream, f.scale); push(stream, f.rotation); push(stream, f.translation);
 }
 void push(std::ofstream& stream, std::shared_ptr<Buffer> f, int64_t size)
 {
@@ -52,6 +62,15 @@ void push(std::ofstream& stream, std::shared_ptr<Mesh> f)
     push(stream, static_cast<uint32_t>(f->indexBuffers.size()));
     for (auto& ib : f->indexBuffers)
         push(stream, ib);
+}
+void push(std::ofstream& stream, std::shared_ptr<Model::Material> f)
+{
+    push(stream, f->diffuseTexture.first);
+}
+void push(std::ofstream& stream, std::shared_ptr<Model::Mesh> f)
+{
+    push(stream, f->mesh);
+    push(stream, f->material);
 }
 void push(std::ofstream& stream, std::shared_ptr<Model::Animation> a)
 {
@@ -87,4 +106,47 @@ void push(std::ofstream& stream, std::shared_ptr<Model::Animation> a)
             push(stream, translation.second);
         }
     }
+}
+void push(std::ofstream& stream, std::shared_ptr<Model> f)
+{
+    std::set<std::shared_ptr<Model::Mesh>> meshes;
+    std::stack<std::shared_ptr<Model::Node>> nodes;
+    if (f->rootNode) nodes.push(f->rootNode);
+    while (!nodes.empty()) {
+        auto node = nodes.top();
+        nodes.pop();
+        for (auto mesh : node->meshes) meshes.insert(mesh);
+        for (auto child: node->children()) nodes.push(child);
+    }
+    push(stream, static_cast<uint16_t>(meshes.size()));
+    for (auto mesh : meshes) push(stream, mesh);
+    if (f->rootNode) nodes.push(f->rootNode);
+    while (!nodes.empty()) {
+        auto node = nodes.top();
+        nodes.pop();
+
+        push(stream, node->transform);
+        push(stream, static_cast<uint16_t>(node->meshes.size()));
+        for (auto mesh : node->meshes)
+            push(stream, static_cast<uint16_t>(std::distance(meshes.begin(), meshes.find(mesh))));
+        push(stream, node->boneIndex);
+
+        for (auto it = node->children().rbegin(); it != node->children().rend(); ++it)
+            nodes.push(*it);
+    }
+
+    push(stream, static_cast<uint16_t>(f->animations.size()));
+    for (auto& animation : f->animations)
+    {
+        push(stream, animation.first);
+        push(stream, animation.second);
+    }
+
+    push(stream, static_cast<uint16_t>(f->boneTransforms.size()));
+    for (auto& boneTransform : f->boneTransforms)
+        push(stream, boneTransform);
+
+    push(stream, static_cast<uint16_t>(f->boneNames.size()));
+    for (auto& boneName : f->boneNames)
+        push(stream, boneName);
 }

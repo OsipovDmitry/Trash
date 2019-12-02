@@ -41,7 +41,10 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
             {
                 aiString path;
                 if (material->GetTexture(aiTextureType_DIFFUSE, 0, &path) == AI_SUCCESS)
-                    materialTo->diffuseTexture = loadTexture(path.C_Str());
+                {
+                    std::string filename = path.C_Str();
+                    materialTo->diffuseTexture = std::make_pair(filename, loadTexture(filename));
+                }
             }
 
             materials[m] = materialTo;

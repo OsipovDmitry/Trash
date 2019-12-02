@@ -50,8 +50,8 @@ SOURCES += \
     src/importexport.cpp
 
 LIBS += \
-    -lassimp-vc140-mt
-#    -lassimp
+#    -lassimp-vc140-mt
+    -lassimp
 
 RESOURCES += \
     core.qrc

@@ -143,7 +143,7 @@ struct Model : public ResourceStorage::Object
 
 struct Model::Material
 {
-    std::shared_ptr<Texture> diffuseTexture;
+    std::pair<std::string, std::shared_ptr<Texture>> diffuseTexture;
 };
 
 struct Model::Mesh

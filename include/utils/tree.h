@@ -47,8 +47,8 @@ public:
     const T *parent() const { return m_parent; }
     T *parent() { return m_parent; }
 
-    const std::vector<std::shared_ptr<T>> children() const { return m_children; }
-    std::vector<std::shared_ptr<T>> children() { return m_children; }
+    const std::vector<std::shared_ptr<T>>& children() const { return m_children; }
+    std::vector<std::shared_ptr<T>>& children() { return m_children; }
 
 protected:
     virtual void doAttach() {}
