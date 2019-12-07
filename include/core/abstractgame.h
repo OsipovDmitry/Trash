@@ -11,6 +11,7 @@ class AbstractGame
 
 public:
     virtual void doInitialize() {}
+    virtual void doUnitialize() {}
     virtual void doUpdate(uint64_t, uint64_t) {}
     virtual void doMouseClick(int, int) {}
 

@@ -11,6 +11,12 @@
 
 class NodePrivate;
 
+class NodeUserData
+{
+public:
+    virtual ~NodeUserData() = default;
+};
+
 class CORESHARED_EXPORT Node : public TreeNode<Node>
 {
     PIMPL(Node)
@@ -25,6 +31,9 @@ public:
     const Transform& globalTransform() const;
 
     const BoundingSphere& boundingSphere() const;
+
+    std::shared_ptr<NodeUserData> userData() const;
+    void setUserData(std::shared_ptr<NodeUserData>);
 
 protected:
     void doAttach() override;

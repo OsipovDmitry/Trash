@@ -76,9 +76,26 @@ void ModelNode::showBones(bool state)
 //    model->animations[animIter->first] = animIter->second;
 //}
 
-void ModelNode::playAnimation(const std::string& animationName, uint32_t timeOffset)
+void ModelNode::playAnimation(const std::string& animationName, uint64_t timeOffset)
 {
     auto& privateData = m();
+
+    if (!privateData.model->animations.count(animationName))
+    {
+        auto anim = Renderer::instance().loadAnimation(animationName + ".anim");
+        assert(anim != nullptr);
+        privateData.model->animations.insert({animationName, anim});
+    }
+
     privateData.animationName = animationName;
     privateData.timeOffset = timeOffset;
+    privateData.startAnimation = true;
+}
+
+uint64_t ModelNode::animationTime(const std::string& animationName) const
+{
+    auto anim = m().model->animations[animationName];
+    if (!anim)
+        return 0;
+    return static_cast<uint64_t>(anim->duration / anim->framesPerSecond * 1000.0f);
 }

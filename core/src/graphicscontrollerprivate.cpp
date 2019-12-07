@@ -4,6 +4,7 @@
 #include <utils/ray.h>
 
 #include <core/node.h>
+#include <core/graphicscontroller.h>
 
 #include "graphicscontrollerprivate.h"
 #include "nodeprivate.h"
@@ -43,7 +44,7 @@ void GraphicsControllerPrivate::updateScene(uint64_t time, uint64_t dt)
     }
 }
 
-std::shared_ptr<Node> GraphicsControllerPrivate::pickNode(int32_t xi, int32_t yi)
+PickData GraphicsControllerPrivate::pickNode(int32_t xi, int32_t yi)
 {
     auto& renderer = Renderer::instance();
     const auto& vp = renderer.viewport();
@@ -51,10 +52,10 @@ std::shared_ptr<Node> GraphicsControllerPrivate::pickNode(int32_t xi, int32_t yi
     const float x = static_cast<float>(xi - vp.x) / static_cast<float>(vp.z) * 2.0f - 1.0f;
     const float y = (1.0f - static_cast<float>(yi - vp.y) / static_cast<float>(vp.w)) * 2.0f - 1.0f;
 
-    auto modelViewMatrixInverse = glm::inverse(renderer.projectionMatrix() * viewMatrix);
+    auto viewProjectionMatrixInverse = glm::inverse(renderer.projectionMatrix() * viewMatrix);
 
-    glm::vec4 p0 = modelViewMatrixInverse * glm::vec4(x, y, -1.0f, 1.0f);
-    glm::vec4 p1 = modelViewMatrixInverse * glm::vec4(x, y, 1.0f, 1.0f);
+    glm::vec4 p0 = viewProjectionMatrixInverse * glm::vec4(x, y, -1.0f, 1.0f);
+    glm::vec4 p1 = viewProjectionMatrixInverse * glm::vec4(x, y, 1.0f, 1.0f);
 
     p0 /= p0.w;
     p1 /= p1.w;
@@ -81,6 +82,19 @@ std::shared_ptr<Node> GraphicsControllerPrivate::pickNode(int32_t xi, int32_t yi
             nodes.push(child);
     }
 
-    uint32_t id = renderer.pick(xi, yi, SelectionDrawable::idToColor(0xFFFFFFFF));
-    return (id != 0xFFFFFFFF) ? nodeIds[id] : nullptr;
+    uint32_t idColor;
+    float depth;
+    renderer.pick(xi, yi, SelectionDrawable::idToColor(0xFFFFFFFF), idColor, depth);
+    std::shared_ptr<Node> node = (idColor != 0xFFFFFFFF) ? nodeIds[idColor] : nullptr;
+
+    depth = depth * 2.0f - 1.0f;
+    p0 = viewProjectionMatrixInverse * glm::vec4(x, y, depth, 1.0f);
+    p0 /= p0.w;
+
+    glm::vec3 localCoord(0.0f, 0.0f, 0.0f);
+    if (node)
+        localCoord = node->globalTransform().inverse() * glm::vec3(p0.x, p0.y, p0.z);
+
+
+    return PickData{node, localCoord};
 }

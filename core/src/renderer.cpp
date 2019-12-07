@@ -14,6 +14,7 @@
 #include "drawables.h"
 #include "resources.h"
 #include "model.inl"
+#include "importexport.h"
 
 #include <iostream>
 
@@ -146,11 +147,15 @@ void Texture::generateMipmaps()
 }
 
 Buffer::Buffer(GLsizeiptr size, GLvoid *data, GLenum usage)
+    : id(0)
 {
     auto& functions = Renderer::instance().functions();
-    functions.glGenBuffers(1, &id);
-    functions.glBindBuffer(GL_ARRAY_BUFFER, id);
-    functions.glBufferData(GL_ARRAY_BUFFER, size, data, usage);
+    if (size)
+    {
+        functions.glGenBuffers(1, &id);
+        functions.glBindBuffer(GL_ARRAY_BUFFER, id);
+        functions.glBufferData(GL_ARRAY_BUFFER, size, data, usage);
+    }
 }
 
 Buffer::~Buffer()
@@ -206,6 +211,7 @@ void Mesh::declareVertexAttribute(VertexAttribute attrib, std::shared_ptr<Vertex
 
     attributesDeclaration[attrib] = vb;
 
+
     if (attrib == VertexAttribute::Position)
     {
         assert(vb->numComponents == 2 || vb->numComponents == 3);
@@ -251,7 +257,7 @@ void Mesh::attachIndexBuffer(std::shared_ptr<IndexBuffer> b)
 
 Framebuffer::Framebuffer(GLint internalFormat)
     : colorTexture(0)
-    , depthStencilRenderbuffer(0)
+    , depthTexture(0)
     , colorTextureInternalFormat(internalFormat)
 {
     auto& functions = Renderer::instance().functions();
@@ -264,12 +270,12 @@ Framebuffer::~Framebuffer()
     auto& functions = Renderer::instance().functions();
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
-    functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
+    functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
     functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
     QOpenGLFramebufferObject::bindDefault();
 
-    if (depthStencilRenderbuffer)
-        functions.glDeleteRenderbuffers(1, &depthStencilRenderbuffer);
+    if (depthTexture)
+        functions.glDeleteTextures(1, &depthTexture);
 
     if (colorTexture)
         functions.glDeleteTextures(1, &colorTexture);
@@ -282,19 +288,21 @@ void Framebuffer::resize(int width, int height)
     auto& functions = Renderer::instance().functions();
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
-    functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
+    functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
     functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
 
-    if (depthStencilRenderbuffer)
-        functions.glDeleteRenderbuffers(1, &depthStencilRenderbuffer);
+    if (depthTexture)
+        functions.glDeleteTextures(1, &depthTexture);
 
     if (colorTexture)
         functions.glDeleteTextures(1, &colorTexture);
 
-    functions.glGenRenderbuffers(1, &depthStencilRenderbuffer);
-    functions.glBindRenderbuffer(GL_RENDERBUFFER, depthStencilRenderbuffer);
-    functions.glRenderbufferStorage(GL_RENDERBUFFER, GL_DEPTH24_STENCIL8, width, height);
-    functions.glBindRenderbuffer(GL_RENDERBUFFER, 0);
+    functions.glGenTextures(1, &depthTexture);
+    functions.glBindTexture(GL_TEXTURE_2D, depthTexture);
+    functions.glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, nullptr);
+    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    functions.glBindTexture(GL_TEXTURE_2D, 0);
 
     functions.glGenTextures(1, &colorTexture);
     functions.glBindTexture(GL_TEXTURE_2D, colorTexture);
@@ -303,7 +311,7 @@ void Framebuffer::resize(int width, int height)
     functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     functions.glBindTexture(GL_TEXTURE_2D, 0);
 
-    functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, depthStencilRenderbuffer);
+    functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
     functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture, 0);
     QOpenGLFramebufferObject::bindDefault();
 }
@@ -322,6 +330,30 @@ void Renderer::initializeResources()
 
     auto standardTexture = loadTexture(standardTextureName);
     standardTexture->generateMipmaps();
+
+//    const float L = 1250;
+//    const float wrap = 7;
+//    std::vector<glm::vec3> pos {glm::vec3(-L, 0.0f, -L), glm::vec3(-L, 0.0f, +L), glm::vec3(+L, 0.0f, -L), glm::vec3(+L, 0.0f, +L)};
+//    std::vector<glm::vec3> n {glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f)};
+//    std::vector<glm::vec2> tc {glm::vec2(0.f, 0.f), glm::vec2(0.f, wrap), glm::vec2(wrap, 0.f), glm::vec2(wrap, wrap)};
+//    std::vector<uint32_t> indices {0, 1, 2, 3};
+
+//    auto mesh = std::make_shared<Mesh>();
+//    mesh->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(4, 3, &pos[0].x, GL_STATIC_DRAW));
+//    mesh->declareVertexAttribute(VertexAttribute::Normal, std::make_shared<VertexBuffer>(4, 3, &n[0].x, GL_STATIC_DRAW));
+//    mesh->declareVertexAttribute(VertexAttribute::TexCoord, std::make_shared<VertexBuffer>(4, 2, &tc[0].x, GL_STATIC_DRAW));
+//    mesh->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_TRIANGLE_STRIP, 4, indices.data(), GL_STATIC_DRAW));
+
+//    auto mat = std::make_shared<Model::Material>();
+//    mat->diffuseTexture = std::make_pair(std::string("textures/floor.jpg"), loadTexture("textures/floor.jpg"));
+
+//    auto mdl = std::make_shared<Model>();
+//    mdl->rootNode = std::make_shared<Model::Node>();
+//    mdl->rootNode->meshes.push_back(std::make_shared<Model::Mesh>(mesh, mat));
+
+//    std::ofstream f("floor.mdl", std::ios_base::binary);
+//    push(f, mdl);
+//    f.close();
 }
 
 Renderer &Renderer::instance()
@@ -337,7 +369,7 @@ QOpenGLExtraFunctions& Renderer::functions()
 std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &vertexFile, const std::string &fragmentFile)
 {
     const std::string key = vertexFile+fragmentFile;
-    auto object = m_resourceStorage->get(key);
+    auto object = std::dynamic_pointer_cast<RenderProgram>(m_resourceStorage->get(key));
     if (!object)
     {
         std::array<std::pair<GLenum, QString>, 2> shaderFilenames {
@@ -408,12 +440,12 @@ std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &ve
         m_resourceStorage->store(key, object);
     }
 
-    return std::static_pointer_cast<RenderProgram>(object);
+    return object;
 }
 
 std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
 {
-    auto object = m_resourceStorage->get(filename);
+    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(filename));
     if (!object)
     {
         QImage image;
@@ -429,10 +461,26 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
         m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 
         object = std::make_shared<Texture>(id);
+        object->generateMipmaps();
         m_resourceStorage->store(filename, object);
     }
 
-    return std::static_pointer_cast<Texture>(object);
+    return object;
+}
+
+std::shared_ptr<Model::Animation> Renderer::loadAnimation(const std::string& filename)
+{
+    auto object = std::dynamic_pointer_cast<Model::Animation>(m_resourceStorage->get(filename));
+    if (!object)
+    {
+        std::shared_ptr<Model::Animation> anim;
+        std::ifstream file(filename, std::ios_base::binary);
+        pull(file, object);
+        file.close();
+
+        m_resourceStorage->store(filename, object);
+    }
+    return object;
 }
 
 void Renderer::bindTexture(std::shared_ptr<Texture> texture, GLint unit)
@@ -452,7 +500,7 @@ void Renderer::draw(std::shared_ptr<Drawable> drawable, const Transform& transfo
     m_drawData.insert(std::make_pair(drawable, transform));
 }
 
-uint32_t Renderer::pick(int xi, int yi, const glm::vec4& backgroundColor)
+void Renderer::pick(int xi, int yi, const glm::vec4& backgroundColor, uint32_t& pickColor, float& pickDepth)
 {
     static const GLenum drawBuffers[1] = {GL_COLOR_ATTACHMENT0};
 
@@ -498,6 +546,8 @@ uint32_t Renderer::pick(int xi, int yi, const glm::vec4& backgroundColor)
     uint8_t color[4];
     m_functions.glReadBuffer(GL_COLOR_ATTACHMENT0);
     m_functions.glReadPixels(xi, m_viewport.w - yi - 1, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, color);
+    m_functions.glReadBuffer(GL_DEPTH_ATTACHMENT);
+    m_functions.glReadPixels(xi, m_viewport.w - yi - 1, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &pickDepth);
 
 //    std::vector<uint8_t> color(m_viewport.z * m_viewport.w * 4);
 //    m_functions.glReadBuffer(GL_COLOR_ATTACHMENT0);
@@ -507,7 +557,7 @@ uint32_t Renderer::pick(int xi, int yi, const glm::vec4& backgroundColor)
 
     QOpenGLFramebufferObject::bindDefault();
 
-    return SelectionMeshDrawable::colorToId(color[0], color[1], color[2], color[3]);
+    pickColor = SelectionMeshDrawable::colorToId(color[0], color[1], color[2], color[3]);
 }
 
 void Renderer::setViewMatrix(const glm::mat4x4& value)
@@ -547,7 +597,7 @@ void Renderer::render()
         &Renderer::renderTransparentLayer
     };
 
-    m_functions.glClearColor(.5f, .5f, 1.f, 1.f);
+    m_functions.glClearColor(.4f, .4f, .85f, 1.f);
     m_functions.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
     m_functions.glViewport(m_viewport.x, m_viewport.y, m_viewport.z, m_viewport.w);

@@ -5,12 +5,12 @@
 #include <QtCore/QTimer>
 #include <QtCore/QDateTime>
 
-
 #include <core/core.h>
 
 #include "renderwidget.h"
 #include "renderer.h"
 #include "importexport.h"
+
 RenderWidget::RenderWidget(Core& core)
     : QOpenGLWidget()
     , m_core(core)
@@ -45,11 +45,6 @@ void RenderWidget::initializeGL()
     m_startTime = m_lastUpdateTime = m_lastFpsTime = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
 
     m_core.sendMessage(std::make_shared<RenderWidgetWasInitializedMessage>());
-
-    auto mdl = m_renderer->loadModel("dance1.dae");
-    std::ofstream file("dance1.mdl", std::ios_base::binary);
-    push(file, mdl);
-    file.close();
 }
 
 void RenderWidget::resizeGL(int w, int h)

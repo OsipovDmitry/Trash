@@ -9,55 +9,79 @@
 
 #include <game/game.h>
 
-static const float dist = 700.0f;
-static const int n = 6;
+#include "gameprivate.h"
+#include "scene.h"
+#include "person.h"
+#include "floor.h"
+
+Game::Game()
+    : m_(std::make_unique<GamePrivate>())
+{
+}
+
+Game::~Game()
+{
+}
 
 void Game::doInitialize()
 {
-    static const std::vector<std::string> filenames { "dance1.dae", "dance2.dae", "dance3.dae", "dance4.dae", "dance5.dae" };
+    m_->scene = std::make_shared<Scene>();
 
-    auto rootNode = Core::instance().graphicsController().rootNode();
-    for (int i = -n; i <= n; ++i)
-        for (int j = -n; j <= n; ++j)
-        {
-            auto node = std::make_shared<ModelNode>(filenames[rand() % filenames.size()]);
-            node->setTransform(Transform(glm::vec3(1.f, 1.f, 1.f), glm::quat(1.f, 0.f, 0.f, 0.f), glm::vec3(i * dist, 0.0f, j * dist)));
-            rootNode->attach(node);
+    for (size_t i = 0; i < GamePrivate::numPersons; ++i)
+    {
+        m_->persons[i] = std::make_shared<Person>(GamePrivate::personsNames[i]);
+        m_->scene->attachObject(m_->persons[i]);
 
-            node->playAnimation("", rand() % 10000);
-        }
+        float angle = 2.0f * glm::pi<float>() * i / GamePrivate::numPersons;
+        m_->persons[i]->graphicsNode()->setTransform(Transform(
+                                                         glm::vec3(1.f,1.f,1.f),
+                                                         glm::quat_cast(glm::mat3x3(glm::vec3(-.7f,0.f,-.7f), glm::vec3(0.f,1.f,0.f), glm::vec3(.7f,0.f,-.7f))),
+                                                         900.0f * glm::vec3(glm::cos(angle), 0.0f,glm::sin(angle))));
+    }
 
-    Core::instance().graphicsController().setProjectionMatrix(glm::pi<float>() * 0.25f, 500.0f, 400000.0f);
-    Core::instance().graphicsController().setViewMatrix(glm::lookAt(glm::vec3(0.f, 0.f, 2 * dist * n * 3.0f), glm::vec3(), glm::vec3(0.0f, 1.0f, 0.0f)));
+    m_->floor = std::make_shared<Floor>();
+    m_->scene->attachObject(m_->floor);
+
+    const float r = 350;
+    Core::instance().graphicsController().setProjectionMatrix(glm::pi<float>() * 0.25f, 1000.0f, 5000.0f);
+    Core::instance().graphicsController().setViewMatrix(glm::lookAt(glm::vec3(5 * r, 3 * r, -5 * r), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+}
+
+void Game::doUnitialize()
+{
+    m_->floor = nullptr;
+    for (size_t i = 0; i < GamePrivate::numPersons; ++i)
+        m_->persons[i] = nullptr;
+    m_->scene = nullptr;
 }
 
 void Game::doUpdate(uint64_t time, uint64_t dt)
 {
-    const float angle = (time - m_resetTime) * 0.00003f + 0.8f;
-    const float radius = dist * n * 1.8f;
-    const float height = dist * 8;
-
-    Core::instance().graphicsController().setViewMatrix(
-    glm::lookAt(radius * glm::vec3(cos(angle), 0.0f, sin(angle)) + glm::vec3(0.0f, height, 0.0f),
-                glm::vec3(0.0f, 0.0f, 0.0f),
-                glm::vec3(0.0f, 1.0f, 0.0f))
-    );
-
-    m_currTime = time;
+    m_->scene->update(time, dt);
 }
 
 void Game::doMouseClick(int x, int y)
 {
-    //m_resetTime = m_currTime;
-//    auto p = Core::instance().graphicsController().pickNode(x, y);
-//    if (p)
-//    {
-//        if (auto *m = dynamic_cast<ModelNode*>(p->parent()))
-//            m->playAnimation("", rand() % 10000);
-//    }
-}
-
-Game::Game()
-    : AbstractGame()
-{ 
+    auto pickData = Core::instance().graphicsController().pickNode(x, y);
+    if (pickData.node)
+    {
+        auto object = m_->scene->findObject(pickData.node.get());
+        if (object == m_->floor)
+        {
+            if (!m_->acivePerson.expired())
+                m_->acivePerson.lock()->moveTo(pickData.localCoord);
+        }
+        else
+        {
+            for (size_t i = 0; i < GamePrivate::numPersons; ++i)
+            {
+                if (m_->persons[i] == object)
+                {
+                    m_->acivePerson = m_->persons[i];
+                    m_->acivePerson.lock()->wave();
+                    break;
+                }
+            }
+        }
+    }
 }

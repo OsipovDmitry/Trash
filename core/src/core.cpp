@@ -68,6 +68,10 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
     }
     case ControllerMessageType::RenderWidgetWasClosed:
     {
+        if (!corePrivate.game.expired())
+        {
+            corePrivate.game.lock()->doUnitialize();
+        }
         delete static_cast<GraphicsController*>(corePrivate.controllers[castFromControllerType(ControllerType::Graphics)]);
         delete static_cast<AudioController*>(corePrivate.controllers[castFromControllerType(ControllerType::Audio)]);
 

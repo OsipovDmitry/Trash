@@ -11,6 +11,12 @@
 #include "abstractcontroller.h"
 #include "types.h"
 
+struct PickData
+{
+    std::shared_ptr<Node> node;
+    glm::vec3 localCoord;
+};
+
 class GraphicsControllerPrivate;
 class CORESHARED_EXPORT GraphicsController : public AbstractController
 {
@@ -27,7 +33,7 @@ public:
     void setViewMatrix(const glm::mat4x4&);
     void setProjectionMatrix(float, float, float);
 
-    std::shared_ptr<Node> pickNode(int32_t, int32_t);
+    PickData pickNode(int32_t, int32_t);
 
 protected:
     void doWork(std::shared_ptr<Message>) override;

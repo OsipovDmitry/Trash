@@ -9,6 +9,7 @@ class Core;
 class GraphicsController;
 class AudioController;
 class AbstractGame;
+class NodeUserData;
 class Node;
 class AbstractCamera;
 

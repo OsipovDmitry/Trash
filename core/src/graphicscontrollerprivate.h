@@ -10,6 +10,7 @@
 #include "abstractcontrollerprivate.h"
 
 class Renderer;
+class PickData;
 
 class GraphicsControllerPrivate : public AbstractControllerPrivate
 {
@@ -22,7 +23,7 @@ public:
     ~GraphicsControllerPrivate();
 
     void updateScene(uint64_t, uint64_t);
-    std::shared_ptr<Node> pickNode(int32_t, int32_t);
+    PickData pickNode(int32_t, int32_t);
 };
 
 

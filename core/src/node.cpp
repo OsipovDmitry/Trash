@@ -48,6 +48,16 @@ const BoundingSphere &Node::boundingSphere() const
     return m_->getBoundingSphere();
 }
 
+std::shared_ptr<NodeUserData> Node::userData() const
+{
+    return m_->userData;
+}
+
+void Node::setUserData(std::shared_ptr<NodeUserData> data)
+{
+    m_->userData = data;
+}
+
 void Node::doAttach()
 {
     m_->dirtyGlobalTransform();

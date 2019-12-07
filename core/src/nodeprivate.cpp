@@ -26,7 +26,7 @@ void NodePrivate::dirtyGlobalTransform()
 void NodePrivate::dirtyBoundingSphere()
 {
     isBoundingSphereDirty = true;
-    while (thisNode.parent())
+    if (thisNode.parent())
         thisNode.parent()->m().dirtyBoundingSphere();
 }
 
@@ -57,9 +57,9 @@ const BoundingSphere &NodePrivate::getBoundingSphere()
             boundingSphere += child->transform() * child->boundingSphere();
         isBoundingSphereDirty = false;
 
-        //drawables.erase(bSphereDrawable);
-        //bSphereDrawable = std::make_shared<SphereDrawable>(8, boundingSphere, glm::vec4(0.8f, .0f, .0f, 1.0f));
-        //drawables.insert(bSphereDrawable);
+//        drawables.erase(bSphereDrawable);
+//        bSphereDrawable = std::make_shared<SphereDrawable>(8, boundingSphere, glm::vec4(0.8f, .0f, .0f, 1.0f));
+//        drawables.insert(bSphereDrawable);
     }
     return boundingSphere;
 }

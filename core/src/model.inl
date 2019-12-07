@@ -8,12 +8,23 @@
 #include <assimp/postprocess.h>
 
 #include "renderer.h"
+#include "importexport.h"
 
 std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
 {
-    auto object = m_resourceStorage->get(filename);
+    auto object = std::static_pointer_cast<Model>(m_resourceStorage->get(filename));
     if (!object)
     {
+        if (filename.find(".mdl") != std::string::npos)
+        {
+            std::shared_ptr<Model> mdl;
+            std::ifstream file(filename, std::ios_base::binary);
+            pull(file, mdl);
+            file.close();
+            m_resourceStorage->store(filename, mdl);
+            return mdl;
+        }
+
         QFile file(QString::fromStdString(filename));
         if (!file.open(QFile::ReadOnly))
             return nullptr;
@@ -28,8 +39,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         if (!scene)
             return nullptr;
 
-        auto model = std::make_shared<Model>();
-        object = model;
+        object = std::make_shared<Model>();
 
         std::vector<std::shared_ptr<Model::Material>> materials(scene->mNumMaterials);
         for (unsigned int m = 0; m < scene->mNumMaterials; ++m)
@@ -109,15 +119,15 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                     auto it = boneMapping.find(boneName);
                     if (it == boneMapping.end())
                     {
-                        boneIndex = static_cast<int32_t>(model->boneTransforms.size());
+                        boneIndex = static_cast<int32_t>(object->boneTransforms.size());
                         boneMapping[boneName] = boneIndex;
 
                         aiVector3D t, s;
                         aiQuaternion r;
                         bone->mOffsetMatrix.Decompose(s, r, t);
 
-                        model->boneNames.push_back(boneName);
-                        model->boneTransforms.push_back(Transform(glm::vec3(s.x, s.y, s.z), glm::quat(r.w, r.x, r.y, r.z), glm::vec3(t.x, t.y, t.z)));
+                        object->boneNames.push_back(boneName);
+                        object->boneTransforms.push_back(Transform(glm::vec3(s.x, s.y, s.z), glm::quat(r.w, r.x, r.y, r.z), glm::vec3(t.x, t.y, t.z)));
 
                     }
                     else
@@ -183,7 +193,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         {
             auto animFrom = scene->mAnimations[a];
             auto animTo = std::make_shared<Model::Animation>(static_cast<float>(animFrom->mTicksPerSecond),static_cast<float>(animFrom->mDuration));
-            model->animations[animFrom->mName.C_Str()] = animTo;
+            object->animations[animFrom->mName.C_Str()] = animTo;
 
             for (unsigned int c = 0; c < animFrom->mNumChannels; ++c)
             {
@@ -238,9 +248,9 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         std::queue<std::pair<aiNode*, std::shared_ptr<Model::Node>>> nodes;
         if (scene->mRootNode)
         {
-            model->rootNode = copyNode(scene->mRootNode);
-            model->rootNode->transform = Transform();
-            nodes.push(std::make_pair(scene->mRootNode, model->rootNode));
+            object->rootNode = copyNode(scene->mRootNode);
+            object->rootNode->transform = Transform();
+            nodes.push(std::make_pair(scene->mRootNode, object->rootNode));
         }
         while (!nodes.empty())
         {
@@ -265,7 +275,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         m_resourceStorage->store(filename, object);
     }
 
-    return std::static_pointer_cast<Model>(object);
+    return object;
 }
 
 uint32_t Model::numBones() const

@@ -19,8 +19,8 @@ public:
     std::shared_ptr<Model> model;
     std::shared_ptr<Buffer> bonesBuffer;
     std::string animationName;
-    uint32_t timeOffset;
-    bool showBones;
+    uint64_t timeOffset, timeStart;
+    bool showBones, startAnimation;
 };
 
 #endif // MODELNODEPRIVATE_H

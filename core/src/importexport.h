@@ -4,10 +4,6 @@
 #include <fstream>
 #include "renderer.h"
 
-#include <queue>
-#include <stack>
-#include "importexport.h"
-
 void push(std::ofstream& stream, float f);
 void push(std::ofstream& stream, uint16_t f);
 void push(std::ofstream& stream, int32_t f);
@@ -24,6 +20,23 @@ void push(std::ofstream& stream, std::shared_ptr<Model::Material> f);
 void push(std::ofstream& stream, std::shared_ptr<Model::Mesh> f);
 void push(std::ofstream& stream, std::shared_ptr<Model::Animation> a);
 void push(std::ofstream& stream, std::shared_ptr<Model> f);
+
+void pull(std::ifstream& stream, float& f);
+void pull(std::ifstream& stream, uint16_t& f);
+void pull(std::ifstream& stream, int32_t& f);
+void pull(std::ifstream& stream, uint32_t& f);
+void pull(std::ifstream& stream, std::string& f);
+void pull(std::ifstream& stream, glm::vec3& f);
+void pull(std::ifstream& stream, glm::quat& f);
+void pull(std::ifstream& stream, Transform& f);
+void pull(std::ifstream& stream, std::shared_ptr<Buffer> f, int64_t size);
+void pull(std::ifstream& stream, std::shared_ptr<VertexBuffer>& f);
+void pull(std::ifstream& stream, std::shared_ptr<IndexBuffer>& f);
+void pull(std::ifstream& stream, std::shared_ptr<Mesh>& f);
+void pull(std::ifstream& stream, std::shared_ptr<Model::Material>& f);
+void pull(std::ifstream& stream, std::shared_ptr<Model::Mesh>& f);
+void pull(std::ifstream& stream, std::shared_ptr<Model::Animation>& a);
+void pull(std::ifstream& stream, std::shared_ptr<Model>& f);
 
 
 #endif // IMPORTEXPORT_H

@@ -116,7 +116,7 @@ struct Framebuffer
 
     GLuint id;
     GLuint colorTexture;
-    GLuint depthStencilRenderbuffer;
+    GLuint depthTexture;
     GLint colorTextureInternalFormat;
 
     Framebuffer(GLint);
@@ -157,7 +157,7 @@ struct Model::Mesh
     {}
 };
 
-struct Model::Animation
+struct Model::Animation : public ResourceStorage::Object
 {
     float framesPerSecond;
     float duration;
@@ -181,7 +181,7 @@ struct Model::Node : public TreeNode<Node>
     std::vector<std::shared_ptr<Mesh>> meshes;
     std::int32_t boneIndex;
 
-    Node(const Transform& t)
+    Node(const Transform& t = Transform())
         : transform(t)
         , boneIndex(-1)
     {
@@ -202,13 +202,14 @@ public:
     std::shared_ptr<RenderProgram> loadRenderProgram(const std::string&, const std::string&);
     std::shared_ptr<Texture> loadTexture(const std::string&);
     std::shared_ptr<Model> loadModel(const std::string&);
+    std::shared_ptr<Model::Animation> loadAnimation(const std::string&);
 
     // binding
     void bindTexture(std::shared_ptr<Texture>, GLint);
     void bindUniformBuffer(std::shared_ptr<Buffer>, GLuint);
 
     void draw(std::shared_ptr<Drawable>, const Transform&);
-    uint32_t pick(int, int, const glm::vec4&);
+    void pick(int, int, const glm::vec4&, uint32_t&, float&);
 
     void setViewMatrix(const glm::mat4x4&);
     void setProjectionMatrix(float, float, float);

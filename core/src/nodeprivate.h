@@ -33,6 +33,7 @@ public:
     BoundingSphere minimalBoundingSphere, boundingSphere;
 
     std::shared_ptr<Drawable> bSphereDrawable;
+    std::shared_ptr<NodeUserData> userData;
 
     bool isGlobalTransformDirty;
     bool isBoundingSphereDirty;

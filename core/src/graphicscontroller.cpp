@@ -38,9 +38,9 @@ void GraphicsController::setProjectionMatrix(float fov, float zNear, float zFar)
 }
 
 
-std::shared_ptr<Node> GraphicsController::pickNode(int32_t xi, int32_t yi)
+PickData GraphicsController::pickNode(int32_t xi, int32_t yi)
 {
-    return m().pickNode(xi, yi);;
+    return m().pickNode(xi, yi);
 }
 
 void GraphicsController::doWork(std::shared_ptr<AbstractController::Message> msg)
