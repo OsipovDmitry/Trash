@@ -9,6 +9,7 @@ const std::pair<std::string, std::string> coloreredStaticMeshRenderProgramName {
 const std::pair<std::string, std::string> texturedMeshRenderProgramName { ":/res/textured_mesh.vert", ":/res/textured_mesh.frag" };
 const std::pair<std::string, std::string> texturedStaticMeshRenderProgramName { ":/res/textured_static_mesh.vert", ":/res/textured_mesh.frag" };
 
-const std::string standardTextureName(":/res/chess.png");
+const std::string standardDiffuseTextureName(":/res/chess.png");
+const std::string standardNormalTextureName(":/res/normal.png");
 
 #endif // RESOURCES_H

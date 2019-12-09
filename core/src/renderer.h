@@ -48,6 +48,7 @@ struct RenderProgram : public ResourceStorage::Object
 
     void setUniform(GLint, GLint);
     void setUniform(GLint, const glm::vec4&);
+    void setUniform(GLint, const glm::mat3x3&);
     void setUniform(GLint, const glm::mat4x4&);
 };
 
@@ -144,6 +145,7 @@ struct Model : public ResourceStorage::Object
 struct Model::Material
 {
     std::pair<std::string, std::shared_ptr<Texture>> diffuseTexture;
+    std::pair<std::string, std::shared_ptr<Texture>> normalTexture;
 };
 
 struct Model::Mesh

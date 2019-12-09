@@ -33,7 +33,10 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         file.close();
 
         Assimp::Importer importer;
-        const aiScene* scene = importer.ReadFileFromMemory(byteArray.data(), static_cast<size_t>(byteArray.size()), aiProcess_Triangulate | aiProcess_FlipUVs);
+        const aiScene* scene = importer.ReadFileFromMemory(byteArray.data(), static_cast<size_t>(byteArray.size()),
+                                                           aiProcess_Triangulate |
+                                                           aiProcess_FlipUVs |
+                                                           aiProcess_CalcTangentSpace);
         byteArray.clear();
 
         if (!scene)
@@ -54,6 +57,16 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                 {
                     std::string filename = path.C_Str();
                     materialTo->diffuseTexture = std::make_pair(filename, loadTexture(filename));
+                }
+
+            }
+            if (material->GetTextureCount(aiTextureType_HEIGHT))
+            {
+                aiString path;
+                if (material->GetTexture(aiTextureType_NORMALS, 0, &path) == AI_SUCCESS)
+                {
+                    std::string filename = path.C_Str();
+                    materialTo->normalTexture = std::make_pair(filename, loadTexture(filename));
                 }
             }
 

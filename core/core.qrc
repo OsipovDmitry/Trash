@@ -7,5 +7,6 @@
         <file>res/colored_mesh.frag</file>
         <file>res/colored_mesh.vert</file>
         <file>res/colored_static_mesh.vert</file>
+        <file>res/normal.png</file>
     </qresource>
 </RCC>

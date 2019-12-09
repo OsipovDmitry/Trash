@@ -81,11 +81,12 @@ public:
 class TexturedMeshDrawable : public MeshDrawable
 {
 public:
-    TexturedMeshDrawable(std::shared_ptr<Mesh>, std::shared_ptr<Texture>, std::shared_ptr<Buffer>);
+    TexturedMeshDrawable(std::shared_ptr<Mesh>, std::shared_ptr<Texture>, std::shared_ptr<Texture>, std::shared_ptr<Buffer>);
 
     void prerender() const override;
 
     std::shared_ptr<Texture> diffuseTexture;
+    std::shared_ptr<Texture> normalTexture;
 };
 
 class SphereDrawable : public ColoredMeshDrawable

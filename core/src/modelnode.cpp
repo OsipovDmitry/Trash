@@ -35,12 +35,12 @@ ModelNode::ModelNode(const std::string &filename)
             if (mesh->material)
             {
                 diffuseTexture = mesh->material->diffuseTexture.second;
-                //normalTexture = ...;
+                normalTexture = mesh->material->normalTexture.second;
             }
 
             auto meshNode = std::make_shared<Node>();
             meshNode->setTransform(transform);
-            meshNode->m().addDrawable(std::make_shared<TexturedMeshDrawable>(mesh->mesh, diffuseTexture, mPrivate.bonesBuffer));
+            meshNode->m().addDrawable(std::make_shared<TexturedMeshDrawable>(mesh->mesh, diffuseTexture, normalTexture, mPrivate.bonesBuffer));
             attach(meshNode);
 
             minimalBoundingSphere += transform * mesh->mesh->boundingSphere;

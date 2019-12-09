@@ -4,6 +4,7 @@
 #include <QtCore/QFile>
 
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtc/matrix_inverse.hpp>
 
 #include <core/core.h>
 
@@ -79,8 +80,7 @@ std::unordered_map<std::string, GLint> RenderProgram::uniformBufferOffsets(GLuin
     GLint count = -1;
     functions.glGetActiveUniformBlockiv(id, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORMS, &count);
 
-    if (count >= 0)
-    {
+    if (count >= 0)    {
         std::vector<GLuint> indices(static_cast<size_t>(count));
         functions.glGetActiveUniformBlockiv(id, blockIndex, GL_UNIFORM_BLOCK_ACTIVE_UNIFORM_INDICES, reinterpret_cast<GLint*>(indices.data()));
 
@@ -122,6 +122,13 @@ void RenderProgram::setUniform(GLint loc, const glm::vec4& value)
     auto& functions = Renderer::instance().functions();
     functions.glUseProgram(id);
     functions.glUniform4fv(loc, 1, glm::value_ptr(value));
+}
+
+void RenderProgram::setUniform(GLint loc, const glm::mat3x3& value)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glUseProgram(id);
+    functions.glUniformMatrix3fv(loc, 1, false, glm::value_ptr(value));
 }
 
 void RenderProgram::setUniform(GLint loc, const glm::mat4x4& value)
@@ -328,7 +335,7 @@ void Renderer::initializeResources()
 {
     m_selectionFramebuffer = std::make_shared<Framebuffer>(GL_RGBA8);
 
-    auto standardTexture = loadTexture(standardTextureName);
+    auto standardTexture = loadTexture(standardDiffuseTextureName);
     standardTexture->generateMipmaps();
 
 //    const float L = 1250;
@@ -354,6 +361,15 @@ void Renderer::initializeResources()
 //    std::ofstream f("floor.mdl", std::ios_base::binary);
 //    push(f, mdl);
 //    f.close();
+
+    std::vector<std::string> names {"liam", "stefani", "shae", "malcolm", "regina"};
+    for (auto& n : names)
+    {
+        auto mdl = loadModel(n+".dae");
+        std::ofstream file(n+".mdl", std::ios_base::binary);
+        push(file, mdl);
+        file.close();
+    }
 }
 
 Renderer &Renderer::instance()
@@ -630,9 +646,13 @@ void Renderer::renderSolidLayer(DrawDataContainer::iterator begin, DrawDataConta
         auto renderProgram = drawable->renderProgram();
         m_functions.glUseProgram(renderProgram->id);
 
+        glm::mat4x4 modelMatrix = transform.operator glm::mat4x4();
+        glm::mat3x3 normalMatrix = glm::inverseTranspose(modelMatrix);
+
         renderProgram->setUniform(renderProgram->uniformLocation("u_projMatrix"), m_projMatrix);
         renderProgram->setUniform(renderProgram->uniformLocation("u_viewMatrix"), m_viewMatrix);
-        renderProgram->setUniform(renderProgram->uniformLocation("u_modelMatrix"), transform.operator glm::mat4x4());
+        renderProgram->setUniform(renderProgram->uniformLocation("u_modelMatrix"), modelMatrix);
+        renderProgram->setUniform(renderProgram->uniformLocation("u_normalMatrix"), normalMatrix);
 
         drawable->prerender();
 

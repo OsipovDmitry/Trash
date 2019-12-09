@@ -68,6 +68,7 @@ void push(std::ofstream& stream, std::shared_ptr<Mesh> f)
 void push(std::ofstream& stream, std::shared_ptr<Model::Material> f)
 {
     push(stream, f->diffuseTexture.first);
+    push(stream, f->normalTexture.first);
 }
 void push(std::ofstream& stream, std::shared_ptr<Model::Mesh> f)
 {
@@ -237,6 +238,8 @@ void pull(std::ifstream& stream, std::shared_ptr<Model::Material>& f)
     f = std::make_shared<Model::Material>();
     pull(stream, f->diffuseTexture.first);
     f->diffuseTexture.second = Renderer::instance().loadTexture(f->diffuseTexture.first);
+    pull(stream, f->normalTexture.first);
+    f->normalTexture.second = Renderer::instance().loadTexture(f->normalTexture.first);
 }
 void pull(std::ifstream& stream, std::shared_ptr<Model::Mesh>& f)
 {

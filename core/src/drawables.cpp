@@ -109,9 +109,10 @@ void ColoredMeshDrawable::prerender() const
     program->setUniform(program->uniformLocation("u_color"), color);
 }
 
-TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m, std::shared_ptr<Texture> df, std::shared_ptr<Buffer> bb)
+TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m, std::shared_ptr<Texture> dt, std::shared_ptr<Texture> nt, std::shared_ptr<Buffer> bb)
     : MeshDrawable(nullptr, m, bb)
-    , diffuseTexture(df)
+    , diffuseTexture(dt)
+    , normalTexture(nt)
 {
     auto& renderer = Renderer::instance();
 
@@ -121,7 +122,10 @@ TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m, std::shared_
         program = renderer.loadRenderProgram(texturedStaticMeshRenderProgramName.first, texturedStaticMeshRenderProgramName.second);
 
     if (!diffuseTexture)
-        diffuseTexture = renderer.loadTexture(standardTextureName);
+        diffuseTexture = renderer.loadTexture(standardDiffuseTextureName);
+
+    if (!normalTexture)
+        normalTexture = renderer.loadTexture(standardNormalTextureName);
 }
 
 void TexturedMeshDrawable::prerender() const
@@ -132,6 +136,9 @@ void TexturedMeshDrawable::prerender() const
 
     program->setUniform(program->uniformLocation("u_diffuseMap"), 0);
     renderer.bindTexture(diffuseTexture, 0);
+
+    program->setUniform(program->uniformLocation("u_normalMap"), 1);
+    renderer.bindTexture(normalTexture, 1);
 }
 
 SphereDrawable::SphereDrawable(uint32_t segs, const BoundingSphere &bs, const glm::vec4& c)
