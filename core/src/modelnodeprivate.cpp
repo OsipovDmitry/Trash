@@ -7,6 +7,11 @@
 #include "renderer.h"
 #include "drawables.h"
 
+namespace trash
+{
+namespace core
+{
+
 ModelNodePrivate::ModelNodePrivate(Node& node)
     : NodePrivate(node)
     , timeOffset(0)
@@ -28,7 +33,7 @@ void ModelNodePrivate::doUpdate(uint64_t time, uint64_t dt)
             startAnimation = false;
         }
 
-        std::vector<Transform> bones;
+        std::vector<utils::Transform> bones;
         model->calcBoneTransforms(animationName, (time - timeStart + timeOffset) * 0.001f, bones);
 
         void *pData = bonesBuffer->map(0, static_cast<GLsizeiptr>(bones.size()*sizeof(glm::mat3x4)), GL_MAP_WRITE_BIT);
@@ -38,3 +43,5 @@ void ModelNodePrivate::doUpdate(uint64_t time, uint64_t dt)
     }
 }
 
+} // namespace
+} // namespace

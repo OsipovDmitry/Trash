@@ -8,19 +8,10 @@ DEFINES += \
 
 HEADERS += \
     ../include/utils/*.h \
-    ../include/core/coreglobal.h \
-    ../include/core/forwarddecl.h \
-    ../include/core/types.h \
-    ../include/core/abstractcontroller.h \
-    ../include/core/core.h \
-    ../include/core/graphicscontroller.h \
-    ../include/core/audiocontroller.h \
-    ../include/core/abstractgame.h \
-    ../include/core/node.h \
-    ../include/core/modelnode.h \
-    ../include/core/abstractcamera.h \
+    ../include/core/*.h \
     src/renderwidget.h \
     src/coreprivate.h \
+    src/cameraprivate.h \
     src/renderer.h \
     src/resourcestorage.h \
     src/model.inl \
@@ -30,7 +21,11 @@ HEADERS += \
     src/modelnodeprivate.h \
     src/drawables.h \
     src/resources.h \
-    src/importexport.h
+    src/importexport.h \
+    src/sceneprivate.h \
+    src/lightprivate.h
+
+    src/cameraprivate.h
 
 SOURCES += \
     src/abstractcontroller.cpp \
@@ -47,11 +42,17 @@ SOURCES += \
     src/modelnode.cpp \
     src/modelnodeprivate.cpp \
     src/drawables.cpp \
-    src/importexport.cpp
+    src/importexport.cpp \
+    src/camera.cpp \
+    src/cameraprivate.cpp \
+    src/scene.cpp \
+    src/light.cpp \
+    src/lightprivate.cpp \
+    src/sceneprivate.cpp
 
 LIBS += \
-#    -lassimp-vc140-mt
-    -lassimp
+    -lassimp-vc140-mt
+#    -lassimp
 
 RESOURCES += \
     core.qrc

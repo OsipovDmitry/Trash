@@ -5,6 +5,11 @@
 
 #include <utils/noncopyble.h>
 
+namespace trash
+{
+namespace core
+{
+
 class AbstractGame
 {
     NONCOPYBLE(AbstractGame)
@@ -20,5 +25,8 @@ protected:
     virtual ~AbstractGame() = default;
 
 };
+
+} // namespace
+} // namespace
 
 #endif // ABSTRACTGAME_H

@@ -9,6 +9,11 @@
 
 #include "abstractcontrollerprivate.h"
 
+namespace trash
+{
+namespace core
+{
+
 class RenderWidget;
 
 class CorePrivate : public AbstractControllerPrivate
@@ -22,5 +27,8 @@ public:
     std::weak_ptr<AbstractGame> game;
 
 };
+
+} // namespace
+} // namespace
 
 #endif // COREPRIVATE_H

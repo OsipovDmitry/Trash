@@ -3,6 +3,11 @@
 
 #include "nodeprivate.h"
 
+namespace trash
+{
+namespace core
+{
+
 Node::Node()
     : m_(std::make_unique<NodePrivate>(*this))
 {
@@ -17,33 +22,26 @@ Node::~Node()
 {
 }
 
-void Node::setTransform(const Transform& value)
+void Node::setTransform(const utils::Transform& value)
 {
     m_->transform = value;
     m_->dirtyGlobalTransform();
+    m_->dirtyLights();
     if (parent())
         parent()->m_->dirtyBoundingSphere();
 }
 
-const Transform &Node::transform() const
+const utils::Transform &Node::transform() const
 {
     return m_->transform;
 }
 
-const Transform &Node::globalTransform() const
+const utils::Transform &Node::globalTransform() const
 {
-    if (m_->isGlobalTransformDirty)
-    {
-        m_->globalTransform =
-                (m_parent ? m_parent->globalTransform() : Transform()) *
-                m_->transform;
-        m_->isGlobalTransformDirty = false;
-    }
-
-    return m_->globalTransform;
+    return m_->getGlobalTransform();
 }
 
-const BoundingSphere &Node::boundingSphere() const
+const utils::BoundingSphere &Node::boundingSphere() const
 {
     return m_->getBoundingSphere();
 }
@@ -61,6 +59,7 @@ void Node::setUserData(std::shared_ptr<NodeUserData> data)
 void Node::doAttach()
 {
     m_->dirtyGlobalTransform();
+    m_->dirtyLights();
     if (parent())
         parent()->m_->dirtyBoundingSphere();
 }
@@ -68,6 +67,10 @@ void Node::doAttach()
 void Node::doDetach()
 {
     m_->dirtyGlobalTransform();
+    m_->dirtyLights();
     if (parent())
         parent()->m_->dirtyBoundingSphere();
 }
+
+} // namespace
+} // namespace

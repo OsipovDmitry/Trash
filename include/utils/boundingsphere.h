@@ -8,6 +8,11 @@
 
 #include "transform.h"
 
+namespace trash
+{
+namespace utils
+{
+
 struct BoundingSphere;
 inline BoundingSphere operator +(const BoundingSphere& s1, const BoundingSphere& s2);
 
@@ -90,5 +95,8 @@ inline BoundingSphere operator *(const Transform& t, const BoundingSphere& s)
     glm::vec3 newRadius = t.scale * s.radius();
     return BoundingSphere(t * s.center(), glm::max(glm::max(newRadius.x, newRadius.y), newRadius.z));
 }
+
+} // namespace
+} // namespace
 
 #endif // BOUNDINGSPHERE_H

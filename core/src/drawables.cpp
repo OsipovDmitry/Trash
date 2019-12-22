@@ -4,6 +4,11 @@
 #include "drawables.h"
 #include "resources.h"
 
+namespace trash
+{
+namespace core
+{
+
 SelectionDrawable::SelectionDrawable(uint32_t id_)
     : id(id_)
 {
@@ -141,7 +146,7 @@ void TexturedMeshDrawable::prerender() const
     renderer.bindTexture(normalTexture, 1);
 }
 
-SphereDrawable::SphereDrawable(uint32_t segs, const BoundingSphere &bs, const glm::vec4& c)
+SphereDrawable::SphereDrawable(uint32_t segs, const utils::BoundingSphere &bs, const glm::vec4& c)
     : ColoredMeshDrawable(nullptr, c, nullptr)
 {
     std::vector<glm::vec3> vertices((segs+1) * (segs * segs));
@@ -178,10 +183,10 @@ SphereDrawable::SphereDrawable(uint32_t segs, const BoundingSphere &bs, const gl
     geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
 }
 
-FrustumDrawable::FrustumDrawable(const Frustum &frustum, const glm::vec4& c)
+FrustumDrawable::FrustumDrawable(const utils::Frustum &frustum, const glm::vec4& c)
     : ColoredMeshDrawable(nullptr, c, nullptr)
 {
-    static auto intersectPlanes = [](const Plane& p0, const Plane& p1, const Plane& p2) -> glm::vec3 {
+    static auto intersectPlanes = [](const utils::Plane& p0, const utils::Plane& p1, const utils::Plane& p2) -> glm::vec3 {
         glm::vec3 bxc = glm::cross(p1.normal(), p2.normal());
         glm::vec3 cxa = glm::cross(p2.normal(), p0.normal());
         glm::vec3 axb = glm::cross(p0.normal(), p1.normal());
@@ -205,3 +210,6 @@ FrustumDrawable::FrustumDrawable(const Frustum &frustum, const glm::vec4& c)
     geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 3, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW));
     geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
 }
+
+} // namespace
+} // namespace

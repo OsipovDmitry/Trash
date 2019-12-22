@@ -5,10 +5,15 @@
 #include <utils/noncopyble.h>
 #include <core/node.h>
 
+namespace trash
+{
+namespace game
+{
+
 class Object;
 class Scene;
 
-class ObjectUserData : public NodeUserData
+class ObjectUserData : public core::NodeUserData
 {
 public:
     ObjectUserData(Object&);
@@ -24,18 +29,21 @@ public:
     Object(std::shared_ptr<ObjectUserData> = nullptr);
     virtual ~Object() = default;
 
-    std::shared_ptr<Node> graphicsNode() const;
+    std::shared_ptr<core::Node> graphicsNode() const;
 
 protected:
     virtual void doUpdate(uint64_t, uint64_t) {}
 
 protected:
     Scene *m_scene;
-    std::shared_ptr<Node> m_graphicsNode;
+    std::shared_ptr<core::Node> m_graphicsNode;
 
     void update(uint64_t, uint64_t);
 
     friend class Scene;
 };
+
+} // namespace
+} // namespace
 
 #endif // OBJECT_H

@@ -19,6 +19,11 @@
 
 #include <iostream>
 
+namespace trash
+{
+namespace core
+{
+
 RenderProgram::~RenderProgram()
 {
     auto& functions = Renderer::instance().functions();
@@ -224,9 +229,9 @@ void Mesh::declareVertexAttribute(VertexAttribute attrib, std::shared_ptr<Vertex
         assert(vb->numComponents == 2 || vb->numComponents == 3);
         auto *p = vb->map(0, vb->numVertices * vb->numComponents * sizeof(float), GL_MAP_READ_BIT);
         if (vb->numComponents == 2)
-            boundingSphere = BoundingSphere(static_cast<glm::vec2*>(p), vb->numVertices);
+            boundingSphere = utils::BoundingSphere(static_cast<glm::vec2*>(p), vb->numVertices);
         if (vb->numComponents == 3)
-            boundingSphere = BoundingSphere(static_cast<glm::vec3*>(p), vb->numVertices);
+            boundingSphere = utils::BoundingSphere(static_cast<glm::vec3*>(p), vb->numVertices);
         vb->unmap();
     }
 }
@@ -323,8 +328,9 @@ void Framebuffer::resize(int width, int height)
     QOpenGLFramebufferObject::bindDefault();
 }
 
-Renderer::Renderer(QOpenGLExtraFunctions& functions)
+Renderer::Renderer(QOpenGLExtraFunctions& functions, GLuint defaultFbo)
     : m_functions(functions)
+    , m_defaultFbo(defaultFbo)
     , m_resourceStorage(std::make_unique<ResourceStorage>())
     , m_projMatrix(1.0f)
     , m_viewMatrix(1.0f)
@@ -333,14 +339,13 @@ Renderer::Renderer(QOpenGLExtraFunctions& functions)
 
 void Renderer::initializeResources()
 {
-    m_selectionFramebuffer = std::make_shared<Framebuffer>(GL_RGBA8);
-
     auto standardTexture = loadTexture(standardDiffuseTextureName);
     standardTexture->generateMipmaps();
 
 //    const float L = 1250;
 //    const float wrap = 7;
 //    std::vector<glm::vec3> pos {glm::vec3(-L, 0.0f, -L), glm::vec3(-L, 0.0f, +L), glm::vec3(+L, 0.0f, -L), glm::vec3(+L, 0.0f, +L)};
+//    std::vector<glm::vec3> t {glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f)};
 //    std::vector<glm::vec3> n {glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f)};
 //    std::vector<glm::vec2> tc {glm::vec2(0.f, 0.f), glm::vec2(0.f, wrap), glm::vec2(wrap, 0.f), glm::vec2(wrap, wrap)};
 //    std::vector<uint32_t> indices {0, 1, 2, 3};
@@ -348,11 +353,13 @@ void Renderer::initializeResources()
 //    auto mesh = std::make_shared<Mesh>();
 //    mesh->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(4, 3, &pos[0].x, GL_STATIC_DRAW));
 //    mesh->declareVertexAttribute(VertexAttribute::Normal, std::make_shared<VertexBuffer>(4, 3, &n[0].x, GL_STATIC_DRAW));
+//    mesh->declareVertexAttribute(VertexAttribute::Tangent, std::make_shared<VertexBuffer>(4, 3, &t[0].x, GL_STATIC_DRAW));
 //    mesh->declareVertexAttribute(VertexAttribute::TexCoord, std::make_shared<VertexBuffer>(4, 2, &tc[0].x, GL_STATIC_DRAW));
 //    mesh->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_TRIANGLE_STRIP, 4, indices.data(), GL_STATIC_DRAW));
 
 //    auto mat = std::make_shared<Model::Material>();
 //    mat->diffuseTexture = std::make_pair(std::string("textures/floor.jpg"), loadTexture("textures/floor.jpg"));
+//    mat->normalTexture = std::make_pair(std::string(":/res/normal.png"), loadTexture(":/res/normal.png"));
 
 //    auto mdl = std::make_shared<Model>();
 //    mdl->rootNode = std::make_shared<Model::Node>();
@@ -362,14 +369,15 @@ void Renderer::initializeResources()
 //    push(f, mdl);
 //    f.close();
 
-    std::vector<std::string> names {"liam", "stefani", "shae", "malcolm", "regina"};
-    for (auto& n : names)
-    {
-        auto mdl = loadModel(n+".dae");
-        std::ofstream file(n+".mdl", std::ios_base::binary);
-        push(file, mdl);
-        file.close();
-    }
+//    std::vector<std::string> names {"liam", "stefani", "shae", "malcolm", "regina"};
+//    for (auto& n : names)
+//    {
+//        auto mdl = loadModel(n+".dae");
+//        mdl->animations.clear();
+//        std::ofstream file(n+".mdl", std::ios_base::binary);
+//        push(file, mdl);
+//        file.close();
+//    }
 }
 
 Renderer &Renderer::instance()
@@ -511,113 +519,28 @@ void Renderer::bindUniformBuffer(std::shared_ptr<Buffer> buffer, GLuint unit)
     m_functions.glBindBufferBase(GL_UNIFORM_BUFFER, unit, id);
 }
 
-void Renderer::draw(std::shared_ptr<Drawable> drawable, const Transform& transform)
+void Renderer::draw(std::shared_ptr<Drawable> drawable, const utils::Transform& transform)
 {
     m_drawData.insert(std::make_pair(drawable, transform));
 }
 
-void Renderer::pick(int xi, int yi, const glm::vec4& backgroundColor, uint32_t& pickColor, float& pickDepth)
-{
-    static const GLenum drawBuffers[1] = {GL_COLOR_ATTACHMENT0};
-
-    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_selectionFramebuffer->id);
-    m_functions.glDrawBuffers(1, drawBuffers);
-
-    m_functions.glEnable(GL_DEPTH_TEST);
-    m_functions.glClearColor(backgroundColor.r, backgroundColor.g, backgroundColor.b, backgroundColor.a);
-    m_functions.glClearDepthf(1.0f);
-    m_functions.glViewport(0, 0, m_viewport.z, m_viewport.w);
-
-    m_functions.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
-
-    auto begin = m_drawData.lower_bound(LayerId::Selection);
-    auto end = m_drawData.upper_bound(*begin);
-
-    for (; begin != end; ++begin)
-    {
-        auto drawable = begin->first;
-        const auto& transform = begin->second;
-
-        auto renderProgram = drawable->renderProgram();
-        m_functions.glUseProgram(renderProgram->id);
-
-        renderProgram->setUniform(renderProgram->uniformLocation("u_projMatrix"), m_projMatrix);
-        renderProgram->setUniform(renderProgram->uniformLocation("u_viewMatrix"), m_viewMatrix);
-        renderProgram->setUniform(renderProgram->uniformLocation("u_modelMatrix"), transform.operator glm::mat4x4());
-
-        drawable->prerender();
-
-        auto mesh = drawable->mesh();
-        if (mesh)
-        {
-            m_functions.glBindVertexArray(mesh->id);
-            for (auto ibo : mesh->indexBuffers)
-                m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
-            m_functions.glBindVertexArray(0);
-        }
-
-        drawable->postrender();
-    }
-
-    uint8_t color[4];
-    m_functions.glReadBuffer(GL_COLOR_ATTACHMENT0);
-    m_functions.glReadPixels(xi, m_viewport.w - yi - 1, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, color);
-    m_functions.glReadBuffer(GL_DEPTH_ATTACHMENT);
-    m_functions.glReadPixels(xi, m_viewport.w - yi - 1, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &pickDepth);
-
-//    std::vector<uint8_t> color(m_viewport.z * m_viewport.w * 4);
-//    m_functions.glReadBuffer(GL_COLOR_ATTACHMENT0);
-//    m_functions.glReadPixels(0, 0, m_viewport.z, m_viewport.w, GL_RGBA, GL_UNSIGNED_BYTE, color.data());
-//    QImage img(color.data(), m_viewport.z, m_viewport.w, QImage::Format_RGBA8888);
-//    img.save("qwe.png");
-
-    QOpenGLFramebufferObject::bindDefault();
-
-    pickColor = SelectionMeshDrawable::colorToId(color[0], color[1], color[2], color[3]);
-}
-
-void Renderer::setViewMatrix(const glm::mat4x4& value)
-{
-    m_viewMatrix = value;
-}
-
-void Renderer::setProjectionMatrix(float fov, float znear, float zfar)
-{
-    m_fov = fov;
-    m_zNear = znear;
-    m_zFar = zfar;
-}
-
-const glm::mat4x4& Renderer::projectionMatrix() const
-{
-    return m_projMatrix;
-}
-
-const glm::ivec4& Renderer::viewport() const
-{
-    return m_viewport;
-}
-
-void Renderer::resize(int width, int height)
-{
-    m_viewport = glm::ivec4(0, 0, width, height);
-    m_selectionFramebuffer->resize(m_viewport.z, m_viewport.w);
-}
-
-void Renderer::render()
+void Renderer::render(std::shared_ptr<Framebuffer> framebuffer)
 {
     using RenderMethod = void(Renderer::*)(DrawDataContainer::iterator, DrawDataContainer::iterator);
     static const std::array<RenderMethod, numElementsLayerId()> renderMethods {
-        &Renderer::renderSelectionLayer,
+        &Renderer::renderSolidLayer, // render selection layer as solid
         &Renderer::renderSolidLayer,
         &Renderer::renderTransparentLayer
     };
 
-    m_functions.glClearColor(.4f, .4f, .85f, 1.f);
-    m_functions.glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
+    GLuint framebufferId = framebuffer ? framebuffer->id : m_defaultFbo;
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
+
+    m_functions.glClearColor(m_clearColor.r, m_clearColor.g, m_clearColor.b, m_clearColor.a);
+    m_functions.glClearDepthf(m_clearDepth);
+    m_functions.glClear(calcClearMask());
 
     m_functions.glViewport(m_viewport.x, m_viewport.y, m_viewport.z, m_viewport.w);
-    m_projMatrix = glm::perspective(m_fov, static_cast<float>(m_viewport.z)/static_cast<float>(m_viewport.w), m_zNear, m_zFar);
 
     for (auto begin = m_drawData.begin(); begin != m_drawData.end(); )
     {
@@ -628,10 +551,54 @@ void Renderer::render()
         begin = end;
     }
     m_drawData.clear();
+
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
 }
 
-void Renderer::renderSelectionLayer(DrawDataContainer::iterator, DrawDataContainer::iterator)
+void Renderer::readPixel(std::shared_ptr<Framebuffer> framebuffer, int xi, int yi, uint8_t &r, uint8_t &g, uint8_t &b, uint8_t &a, float& depth) const
 {
+    GLuint framebufferId = framebuffer ? framebuffer->id : m_defaultFbo;
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
+
+    uint8_t color[4];
+    m_functions.glReadBuffer(GL_COLOR_ATTACHMENT0);
+    m_functions.glReadPixels(xi, m_viewport.w - yi - 1, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, color);
+    r = color[0];
+    g = color[1];
+    b = color[2];
+    a = color[3];
+
+    m_functions.glReadBuffer(GL_DEPTH_ATTACHMENT);
+    m_functions.glReadPixels(xi, m_viewport.w - yi - 1, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depth);
+
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
+}
+
+void Renderer::setViewport(const glm::ivec4& value)
+{
+    m_viewport = value;
+}
+
+void Renderer::setViewMatrix(const glm::mat4x4& value)
+{
+    m_viewMatrix = value;
+}
+
+void Renderer::setProjectionMatrix(const glm::mat4x4& value)
+{
+    m_projMatrix = value;
+}
+
+void Renderer::setClearColor(bool state, const glm::vec4& value)
+{
+    m_clearColorBit = state;
+    m_clearColor = value;
+}
+
+void Renderer::setClearDepth(bool state, float value)
+{
+    m_clearDepthBit = state;
+    m_clearDepth = value;
 }
 
 void Renderer::renderSolidLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
@@ -653,6 +620,7 @@ void Renderer::renderSolidLayer(DrawDataContainer::iterator begin, DrawDataConta
         renderProgram->setUniform(renderProgram->uniformLocation("u_viewMatrix"), m_viewMatrix);
         renderProgram->setUniform(renderProgram->uniformLocation("u_modelMatrix"), modelMatrix);
         renderProgram->setUniform(renderProgram->uniformLocation("u_normalMatrix"), normalMatrix);
+        renderProgram->setUniform(renderProgram->uniformLocation("u_light"), glm::vec4(1000, 1000, -1000, 1));
 
         drawable->prerender();
 
@@ -674,12 +642,24 @@ void Renderer::renderTransparentLayer(DrawDataContainer::iterator, DrawDataConta
 
 }
 
-bool Renderer::DrawDataComarator::operator ()(const Renderer::DrawDataType& left, const Renderer::DrawDataType& right) const
+GLbitfield Renderer::calcClearMask() const
+{
+    GLbitfield clearMask = 0;
+    if (m_clearColorBit) clearMask |= GL_COLOR_BUFFER_BIT;
+    if (m_clearDepthBit) clearMask |= GL_DEPTH_BUFFER_BIT;
+
+    return clearMask;
+}
+
+bool Renderer::DrawDataComparator::operator ()(const Renderer::DrawDataType& left, const Renderer::DrawDataType& right) const
 {
     return left.first->layerId() < right.first->layerId();
 }
 
-bool Renderer::DrawDataComarator::operator ()(const Renderer::DrawDataType& left, LayerId id) const
+bool Renderer::DrawDataComparator::operator ()(const Renderer::DrawDataType& left, LayerId id) const
 {
     return left.first->layerId() < id;
 }
+
+} // namespace
+} // namespace

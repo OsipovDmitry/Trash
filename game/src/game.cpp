@@ -1,6 +1,7 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <core/core.h>
+#include <core/camera.h>
 #include <core/graphicscontroller.h>
 #include <core/modelnode.h>
 
@@ -13,6 +14,11 @@
 #include "scene.h"
 #include "person.h"
 #include "floor.h"
+
+namespace trash
+{
+namespace game
+{
 
 Game::Game()
     : m_(std::make_unique<GamePrivate>())
@@ -33,7 +39,7 @@ void Game::doInitialize()
         m_->scene->attachObject(m_->persons[i]);
 
         float angle = 2.0f * glm::pi<float>() * i / GamePrivate::numPersons;
-        m_->persons[i]->graphicsNode()->setTransform(Transform(
+        m_->persons[i]->graphicsNode()->setTransform(utils::Transform(
                                                          glm::vec3(1.f,1.f,1.f),
                                                          glm::quat_cast(glm::mat3x3(glm::vec3(-.7f,0.f,-.7f), glm::vec3(0.f,1.f,0.f), glm::vec3(.7f,0.f,-.7f))),
                                                          900.0f * glm::vec3(glm::cos(angle), 0.0f,glm::sin(angle))));
@@ -43,8 +49,8 @@ void Game::doInitialize()
     m_->scene->attachObject(m_->floor);
 
     const float r = 350;
-    Core::instance().graphicsController().setProjectionMatrix(glm::pi<float>() * 0.25f, 1000.0f, 5000.0f);
-    Core::instance().graphicsController().setViewMatrix(glm::lookAt(glm::vec3(5 * r, 3 * r, -5 * r), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+    m_->scene->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.25f, 1000.0f, 5000.0f);
+    m_->scene->camera()->setViewMatrix(glm::lookAt(glm::vec3(5 * r, 2 * r, -5 * r), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 }
 
 void Game::doUnitialize()
@@ -62,7 +68,7 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
 
 void Game::doMouseClick(int x, int y)
 {
-    auto pickData = Core::instance().graphicsController().pickNode(x, y);
+    auto pickData = m_->scene->camera()->pickNode(x, y);
     if (pickData.node)
     {
         auto object = m_->scene->findObject(pickData.node.get());
@@ -85,3 +91,6 @@ void Game::doMouseClick(int x, int y)
         }
     }
 }
+
+} // namespace
+} // namespace

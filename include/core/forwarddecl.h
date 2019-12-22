@@ -1,8 +1,12 @@
 #ifndef COREFORWARDDECL_H
 #define COREFORWARDDECL_H
 
-struct Transform;
-struct BoundingSphere;
+#include <inttypes.h>
+
+namespace trash
+{
+namespace core
+{
 
 class AbstractController;
 class Core;
@@ -11,6 +15,14 @@ class AudioController;
 class AbstractGame;
 class NodeUserData;
 class Node;
-class AbstractCamera;
+class ModelNode;
+class Camera;
+class Scene;
+class Light;
+
+enum class LightType : uint32_t;
+
+} // namespace
+} // namespace
 
 #endif // COREFORWARDDECL_H

@@ -8,6 +8,11 @@
 #include "plane.h"
 #include "boundingsphere.h"
 
+namespace trash
+{
+namespace utils
+{
+
 struct Frustum
 {
 public:
@@ -55,5 +60,8 @@ public:
 
     std::array<Plane, 6> planes;
 };
+
+} // namespace
+} // namespace
 
 #endif // FRUSTUM_H

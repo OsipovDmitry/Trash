@@ -6,6 +6,11 @@
 
 #include "nodeprivate.h"
 
+namespace trash
+{
+namespace core
+{
+
 struct Model;
 struct Buffer;
 
@@ -22,5 +27,8 @@ public:
     uint64_t timeOffset, timeStart;
     bool showBones, startAnimation;
 };
+
+} // namespace
+} // namespace
 
 #endif // MODELNODEPRIVATE_H

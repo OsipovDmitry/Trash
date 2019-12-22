@@ -10,6 +10,11 @@
 #include "renderer.h"
 #include "importexport.h"
 
+namespace trash
+{
+namespace core
+{
+
 std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
 {
     auto object = std::static_pointer_cast<Model>(m_resourceStorage->get(filename));
@@ -57,10 +62,14 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                 {
                     std::string filename = path.C_Str();
                     materialTo->diffuseTexture = std::make_pair(filename, loadTexture(filename));
+
+                    std::string bumpFilename = filename;
+                    bumpFilename.replace(bumpFilename.find("Diffuse"), 7, "Normal");
+                    materialTo->normalTexture = std::make_pair(bumpFilename, loadTexture(bumpFilename));
                 }
 
             }
-            if (material->GetTextureCount(aiTextureType_HEIGHT))
+            if (material->GetTextureCount(aiTextureType_NORMALS))
             {
                 aiString path;
                 if (material->GetTexture(aiTextureType_NORMALS, 0, &path) == AI_SUCCESS)
@@ -78,7 +87,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         for (unsigned int m = 0; m < scene->mNumMeshes; ++m)
         {
             auto meshFrom = scene->mMeshes[m];
-            auto meshTo = std::make_shared<::Mesh>();
+            auto meshTo = std::make_shared<core::Mesh>();
 
             if (meshFrom->HasPositions())
             {
@@ -100,21 +109,8 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
 
             if (meshFrom->HasTangentsAndBitangents())
             {
-                std::vector<float> tangents(4 * meshFrom->mNumVertices);
-
-                for (unsigned int i = 0; i < meshFrom->mNumVertices; ++i)
-                {
-                    auto& t = meshFrom->mTangents[i];
-                    auto& b = meshFrom->mBitangents[i];
-                    auto& n = meshFrom->mNormals[i];
-                    float sign = ((n ^ t) * b > 0.0f) ? +1.0f : -1.0f;
-
-                    std::memcpy(tangents.data() + 4 * i, &t, 3 * sizeof(float));
-                    std::memcpy(tangents.data() + 4 * i + 3, &sign, sizeof(float));
-                }
-
-                meshTo->declareVertexAttribute(VertexAttribute::TangentBinormal,
-                                               std::make_shared<VertexBuffer>(meshFrom->mNumVertices, 4, tangents.data(), GL_STATIC_DRAW));
+                meshTo->declareVertexAttribute(VertexAttribute::Tangent,
+                                               std::make_shared<VertexBuffer>(meshFrom->mNumVertices, 3, reinterpret_cast<float*>(meshFrom->mTangents), GL_STATIC_DRAW));
             }
 
             if (meshFrom->HasBones())
@@ -140,7 +136,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                         bone->mOffsetMatrix.Decompose(s, r, t);
 
                         object->boneNames.push_back(boneName);
-                        object->boneTransforms.push_back(Transform(glm::vec3(s.x, s.y, s.z), glm::quat(r.w, r.x, r.y, r.z), glm::vec3(t.x, t.y, t.z)));
+                        object->boneTransforms.push_back(utils::Transform(glm::vec3(s.x, s.y, s.z), glm::quat(r.w, r.x, r.y, r.z), glm::vec3(t.x, t.y, t.z)));
 
                     }
                     else
@@ -252,7 +248,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
             aiVector3D t, s;
             aiQuaternion r;
             node->mTransformation.Decompose(s, r, t);
-            auto result = std::make_shared<Model::Node>(Transform(glm::vec3(s.x, s.y, s.z), glm::quat(r.w, r.x, r.y, r.z), glm::vec3(t.x, t.y, t.z)));
+            auto result = std::make_shared<Model::Node>(utils::Transform(glm::vec3(s.x, s.y, s.z), glm::quat(r.w, r.x, r.y, r.z), glm::vec3(t.x, t.y, t.z)));
             for (unsigned int i = 0; i < node->mNumMeshes; ++i)
                 result->meshes.push_back(meshes[node->mMeshes[i]]);
             return result;
@@ -262,7 +258,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         if (scene->mRootNode)
         {
             object->rootNode = copyNode(scene->mRootNode);
-            object->rootNode->transform = Transform();
+            object->rootNode->transform = utils::Transform();
             nodes.push(std::make_pair(scene->mRootNode, object->rootNode));
         }
         while (!nodes.empty())
@@ -296,9 +292,9 @@ uint32_t Model::numBones() const
     return static_cast<uint32_t>(boneTransforms.size());
 }
 
-bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, std::vector<Transform>& transforms) const
+bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, std::vector<utils::Transform>& transforms) const
 {
-    transforms.resize(numBones(), Transform());
+    transforms.resize(numBones(), utils::Transform());
 
     auto iter = animations.find(animName);
     if (iter == animations.end())
@@ -310,19 +306,19 @@ bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, st
     float timeInTicks = timeInSecs * ticksPerSecond;
     float animTime = std::fmod(timeInTicks, animation->duration);
 
-    std::queue<std::pair<std::shared_ptr<Node>, Transform>> nodes;
+    std::queue<std::pair<std::shared_ptr<Node>, utils::Transform>> nodes;
     if (rootNode)
-        nodes.push(std::make_pair(rootNode, Transform()));
+        nodes.push(std::make_pair(rootNode, utils::Transform()));
     while (!nodes.empty())
     {
         auto node = nodes.front().first;
         auto parentTransform = nodes.front().second;
         nodes.pop();
 
-        Transform globalTransform = parentTransform;
+        utils::Transform globalTransform = parentTransform;
         if (node->boneIndex >= 0)
         {
-            Transform boneTransform = node->transform;
+            utils::Transform boneTransform = node->transform;
             auto& transformTuple = animation->transforms[boneNames[static_cast<size_t>(node->boneIndex)]];
 
             auto& scales = std::get<0>(transformTuple);
@@ -380,3 +376,6 @@ bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, st
 
     return true;
 }
+
+} // namespace
+} // namespace

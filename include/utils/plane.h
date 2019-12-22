@@ -5,6 +5,11 @@
 #include <glm/vec4.hpp>
 #include <glm/geometric.hpp>
 
+namespace trash
+{
+namespace utils
+{
+
 class Plane : public glm::vec4
 {
 public:
@@ -21,5 +26,8 @@ public:
     float distanceTo(const glm::vec3& p) const { return x * p.x + y * p.y + z * p.z + w; }
 
 };
+
+} // namespace
+} // namespace
 
 #endif // PLANE_H

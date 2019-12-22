@@ -8,9 +8,14 @@
 
 #include "gameglobal.h"
 
+namespace trash
+{
+namespace game
+{
+
 class GamePrivate;
 
-class GAMESHARED_EXPORT Game : public AbstractGame
+class GAMESHARED_EXPORT Game : public core::AbstractGame
 {
     PIMPL(Game)
 
@@ -27,5 +32,8 @@ private:
     std::unique_ptr<GamePrivate> m_;
 
 };
+
+} // namespace
+} // namespace
 
 #endif // GAME_H

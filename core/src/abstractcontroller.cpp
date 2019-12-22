@@ -2,6 +2,11 @@
 
 #include "abstractcontrollerprivate.h"
 
+namespace trash
+{
+namespace core
+{
+
 void AbstractController::sendMessage(std::shared_ptr<AbstractController::Message> msg)
 {
     m_->messages.push_back(msg);
@@ -31,3 +36,6 @@ AbstractController::Message::Message(ControllerMessageType msgType)
     : m_type(msgType)
 {
 }
+
+} // namespace
+} // namespace

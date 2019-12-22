@@ -5,6 +5,11 @@
 
 #include "boundingsphere.h"
 
+namespace trash
+{
+namespace utils
+{
+
 class Ray
 {
 public:
@@ -20,5 +25,8 @@ public:
         return glm::intersectRaySphere(pos, dir, bs.center(), bs.radius(), p, n);
     }
 };
+
+} // namespace
+} // namespace
 
 #endif // RAY_H

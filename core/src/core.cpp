@@ -7,6 +7,11 @@
 #include "renderwidget.h"
 #include "importexport.h"
 
+namespace trash
+{
+namespace core
+{
+
 QWidget& Core::renderWidget()
 {
     return *m().renderWidget;
@@ -44,6 +49,16 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
             corePrivate.game.lock()->doInitialize();
         }
 
+        break;
+    }
+    case ControllerMessageType::RenderWidgetWasResized:
+    {
+        auto message = msg_cast<RenderWidgetWasResizedMessage>(msg);
+        auto resizeMessage = std::make_shared<ResizeMessage>(message->width, message->height);
+        for (auto controller : corePrivate.controllers)
+        {
+            controller->sendMessage(resizeMessage);
+        }
         break;
     }
     case ControllerMessageType::RenderWidgetWasUpdated:
@@ -100,3 +115,6 @@ Core::Core()
 Core::~Core()
 {
 }
+
+} // namespace
+} // namespace

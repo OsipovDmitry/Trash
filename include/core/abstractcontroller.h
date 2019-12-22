@@ -7,6 +7,11 @@
 #include <utils/noncopyble.h>
 #include <utils/pimpl.h>
 
+namespace trash
+{
+namespace core
+{
+
 enum class ControllerMessageType : uint32_t;
 
 class AbstractControllerPrivate;
@@ -49,5 +54,7 @@ inline std::shared_ptr<T> msg_cast(std::shared_ptr<AbstractController::Message> 
     return (msg->type() == T::messageType()) ? std::static_pointer_cast<T>(msg) : nullptr;
 }
 
+} // namespace
+} // namespace
 
 #endif // ABSTRACTCONTROLLER_H

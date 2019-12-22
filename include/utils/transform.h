@@ -5,6 +5,11 @@
 #include "../glm/vec3.hpp"
 #include "../glm/gtc/quaternion.hpp"
 
+namespace trash
+{
+namespace utils
+{
+
 struct Transform
 {
 public:
@@ -48,8 +53,9 @@ public:
     {
         return Transform(*this).invert();
     }
-
-
 };
+
+} // namespace
+} // namespace
 
 #endif // TRANSFORM_H

@@ -1,5 +1,10 @@
 #include "gameprivate.h"
 
+namespace trash
+{
+namespace game
+{
+
 const int GamePrivate::numPersons;
 const std::array<std::string, GamePrivate::numPersons> GamePrivate::personsNames {
     "malcolm.mdl",
@@ -12,3 +17,6 @@ const std::array<std::string, GamePrivate::numPersons> GamePrivate::personsNames
 GamePrivate::GamePrivate()
 {
 }
+
+} // namespace
+} // namespace

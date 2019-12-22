@@ -7,12 +7,18 @@
 
 #include <utils/message.h>
 
+#include <core/forwarddecl.h>
 #include <core/abstractcontroller.h>
 #include <core/types.h>
 
 class QTimer;
+
+namespace trash
+{
+namespace core
+{
+
 class Renderer;
-class Core;
 
 class RenderWidget : public QOpenGLWidget
 {
@@ -54,6 +60,14 @@ public:
     RenderWidgetWasUpdatedMessage(uint64_t time_, uint64_t dt_) : AbstractController::Message(messageType()), time(time_), dt(dt_) {}
 };
 
+class RenderWidgetWasResizedMessage : public AbstractController::Message
+{
+    MESSAGE(ControllerMessageType::RenderWidgetWasResized)
+public:
+    int32_t width, height;
+    RenderWidgetWasResizedMessage(int32_t w, int32_t h) : AbstractController::Message(messageType()), width(w), height(h) {}
+};
+
 class RenderWidgetWasClickedMessage : public AbstractController::Message
 {
     MESSAGE(ControllerMessageType::RenderWidgetWasClicked)
@@ -68,5 +82,8 @@ class RenderWidgetWasClosedMessage : public AbstractController::Message
 public:
     RenderWidgetWasClosedMessage() : AbstractController::Message(messageType()) {}
 };
+
+} // namespace
+} // namespace
 
 #endif // RENDERWIDGET_H

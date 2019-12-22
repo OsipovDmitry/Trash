@@ -11,6 +11,11 @@
 #include "renderer.h"
 #include "importexport.h"
 
+namespace trash
+{
+namespace core
+{
+
 RenderWidget::RenderWidget(Core& core)
     : QOpenGLWidget()
     , m_core(core)
@@ -34,7 +39,7 @@ Renderer &RenderWidget::renderer()
 
 void RenderWidget::initializeGL()
 {
-    m_renderer = std::make_unique<Renderer>(*context()->extraFunctions());
+    m_renderer = std::make_unique<Renderer>(*context()->extraFunctions(), defaultFramebufferObject());
     m_renderer->initializeResources();
 
     m_timer = std::make_unique<QTimer>(this);
@@ -49,8 +54,7 @@ void RenderWidget::initializeGL()
 
 void RenderWidget::resizeGL(int w, int h)
 {
-    context()->makeCurrent(context()->surface());
-    m_renderer->resize(w, h);
+    m_core.sendMessage(std::make_shared<RenderWidgetWasResizedMessage>(w, h));
 }
 
 void RenderWidget::paintGL()
@@ -70,8 +74,6 @@ void RenderWidget::paintGL()
 
     m_core.sendMessage(std::make_shared<RenderWidgetWasUpdatedMessage>(time, dt));
     m_core.process();
-
-    m_renderer->render();
 
     int textSize = static_cast<int>(static_cast<float>(height()) / 720 * 28);
     int textXY = static_cast<int>(static_cast<float>(height()) / 720 * 10);
@@ -94,3 +96,6 @@ void RenderWidget::closeEvent(QCloseEvent *event)
     m_core.process();
     event->accept();
 }
+
+} // namespace
+} // namespace

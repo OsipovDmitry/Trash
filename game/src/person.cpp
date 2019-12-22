@@ -3,10 +3,15 @@
 
 #include "person.h"
 
+namespace trash
+{
+namespace game
+{
+
 Person::Person(const std::string &modelFilename)
     : Object(std::make_shared<ObjectUserData>(*this))
 {
-    m_modelNode = std::make_shared<ModelNode>(modelFilename);
+    m_modelNode = std::make_shared<core::ModelNode>(modelFilename);
 
     m_graphicsNode->attach(m_modelNode);
 
@@ -65,3 +70,6 @@ void Person::doUpdate(uint64_t time, uint64_t dt)
         }
     }
 }
+
+} // namespace
+} // namespace

@@ -13,6 +13,7 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <core/types.h>
+#include <core/forwarddecl.h>
 #include <utils/tree.h>
 #include <utils/transform.h>
 #include <utils/boundingsphere.h>
@@ -22,10 +23,14 @@
 #include "resourcestorage.h"
 
 class QOpenGLExtraFunctions;
+
+namespace trash
+{
+namespace core
+{
+
 class ResourceStorage;
 class Drawable;
-struct BoundingSphere;
-struct Frustum;
 
 ENUMCLASS(LayerId, uint32_t,
           Selection,
@@ -99,7 +104,7 @@ struct Mesh
     GLuint id;
     std::unordered_map<VertexAttribute, std::shared_ptr<VertexBuffer>> attributesDeclaration;
     std::unordered_set<std::shared_ptr<IndexBuffer>> indexBuffers;
-    BoundingSphere boundingSphere;
+    utils::BoundingSphere boundingSphere;
 
     Mesh();
     ~Mesh();
@@ -135,11 +140,11 @@ struct Model : public ResourceStorage::Object
 
     std::shared_ptr<Node> rootNode;
     std::unordered_map<std::string, std::shared_ptr<Animation>> animations;
-    std::vector<Transform> boneTransforms;
+    std::vector<utils::Transform> boneTransforms;
     std::vector<std::string> boneNames;
 
     uint32_t numBones() const;
-    bool calcBoneTransforms(const std::string&, float, std::vector<Transform>&) const;
+    bool calcBoneTransforms(const std::string&, float, std::vector<utils::Transform>&) const;
 };
 
 struct Model::Material
@@ -150,10 +155,10 @@ struct Model::Material
 
 struct Model::Mesh
 {
-    std::shared_ptr<::Mesh> mesh;
+    std::shared_ptr<core::Mesh> mesh;
     std::shared_ptr<Material> material;
 
-    Mesh(std::shared_ptr<::Mesh> msh, std::shared_ptr<Material> mtl)
+    Mesh(std::shared_ptr<core::Mesh> msh, std::shared_ptr<Material> mtl)
         : mesh(msh)
         , material(mtl)
     {}
@@ -177,13 +182,13 @@ struct Model::Animation : public ResourceStorage::Object
     }
 };
 
-struct Model::Node : public TreeNode<Node>
+struct Model::Node : public utils::TreeNode<Node>
 {
-    Transform transform;
+    utils::Transform transform;
     std::vector<std::shared_ptr<Mesh>> meshes;
     std::int32_t boneIndex;
 
-    Node(const Transform& t = Transform())
+    Node(const utils::Transform& t = utils::Transform())
         : transform(t)
         , boneIndex(-1)
     {
@@ -195,7 +200,7 @@ class Renderer
     NONCOPYBLE(Renderer)
 
 public:
-    Renderer(QOpenGLExtraFunctions&);
+    Renderer(QOpenGLExtraFunctions&, GLuint);
     void initializeResources();
 
     static Renderer& instance();
@@ -210,41 +215,48 @@ public:
     void bindTexture(std::shared_ptr<Texture>, GLint);
     void bindUniformBuffer(std::shared_ptr<Buffer>, GLuint);
 
-    void draw(std::shared_ptr<Drawable>, const Transform&);
-    void pick(int, int, const glm::vec4&, uint32_t&, float&);
+    void draw(std::shared_ptr<Drawable>, const utils::Transform&);
+    void render(std::shared_ptr<Framebuffer>);
 
+    void readPixel(std::shared_ptr<Framebuffer>, int, int, uint8_t&, uint8_t&, uint8_t&, uint8_t&, float&) const;
+
+    void setViewport(const glm::ivec4&);
     void setViewMatrix(const glm::mat4x4&);
-    void setProjectionMatrix(float, float, float);
-
-    const glm::mat4x4& projectionMatrix() const;
-    const glm::ivec4& viewport() const;
+    void setProjectionMatrix(const glm::mat4x4&);
+    void setClearColor(bool, const glm::vec4&);
+    void setClearDepth(bool, float);
 
 private:
-    using DrawDataType = std::pair<std::shared_ptr<Drawable>, Transform>;
-    struct DrawDataComarator
+    using DrawDataType = std::pair<std::shared_ptr<Drawable>, utils::Transform>;
+    struct DrawDataComparator
     {
         using is_transparent = void;
         bool operator ()(const DrawDataType&, const DrawDataType&) const;
         bool operator ()(const DrawDataType&, LayerId) const;
     };
-    using DrawDataContainer = std::multiset<DrawDataType, DrawDataComarator>;
+    using DrawDataContainer = std::multiset<DrawDataType, DrawDataComparator>;
 
-    void resize(int, int);
-    void render();
-    void renderSelectionLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
     void renderSolidLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
     void renderTransparentLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
 
+    GLbitfield calcClearMask() const;
+
     QOpenGLExtraFunctions& m_functions;
+    GLuint m_defaultFbo;
     std::unique_ptr<ResourceStorage> m_resourceStorage;
-    std::shared_ptr<Framebuffer> m_selectionFramebuffer;
     DrawDataContainer m_drawData;
     glm::mat4x4 m_projMatrix;
     glm::mat4x4 m_viewMatrix;
     glm::ivec4 m_viewport;
-    float m_fov = glm::pi<float>() * 0.25f, m_zNear = 0.5f, m_zFar = 10000.0f;
+
+    bool m_clearColorBit = true, m_clearDepthBit = true;
+    glm::vec4 m_clearColor = glm::vec4(0.f, 0.f, 0.f, 1.f);
+    float m_clearDepth = 1.0f;
 
     friend class RenderWidget;
 };
+
+} // namespace
+} // namespace
 
 #endif // RENDERER_H

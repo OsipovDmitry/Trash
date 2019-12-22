@@ -5,6 +5,11 @@
 
 #include "node.h"
 
+namespace trash
+{
+namespace core
+{
+
 class ModelNodePrivate;
 
 class CORESHARED_EXPORT ModelNode : public Node
@@ -21,5 +26,8 @@ public:
     uint64_t animationTime(const std::string&) const;
 
 };
+
+} // namespace
+} // namespace
 
 #endif // MODELNODE_H

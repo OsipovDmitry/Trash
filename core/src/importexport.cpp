@@ -4,6 +4,11 @@
 #include "renderer.h"
 #include "importexport.h"
 
+namespace trash
+{
+namespace core
+{
+
 void push(std::ofstream& stream, float f)
 {
     stream.write(reinterpret_cast<const char*>(&f), sizeof(float));
@@ -33,7 +38,7 @@ void push(std::ofstream& stream, const glm::quat& f)
 {
     push(stream, f.x); push(stream, f.y); push(stream, f.z); push(stream, f.w);
 }
-void push(std::ofstream& stream, const Transform& f)
+void push(std::ofstream& stream, const utils::Transform& f)
 {
     push(stream, f.scale); push(stream, f.rotation); push(stream, f.translation);
 }
@@ -188,7 +193,7 @@ void pull(std::ifstream& stream, glm::quat& f)
 {
     pull(stream, f.x); pull(stream, f.y); pull(stream, f.z); pull(stream, f.w);
 }
-void pull(std::ifstream& stream, Transform& f)
+void pull(std::ifstream& stream, utils::Transform& f)
 {
     pull(stream, f.scale); pull(stream, f.rotation); pull(stream, f.translation);
 }
@@ -236,8 +241,10 @@ void pull(std::ifstream& stream, std::shared_ptr<Mesh>& f)
 void pull(std::ifstream& stream, std::shared_ptr<Model::Material>& f)
 {
     f = std::make_shared<Model::Material>();
+
     pull(stream, f->diffuseTexture.first);
     f->diffuseTexture.second = Renderer::instance().loadTexture(f->diffuseTexture.first);
+
     pull(stream, f->normalTexture.first);
     f->normalTexture.second = Renderer::instance().loadTexture(f->normalTexture.first);
 }
@@ -347,3 +354,6 @@ void pull(std::ifstream& stream, std::shared_ptr<Model>& f)
     for (auto& boneName : f->boneNames)
         pull(stream, boneName);
 }
+
+} // namespace
+} // namespace

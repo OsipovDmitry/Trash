@@ -7,6 +7,11 @@
 
 #include "noncopyble.h"
 
+namespace trash
+{
+namespace utils
+{
+
 template <typename T>
 class TreeNode
 {
@@ -61,7 +66,9 @@ protected:
 
     std::vector<std::shared_ptr<T>> m_children;
     T* m_parent = nullptr;
-
 };
+
+} // namespace
+} // namespace
 
 #endif

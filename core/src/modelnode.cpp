@@ -6,6 +6,11 @@
 #include "renderer.h"
 #include "drawables.h"
 
+namespace trash
+{
+namespace core
+{
+
 ModelNode::ModelNode(const std::string &filename)
     : Node(new ModelNodePrivate(*this))
 {
@@ -17,15 +22,15 @@ ModelNode::ModelNode(const std::string &filename)
     if (mPrivate.model->numBones())
         mPrivate.bonesBuffer = std::make_shared<Buffer>(mPrivate.model->numBones()*sizeof(glm::mat3x4), nullptr, GL_DYNAMIC_DRAW);
 
-    BoundingSphere minimalBoundingSphere;
-    std::queue<std::pair<std::shared_ptr<Model::Node>, Transform>> nodes;
-    nodes.push(std::make_pair(mPrivate.model->rootNode, Transform()));
+    utils::BoundingSphere minimalBoundingSphere;
+    std::queue<std::pair<std::shared_ptr<Model::Node>, utils::Transform>> nodes;
+    nodes.push(std::make_pair(mPrivate.model->rootNode, utils::Transform()));
 
     while (!nodes.empty())
     {
         auto& nodeData = nodes.front();
         std::shared_ptr<Model::Node> node = nodeData.first;
-        Transform transform = nodeData.second * node->transform;
+        utils::Transform transform = nodeData.second * node->transform;
         nodes.pop();
 
         for (auto mesh : node->meshes)
@@ -99,3 +104,6 @@ uint64_t ModelNode::animationTime(const std::string& animationName) const
         return 0;
     return static_cast<uint64_t>(anim->duration / anim->framesPerSecond * 1000.0f);
 }
+
+} // namespace
+} // namespace

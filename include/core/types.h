@@ -7,6 +7,11 @@
 
 #include <utils/enumclass.h>
 
+namespace trash
+{
+namespace core
+{
+
 ENUMCLASS(ControllerType, uint32_t,
           Core,
           Graphics,
@@ -14,10 +19,12 @@ ENUMCLASS(ControllerType, uint32_t,
 
 ENUMCLASS(ControllerMessageType, uint32_t,
           RenderWidgetWasInitialized,
+          RenderWidgetWasResized,
           RenderWidgetWasUpdated,
           RenderWidgetWasClicked,
           RenderWidgetWasClosed,
 
+          Resize,
           Update)
 
 ENUMCLASS(VertexAttribute, uint32_t,
@@ -26,13 +33,18 @@ ENUMCLASS(VertexAttribute, uint32_t,
           TexCoord,
           BonesIDs,
           BonesWeights,
-          TangentBinormal)
+          Tangent)
+
+} // namespace
+} // namespace
 
 namespace std
 {
-template<> struct hash<VertexAttribute> {
-    std::size_t operator()(VertexAttribute const& key) const noexcept { return castFromVertexAttribute(key); }
+template<> struct hash<trash::core::VertexAttribute> {
+    std::size_t operator()(trash::core::VertexAttribute const& key) const noexcept { return castFromVertexAttribute(key); }
 };
 }
+
+
 
 #endif // TYPES_H

@@ -1,10 +1,15 @@
 #ifndef DRAWABLES_H
 #define DRAWABLES_H
 
+#include <utils/forwarddecl.h>
+#include <core/forwarddecl.h>
+
 #include "renderer.h"
 
-struct BoundingSphere;
-struct Frustum;
+namespace trash
+{
+namespace core
+{
 
 class SelectionDrawable;
 
@@ -92,13 +97,16 @@ public:
 class SphereDrawable : public ColoredMeshDrawable
 {
 public:
-    SphereDrawable(uint32_t, const BoundingSphere&, const glm::vec4&);
+    SphereDrawable(uint32_t, const utils::BoundingSphere&, const glm::vec4&);
 };
 
 class FrustumDrawable : public ColoredMeshDrawable
 {
 public:
-    FrustumDrawable(const Frustum&, const glm::vec4&);
+    FrustumDrawable(const utils::Frustum&, const glm::vec4&);
 };
+
+} // namespace
+} // namespace
 
 #endif // DRAWABLES_H

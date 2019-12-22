@@ -3,6 +3,11 @@
 
 #include <string>
 
+namespace trash
+{
+namespace core
+{
+
 const std::pair<std::string, std::string> coloreredMeshRenderProgramName { ":/res/colored_mesh.vert", ":/res/colored_mesh.frag" };
 const std::pair<std::string, std::string> coloreredStaticMeshRenderProgramName { ":/res/colored_static_mesh.vert", ":/res/colored_mesh.frag" };
 
@@ -11,5 +16,8 @@ const std::pair<std::string, std::string> texturedStaticMeshRenderProgramName { 
 
 const std::string standardDiffuseTextureName(":/res/chess.png");
 const std::string standardNormalTextureName(":/res/normal.png");
+
+} // namespace
+} // namespace
 
 #endif // RESOURCES_H

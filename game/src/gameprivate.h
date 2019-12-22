@@ -4,6 +4,11 @@
 #include <array>
 #include <memory>
 
+namespace trash
+{
+namespace game
+{
+
 class Scene;
 class Person;
 class Floor;
@@ -23,5 +28,8 @@ public:
 
     std::shared_ptr<Floor> floor;
 };
+
+} // namespace
+} // namespace
 
 #endif // GAMEPRIVATE_H

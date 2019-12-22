@@ -1,9 +1,14 @@
 #ifndef FLOOR_H
 #define FLOOR_H
 
+#include <core/forwarddecl.h>
+
 #include "object.h"
 
-class ModelNode;
+namespace trash
+{
+namespace game
+{
 
 class Floor : public Object
 {
@@ -11,8 +16,11 @@ public:
     Floor();
 
 protected:
-    std::shared_ptr<ModelNode> m_modelNode;
+    std::shared_ptr<core::ModelNode> m_modelNode;
 
 };
+
+} // namespace
+} // namespace
 
 #endif // FLOOR_H

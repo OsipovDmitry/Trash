@@ -27,10 +27,10 @@ int main(int argc, char *argv[])
     }
     QSurfaceFormat::setDefaultFormat(surfaceFormat);
 
-    auto game = std::make_shared<Game>();
-    Core::instance().setGame(game);
-    Core::instance().renderWidget().resize(widgetHeight * 16 / 9, widgetHeight);
-    Core::instance().renderWidget().show();
+    auto game = std::make_shared<trash::game::Game>();
+    trash::core::Core::instance().setGame(game);
+    trash::core::Core::instance().renderWidget().resize(widgetHeight * 16 / 9, widgetHeight);
+    trash::core::Core::instance().renderWidget().show();
 
     int res = QApplication::exec();
     std::cout << "finish!" << std::endl;

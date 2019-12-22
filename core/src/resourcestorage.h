@@ -7,6 +7,11 @@
 
 #include <utils/noncopyble.h>
 
+namespace trash
+{
+namespace core
+{
+
 class ResourceStorage
 {
     NONCOPYBLE(ResourceStorage)
@@ -34,5 +39,8 @@ public:
 protected:
     Object() {}
 };
+
+} // namespace
+} // namespace
 
 #endif // RESOURCESTORAGE_H

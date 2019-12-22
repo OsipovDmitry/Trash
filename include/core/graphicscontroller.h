@@ -1,39 +1,31 @@
 #ifndef GRAPHICSCONTROLLER_H
 #define GRAPHICSCONTROLLER_H
 
-#include <glm/mat4x4.hpp>
-
 #include <utils/pimpl.h>
 #include <utils/controller.h>
 
-#include "coreglobal.h"
-#include "forwarddecl.h"
-#include "abstractcontroller.h"
-#include "types.h"
+#include <core/coreglobal.h>
+#include <core/forwarddecl.h>
+#include <core/abstractcontroller.h>
+#include <core/types.h>
 
-struct PickData
+namespace trash
 {
-    std::shared_ptr<Node> node;
-    glm::vec3 localCoord;
-};
+namespace core
+{
 
 class GraphicsControllerPrivate;
+
 class CORESHARED_EXPORT GraphicsController : public AbstractController
 {
     CONTROLLER(ControllerType::Graphics)
     PIMPL(GraphicsController)
 
 public:
-    std::shared_ptr<const Node> rootNode() const;
-    std::shared_ptr<Node> rootNode();
-
-    std::shared_ptr<const AbstractCamera> camera() const;
-    void setCamera(std::shared_ptr<AbstractCamera>);
-
-    void setViewMatrix(const glm::mat4x4&);
-    void setProjectionMatrix(float, float, float);
-
-    PickData pickNode(int32_t, int32_t);
+    void addCamera(uint32_t, std::shared_ptr<Camera>);
+    void removeCamera(uint32_t);
+    std::shared_ptr<const Camera> camera(uint32_t) const;
+    std::shared_ptr<Camera> camera(uint32_t);
 
 protected:
     void doWork(std::shared_ptr<Message>) override;
@@ -44,5 +36,8 @@ private:
 
     friend class Core;
 };
+
+} // namespace
+} // namespace
 
 #endif // GRAPHICSCONTROLLER_H

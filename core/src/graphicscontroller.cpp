@@ -1,47 +1,40 @@
 #include <core/core.h>
+#include <core/camera.h>
 #include <core/graphicscontroller.h>
 
-#include "coreprivate.h"
 #include "graphicscontrollerprivate.h"
-#include "renderwidget.h"
-#include "renderer.h"
 
-std::shared_ptr<const Node> GraphicsController::rootNode() const
+namespace trash
 {
-    return m().rootNode;
+namespace core
+{
+
+void GraphicsController::addCamera(uint32_t id, std::shared_ptr<Camera> camera)
+{
+    auto& gcPrivate = m();
+    gcPrivate.cameras.insert({id, camera});
+    camera->setViewport(gcPrivate.currentViewport);
 }
 
-std::shared_ptr<Node> GraphicsController::rootNode()
+void GraphicsController::removeCamera(uint32_t id)
 {
-    return m().rootNode;
+    m().cameras.erase(id);
 }
 
-std::shared_ptr<const AbstractCamera> GraphicsController::camera() const
+std::shared_ptr<const Camera> GraphicsController::camera(uint32_t id) const
 {
-    return m().camera;
+    auto& cameras = m().cameras;
+    auto it = cameras.find(id);
+    return (it == cameras.end()) ? nullptr : it->second;
 }
 
-void GraphicsController::setCamera(std::shared_ptr<AbstractCamera> value)
+std::shared_ptr<Camera> GraphicsController::camera(uint32_t id)
 {
-    m().camera = value;
+    auto& cameras = m().cameras;
+    auto it = cameras.find(id);
+    return (it == cameras.end()) ? nullptr : it->second;
 }
 
-void GraphicsController::setViewMatrix(const glm::mat4x4& value)
-{
-    m().viewMatrix = value;
-    Renderer::instance().setViewMatrix(value);
-}
-
-void GraphicsController::setProjectionMatrix(float fov, float zNear, float zFar)
-{
-    Renderer::instance().setProjectionMatrix(fov, zNear, zFar);
-}
-
-
-PickData GraphicsController::pickNode(int32_t xi, int32_t yi)
-{
-    return m().pickNode(xi, yi);
-}
 
 void GraphicsController::doWork(std::shared_ptr<AbstractController::Message> msg)
 {
@@ -49,6 +42,12 @@ void GraphicsController::doWork(std::shared_ptr<AbstractController::Message> msg
 
     switch (msg->type())
     {
+    case ControllerMessageType::Resize:
+    {
+        auto resizeMessage = msg_cast<ResizeMessage>(msg);
+        gcPrivate.resize(resizeMessage->width, resizeMessage->height);
+        break;
+    }
     case ControllerMessageType::Update:
     {
         auto updateMessage = msg_cast<UpdateMessage>(msg);
@@ -63,10 +62,11 @@ void GraphicsController::doWork(std::shared_ptr<AbstractController::Message> msg
 GraphicsController::GraphicsController()
     : AbstractController(new GraphicsControllerPrivate())
 {
-    setViewMatrix(glm::mat4x4(1.0f));
-    setProjectionMatrix(glm::pi<float>() * 0.5f, 0.5f, 10000.0f);
 }
 
 GraphicsController::~GraphicsController()
 {
 }
+
+} // namespace
+} // namespace

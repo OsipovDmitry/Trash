@@ -8,12 +8,18 @@
 #include <utils/pimpl.h>
 #include <utils/message.h>
 
-#include "coreglobal.h"
-#include "forwarddecl.h"
-#include "abstractcontroller.h"
-#include "types.h"
+#include <core/coreglobal.h>
+#include <core/forwarddecl.h>
+#include <core/abstractcontroller.h>
+#include <core/types.h>
 
 class QWidget;
+
+namespace trash
+{
+namespace core
+{
+
 class CorePrivate;
 
 class CORESHARED_EXPORT Core : public AbstractController
@@ -37,6 +43,14 @@ private:
     ~Core() override;
 };
 
+class ResizeMessage : public AbstractController::Message
+{
+    MESSAGE(ControllerMessageType::Resize)
+public:
+    int32_t width, height;
+    ResizeMessage(int32_t w, int32_t h) : AbstractController::Message(messageType()), width(w), height(h) {}
+};
+
 class UpdateMessage : public AbstractController::Message
 {
     MESSAGE(ControllerMessageType::Update)
@@ -44,5 +58,8 @@ public:
     uint64_t time, dt;
     UpdateMessage(uint64_t time_, uint64_t dt_) : AbstractController::Message(messageType()), time(time_), dt(dt_) {}
 };
+
+} // namespace
+} // namespace
 
 #endif // CORE_H

@@ -3,6 +3,11 @@
 #include "resourcestorage.h"
 #include "renderer.h"
 
+namespace trash
+{
+namespace core
+{
+
 ResourceStorage::ResourceStorage()
 {
 }
@@ -30,3 +35,6 @@ std::shared_ptr<ResourceStorage::Object> ResourceStorage::get(const std::string&
 
     return iter->second;
 }
+
+} // namespace
+} // namespace
