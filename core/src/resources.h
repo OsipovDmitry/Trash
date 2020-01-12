@@ -15,7 +15,6 @@ const std::pair<std::string, std::string> texturedMeshRenderProgramName { ":/res
 const std::pair<std::string, std::string> texturedStaticMeshRenderProgramName { ":/res/textured_static_mesh.vert", ":/res/textured_mesh.frag" };
 
 const std::string standardDiffuseTextureName(":/res/chess.png");
-const std::string standardNormalTextureName(":/res/normal.png");
 
 } // namespace
 } // namespace

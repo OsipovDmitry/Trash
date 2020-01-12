@@ -63,9 +63,23 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                     std::string filename = path.C_Str();
                     materialTo->diffuseTexture = std::make_pair(filename, loadTexture(filename));
 
-                    std::string bumpFilename = filename;
-                    bumpFilename.replace(bumpFilename.find("Diffuse"), 7, "Normal");
-                    materialTo->normalTexture = std::make_pair(bumpFilename, loadTexture(bumpFilename));
+//                    std::string bumpFilename = filename;
+//                    bumpFilename.replace(bumpFilename.find("Diffuse"), 7, "Normal");
+//                    materialTo->normalTexture = std::make_pair(bumpFilename, loadTexture(bumpFilename));
+
+//                    std::string opacityFilename = filename;
+//                    opacityFilename.replace(opacityFilename.find("Diffuse"), 7, "Opacity");
+//                    materialTo->opacityTexture = std::make_pair(opacityFilename, loadTexture(opacityFilename));
+
+//                    std::string specularFilename = filename;
+//                    specularFilename.replace(specularFilename.find("Diffuse"), 7, "Specular");
+//                    materialTo->metallicOrSpecularTexture = std::make_pair(specularFilename, loadTexture(specularFilename));
+
+//                    std::string glossFilename = filename;
+//                    glossFilename.replace(glossFilename.find("Diffuse"), 7, "Gloss");
+//                    materialTo->roughOrGlossTexture = std::make_pair(glossFilename, loadTexture(glossFilename));
+
+//                    materialTo->isMetallicRoughWorkflow = false;
                 }
 
             }

@@ -46,12 +46,14 @@ struct RenderProgram : public ResourceStorage::Object
     void setupTransformFeedback(const std::vector<std::string>&, GLenum);
 
     GLuint uniformBufferIndexByName(const std::string&);
+    void setUniformBufferBinding(GLuint, GLuint);
     GLint uniformBufferDataSize(GLuint);
     std::unordered_map<std::string, GLint> uniformBufferOffsets(GLuint); // it works but don't use it better
 
     GLint uniformLocation(const std::string&);
 
     void setUniform(GLint, GLint);
+    void setUniform(GLint, const glm::vec3&);
     void setUniform(GLint, const glm::vec4&);
     void setUniform(GLint, const glm::mat3x3&);
     void setUniform(GLint, const glm::mat4x4&);
@@ -149,8 +151,12 @@ struct Model : public ResourceStorage::Object
 
 struct Model::Material
 {
-    std::pair<std::string, std::shared_ptr<Texture>> diffuseTexture;
-    std::pair<std::string, std::shared_ptr<Texture>> normalTexture;
+    std::pair<std::string, std::shared_ptr<Texture>> diffuseTexture = {"", nullptr};
+    std::pair<std::string, std::shared_ptr<Texture>> normalTexture = {"", nullptr};
+    std::pair<std::string, std::shared_ptr<Texture>> opacityTexture = {"", nullptr};
+    std::pair<std::string, std::shared_ptr<Texture>> metallicOrSpecularTexture = {"", nullptr};
+    std::pair<std::string, std::shared_ptr<Texture>> roughOrGlossTexture = {"", nullptr};
+    bool isMetallicRoughWorkflow = true;
 };
 
 struct Model::Mesh
@@ -208,6 +214,8 @@ public:
 
     std::shared_ptr<RenderProgram> loadRenderProgram(const std::string&, const std::string&);
     std::shared_ptr<Texture> loadTexture(const std::string&);
+    std::shared_ptr<Texture> loadTexture(const glm::vec3&);
+    std::shared_ptr<Texture> loadTexture(float);
     std::shared_ptr<Model> loadModel(const std::string&);
     std::shared_ptr<Model::Animation> loadAnimation(const std::string&);
 
@@ -219,12 +227,14 @@ public:
     void render(std::shared_ptr<Framebuffer>);
 
     void readPixel(std::shared_ptr<Framebuffer>, int, int, uint8_t&, uint8_t&, uint8_t&, uint8_t&, float&) const;
+    std::shared_ptr<Buffer> lightsBuffer() const;
 
     void setViewport(const glm::ivec4&);
     void setViewMatrix(const glm::mat4x4&);
     void setProjectionMatrix(const glm::mat4x4&);
     void setClearColor(bool, const glm::vec4&);
     void setClearDepth(bool, float);
+    void setLightsBuffer(std::shared_ptr<Buffer>);
 
 private:
     using DrawDataType = std::pair<std::shared_ptr<Drawable>, utils::Transform>;
@@ -240,18 +250,21 @@ private:
     void renderTransparentLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
 
     GLbitfield calcClearMask() const;
+    static std::string precompileShader(QByteArray&);
 
     QOpenGLExtraFunctions& m_functions;
     GLuint m_defaultFbo;
     std::unique_ptr<ResourceStorage> m_resourceStorage;
     DrawDataContainer m_drawData;
     glm::mat4x4 m_projMatrix;
-    glm::mat4x4 m_viewMatrix;
+    glm::mat4x4 m_viewMatrix, m_viewMatrixInverse;
     glm::ivec4 m_viewport;
+    glm::vec3 m_viewPosition;
 
     bool m_clearColorBit = true, m_clearDepthBit = true;
     glm::vec4 m_clearColor = glm::vec4(0.f, 0.f, 0.f, 1.f);
     float m_clearDepth = 1.0f;
+    std::shared_ptr<Buffer> m_lightsBuffer = nullptr;
 
     friend class RenderWidget;
 };

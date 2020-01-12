@@ -7,6 +7,8 @@
         <file>res/colored_mesh.frag</file>
         <file>res/colored_mesh.vert</file>
         <file>res/colored_static_mesh.vert</file>
-        <file>res/normal.png</file>
+        <file>res/gammacorrection.glsl</file>
+        <file>res/lights.glsl</file>
+        <file>res/pbr.glsl</file>
     </qresource>
 </RCC>

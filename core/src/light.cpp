@@ -13,10 +13,10 @@ namespace trash
 namespace core
 {
 
-Light::Light()
+Light::Light(LightType lightType)
     : m_(std::make_unique<LightPrivate>())
 {
-    m_->type = LightType::Point;
+    m_->type = lightType;
     m_->pos = glm::vec3();
     m_->dir = glm::vec3(0.f, 0.f, 1.f);
     m_->color = glm::vec3(1.f, 1.f, 1.f);
@@ -41,7 +41,11 @@ void Light::setType(LightType value)
     m_->type = value;
 
     if (m_->scene)
-        m_->scene->m().rootNode->m().dirtyLights();
+    {
+        auto& scenePrivate = m_->scene->m();
+        scenePrivate.rootNode->m().dirtyLights();
+        scenePrivate.dirtyLight(this);
+    }
 }
 
 const glm::vec3& Light::color() const
@@ -52,6 +56,13 @@ const glm::vec3& Light::color() const
 void Light::setColor(const glm::vec3& value)
 {
     m_->color = value;
+
+    if (m_->scene)
+    {
+        auto& scenePrivate = m_->scene->m();
+        //scenePrivate.rootNode->m().dirtyLights();
+        //scenePrivate.dirtyLight(this);
+    }
 }
 
 const glm::vec3& Light::attenuation() const
@@ -64,7 +75,11 @@ void Light::setAttenuation(const glm::vec3& value)
     m_->att = value;
 
     if (m_->scene)
-        m_->scene->m().rootNode->m().dirtyLights();
+    {
+        auto& scenePrivate = m_->scene->m();
+        scenePrivate.rootNode->m().dirtyLights();
+        scenePrivate.dirtyLight(this);
+    }
 }
 
 const glm::vec3& Light::position() const
@@ -77,7 +92,11 @@ void Light::setPosition(const glm::vec3& value)
     m_->pos = value;
 
     if (m_->scene)
-        m_->scene->m().rootNode->m().dirtyLights();
+    {
+        auto& scenePrivate = m_->scene->m();
+        scenePrivate.rootNode->m().dirtyLights();
+        scenePrivate.dirtyLight(this);
+    }
 }
 
 const glm::vec3& Light::direction() const
@@ -90,7 +109,11 @@ void Light::setDirection(const glm::vec3& value)
     m_->dir = glm::normalize(value);
 
     if (m_->scene)
-        m_->scene->m().rootNode->m().dirtyLights();
+    {
+        auto& scenePrivate = m_->scene->m();
+        scenePrivate.rootNode->m().dirtyLights();
+        scenePrivate.dirtyLight(this);
+    }
 }
 
 const glm::vec2& Light::spotAngles() const
@@ -104,7 +127,11 @@ void Light::setSpotAngles(const glm::vec2& value)
     m_->cosAngles = glm::cos(m_->angles);
 
     if (m_->scene)
-        m_->scene->m().rootNode->m().dirtyLights();
+    {
+        auto& scenePrivate = m_->scene->m();
+        scenePrivate.rootNode->m().dirtyLights();
+        scenePrivate.dirtyLight(this);
+    }
 }
 
 } // namespace

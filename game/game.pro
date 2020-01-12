@@ -13,7 +13,8 @@ HEADERS += \
     src/scene.h \
     src/gameprivate.h \
     src/floor.h \
-    src/person.h
+    src/person.h \
+    src/sphere.h
 
 SOURCES += \
     src/game.cpp \
@@ -21,7 +22,8 @@ SOURCES += \
     src/scene.cpp \
     src/gameprivate.cpp \
     src/floor.cpp \
-    src/person.cpp
+    src/person.cpp \
+    src/sphere.cpp
 
 LIBS += \
     -lcore

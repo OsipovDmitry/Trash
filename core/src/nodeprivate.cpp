@@ -1,9 +1,12 @@
 #include <core/node.h>
 #include <core/light.h>
+#include <core/scene.h>
 
 #include "nodeprivate.h"
+#include "sceneprivate.h"
 #include "drawables.h"
 #include "renderer.h"
+#include "sceneprivate.h"
 #include "lightprivate.h"
 
 namespace trash
@@ -47,10 +50,11 @@ void NodePrivate::dirtyLights()
 
 void NodePrivate::doUpdate(uint64_t, uint64_t)
 {
-    auto& renderer = Renderer::instance();
+    getLights();
 
+    auto& renderer = Renderer::instance();
     for (auto& drawable : drawables)
-        renderer.draw(drawable, thisNode.globalTransform());
+        renderer.draw(drawable, getGlobalTransform());
 }
 
 void NodePrivate::doPick(uint32_t id)
@@ -59,6 +63,21 @@ void NodePrivate::doPick(uint32_t id)
 
     for (auto& drawable : drawables)
         renderer.draw(drawable->selectionDrawable(id), thisNode.globalTransform());
+}
+
+Scene *NodePrivate::getScene() const
+{
+    Node *node = &thisNode;
+
+    while (node->parent())
+        node = node->parent();
+
+    if (auto sceneRootNode = dynamic_cast<SceneRootNode*>(node))
+    {
+        return sceneRootNode->scene();
+    }
+
+    return nullptr;
 }
 
 const utils::BoundingSphere &NodePrivate::getBoundingSphere()
@@ -95,10 +114,12 @@ const utils::Transform &NodePrivate::getGlobalTransform()
     return globalTransform;
 }
 
-const LightList &NodePrivate::getLights(const std::vector<std::shared_ptr<Light>>& sceneLights)
+const LightIndicesList &NodePrivate::getLights()
 {
     if (isLightsDirty)
     {
+        auto& lightsList = getScene()->m().lights;
+
         std::array<float, MAX_LIGHTS_PER_NODE> intesities;
         for (size_t i = 0; i < MAX_LIGHTS_PER_NODE; ++i)
         {
@@ -106,22 +127,23 @@ const LightList &NodePrivate::getLights(const std::vector<std::shared_ptr<Light>
             lights[i] = -1;
         }
 
-        for (size_t lightIndex = 0; lightIndex < sceneLights.size(); ++lightIndex)
+        for (size_t lightIndex = 0; lightIndex < lightsList.size(); ++lightIndex)
         {
-            auto light = sceneLights[lightIndex];
+            auto light = lightsList[lightIndex];
             float lightIntensity = light->m().intensity(getGlobalTransform().translation);
-            for (int32_t i = MAX_LIGHTS_PER_NODE-1; i >= 0; --i)
+            for (size_t i = 0; i < MAX_LIGHTS_PER_NODE; ++i)
+            {
                 if (intesities[static_cast<size_t>(i)] < lightIntensity)
                 {
-                    for (int32_t j = MAX_LIGHTS_PER_NODE-1; j > i; --j)
-                    {
-                        intesities[static_cast<size_t>(j)] = intesities[static_cast<size_t>(j-1)];
-                        lights[static_cast<size_t>(j)] = lights[static_cast<size_t>(j-1)];
-                    }
+                    std::copy_backward(intesities.begin()+i, intesities.end()-1, intesities.end());
+                    std::copy_backward(lights.begin()+i, lights.end()-1, lights.end());
+
                     intesities[static_cast<size_t>(i)] = lightIntensity;
                     lights[static_cast<size_t>(i)] = static_cast<int32_t>(lightIndex);
+
                     break;
                 }
+            }
         }
 
         isLightsDirty = false;

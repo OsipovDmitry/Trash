@@ -10,7 +10,7 @@ namespace trash
 namespace utils
 {
 
-class Plane : public glm::vec4
+struct Plane : public glm::vec4
 {
 public:
     Plane() : glm::vec4(0.f, 1.f, 0.f, 0.f) {}

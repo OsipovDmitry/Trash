@@ -9,6 +9,10 @@ namespace trash
 namespace core
 {
 
+void push(std::ofstream &stream, bool f)
+{
+    stream.write(reinterpret_cast<const char*>(&f), sizeof(bool));
+}
 void push(std::ofstream& stream, float f)
 {
     stream.write(reinterpret_cast<const char*>(&f), sizeof(float));
@@ -73,7 +77,11 @@ void push(std::ofstream& stream, std::shared_ptr<Mesh> f)
 void push(std::ofstream& stream, std::shared_ptr<Model::Material> f)
 {
     push(stream, f->diffuseTexture.first);
+    push(stream, f->opacityTexture.first);
     push(stream, f->normalTexture.first);
+    push(stream, f->metallicOrSpecularTexture.first);
+    push(stream, f->roughOrGlossTexture.first);
+    push(stream, f->isMetallicRoughWorkflow);
 }
 void push(std::ofstream& stream, std::shared_ptr<Model::Mesh> f)
 {
@@ -162,6 +170,10 @@ void push(std::ofstream& stream, std::shared_ptr<Model> f)
         push(stream, boneName);
 }
 
+void pull(std::ifstream &stream, bool &f)
+{
+    stream.read(reinterpret_cast<char*>(&f), sizeof(bool));
+}
 void pull(std::ifstream& stream, float& f)
 {
     stream.read(reinterpret_cast<char*>(&f), sizeof(float));
@@ -245,8 +257,19 @@ void pull(std::ifstream& stream, std::shared_ptr<Model::Material>& f)
     pull(stream, f->diffuseTexture.first);
     f->diffuseTexture.second = Renderer::instance().loadTexture(f->diffuseTexture.first);
 
+    pull(stream, f->opacityTexture.first);
+    f->opacityTexture.second = Renderer::instance().loadTexture(f->opacityTexture.first);
+
     pull(stream, f->normalTexture.first);
     f->normalTexture.second = Renderer::instance().loadTexture(f->normalTexture.first);
+
+    pull(stream, f->metallicOrSpecularTexture.first);
+    f->metallicOrSpecularTexture.second = Renderer::instance().loadTexture(f->metallicOrSpecularTexture.first);
+
+    pull(stream, f->roughOrGlossTexture.first);
+    f->roughOrGlossTexture.second = Renderer::instance().loadTexture(f->roughOrGlossTexture.first);
+
+    pull(stream, f->isMetallicRoughWorkflow);
 }
 void pull(std::ifstream& stream, std::shared_ptr<Model::Mesh>& f)
 {

@@ -52,8 +52,12 @@ void MeshDrawable::prerender() const
 
     auto& renderer = Renderer::instance();
 
-    if (bonesBuffer)
-        renderer.bindUniformBuffer(bonesBuffer, program->uniformBufferIndexByName("u_bonesBuffer"));
+    GLuint bonesBufferIndex = program->uniformBufferIndexByName("u_bonesBuffer");
+    if (bonesBuffer && (bonesBufferIndex != (GLuint)-1))
+    {
+        program->setUniformBufferBinding(bonesBufferIndex, 0);
+        renderer.bindUniformBuffer(bonesBuffer, 0);
+    }
 }
 
 SelectionMeshDrawable::SelectionMeshDrawable(std::shared_ptr<Mesh> m, std::shared_ptr<Buffer> bb, uint32_t id)
@@ -89,8 +93,12 @@ void SelectionMeshDrawable::prerender() const
 {
     auto& renderer = Renderer::instance();
 
-    if (bonesBuffer)
-        renderer.bindUniformBuffer(bonesBuffer, program->uniformBufferIndexByName("u_bonesBuffer"));
+    GLuint bonesBufferIndex = program->uniformBufferIndexByName("u_bonesBuffer");
+    if (bonesBuffer && (bonesBufferIndex != (GLuint)-1))
+    {
+        program->setUniformBufferBinding(bonesBufferIndex, 0);
+        renderer.bindUniformBuffer(bonesBuffer, 0);
+    }
 
     program->setUniform(program->uniformLocation("u_color"), idToColor(id));
 }
@@ -114,10 +122,23 @@ void ColoredMeshDrawable::prerender() const
     program->setUniform(program->uniformLocation("u_color"), color);
 }
 
-TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m, std::shared_ptr<Texture> dt, std::shared_ptr<Texture> nt, std::shared_ptr<Buffer> bb)
+TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m,
+                                           std::shared_ptr<Texture> bct,
+                                           std::shared_ptr<Texture> ot,
+                                           std::shared_ptr<Texture> nt,
+                                           std::shared_ptr<Texture> mt,
+                                           std::shared_ptr<Texture> rt,
+                                           bool mrw,
+                                           std::shared_ptr<Buffer> bb,
+                                           const LightIndicesList& ll)
     : MeshDrawable(nullptr, m, bb)
-    , diffuseTexture(dt)
+    , baseColorTexture(bct)
+    , opacityTexture(ot)
     , normalTexture(nt)
+    , metallicOrSpecTexture(mt)
+    , roughOrGlossTexture(rt)
+    , isMetallicRoughWorkflow(mrw)
+    , lightsList(ll)
 {
     auto& renderer = Renderer::instance();
 
@@ -126,11 +147,20 @@ TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m, std::shared_
     else
         program = renderer.loadRenderProgram(texturedStaticMeshRenderProgramName.first, texturedStaticMeshRenderProgramName.second);
 
-    if (!diffuseTexture)
-        diffuseTexture = renderer.loadTexture(standardDiffuseTextureName);
+    if (!baseColorTexture)
+        baseColorTexture = renderer.loadTexture(standardDiffuseTextureName);
+
+    if (!opacityTexture)
+        opacityTexture = renderer.loadTexture(1.0f);
 
     if (!normalTexture)
-        normalTexture = renderer.loadTexture(standardNormalTextureName);
+        normalTexture = renderer.loadTexture(glm::vec3(.5f, .5f, 1.f));
+
+    if (!metallicOrSpecTexture)
+        metallicOrSpecTexture = renderer.loadTexture(0.0f);
+
+    if (!roughOrGlossTexture)
+        roughOrGlossTexture = renderer.loadTexture(0.6f);
 }
 
 void TexturedMeshDrawable::prerender() const
@@ -139,11 +169,27 @@ void TexturedMeshDrawable::prerender() const
 
     auto& renderer = Renderer::instance();
 
-    program->setUniform(program->uniformLocation("u_diffuseMap"), 0);
-    renderer.bindTexture(diffuseTexture, 0);
+    program->setUniform(program->uniformLocation("u_baseColorMap"), castFromTextureUnit(TextureUnit::BaseColor));
+    renderer.bindTexture(baseColorTexture, castFromTextureUnit(TextureUnit::BaseColor));
 
-    program->setUniform(program->uniformLocation("u_normalMap"), 1);
-    renderer.bindTexture(normalTexture, 1);
+    program->setUniform(program->uniformLocation("u_opacityMap"), castFromTextureUnit(TextureUnit::Opacity));
+    renderer.bindTexture(opacityTexture, castFromTextureUnit(TextureUnit::Opacity));
+
+    program->setUniform(program->uniformLocation("u_normalMap"), castFromTextureUnit(TextureUnit::Normal));
+    renderer.bindTexture(normalTexture, castFromTextureUnit(TextureUnit::Normal));
+
+    program->setUniform(program->uniformLocation("u_metallicMap"), castFromTextureUnit(TextureUnit::Metallic));
+    renderer.bindTexture(metallicOrSpecTexture, castFromTextureUnit(TextureUnit::Metallic));
+
+    program->setUniform(program->uniformLocation("u_roughnessMap"), castFromTextureUnit(TextureUnit::Roughness));
+    renderer.bindTexture(roughOrGlossTexture, castFromTextureUnit(TextureUnit::Roughness));
+
+    program->setUniform(program->uniformLocation("u_isMetallicRoughWorkflow"), isMetallicRoughWorkflow ? 1 : 0);
+
+    for (size_t i = 0; i < MAX_LIGHTS_PER_NODE; ++i)
+    {
+        program->setUniform(program->uniformLocation("u_lightIndices["+std::to_string(i)+"]"), lightsList[i]);
+    }
 }
 
 SphereDrawable::SphereDrawable(uint32_t segs, const utils::BoundingSphere &bs, const glm::vec4& c)

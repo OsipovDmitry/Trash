@@ -35,17 +35,31 @@ ModelNode::ModelNode(const std::string &filename)
 
         for (auto mesh : node->meshes)
         {
-            std::shared_ptr<Texture> diffuseTexture, normalTexture;
+            std::shared_ptr<Texture> diffuseTexture, opacityTexture, normalTexture, metallicTexture, roughTexture;
+            bool isMetallicRoughTexture = true;
 
             if (mesh->material)
             {
                 diffuseTexture = mesh->material->diffuseTexture.second;
+                opacityTexture = mesh->material->opacityTexture.second;
                 normalTexture = mesh->material->normalTexture.second;
+                metallicTexture = mesh->material->metallicOrSpecularTexture.second;
+                roughTexture = mesh->material->roughOrGlossTexture.second;
+                isMetallicRoughTexture = mesh->material->isMetallicRoughWorkflow;
             }
 
             auto meshNode = std::make_shared<Node>();
+            auto& meshNodePrivate = meshNode->m();
             meshNode->setTransform(transform);
-            meshNode->m().addDrawable(std::make_shared<TexturedMeshDrawable>(mesh->mesh, diffuseTexture, normalTexture, mPrivate.bonesBuffer));
+            meshNodePrivate.addDrawable(std::make_shared<TexturedMeshDrawable>(mesh->mesh,
+                                                                               diffuseTexture,
+                                                                               opacityTexture,
+                                                                               normalTexture,
+                                                                               metallicTexture,
+                                                                               roughTexture,
+                                                                               isMetallicRoughTexture,
+                                                                               mPrivate.bonesBuffer,
+                                                                               meshNodePrivate.lights));
             attach(meshNode);
 
             minimalBoundingSphere += transform * mesh->mesh->boundingSphere;

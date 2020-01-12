@@ -16,8 +16,12 @@ namespace trash
 namespace core
 {
 
-static const size_t MAX_LIGHTS_PER_NODE = 8;
-using LightList = std::array<int32_t, MAX_LIGHTS_PER_NODE>;
+struct UpdateInfo
+{
+    uint64_t time;
+    uint64_t dt;
+    const LightsList& lightsList;
+};
 
 class Drawable;
 
@@ -34,9 +38,10 @@ public:
     virtual void doUpdate(uint64_t, uint64_t);
     virtual void doPick(uint32_t);
 
+    Scene *getScene() const;
     const utils::BoundingSphere& getBoundingSphere();
     const utils::Transform& getGlobalTransform();
-    const LightList& getLights(const std::vector<std::shared_ptr<Light>>&);
+    const LightIndicesList& getLights();
 
     void addDrawable(std::shared_ptr<Drawable>);
     void removeDrawable(std::shared_ptr<Drawable>);
@@ -45,7 +50,7 @@ public:
     std::unordered_set<std::shared_ptr<Drawable>> drawables;
     utils::Transform transform, globalTransform;
     utils::BoundingSphere minimalBoundingSphere, boundingSphere;
-    LightList lights;
+    LightIndicesList lights;
 
     std::shared_ptr<Drawable> bSphereDrawable;
     std::shared_ptr<NodeUserData> userData;

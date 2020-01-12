@@ -86,12 +86,25 @@ public:
 class TexturedMeshDrawable : public MeshDrawable
 {
 public:
-    TexturedMeshDrawable(std::shared_ptr<Mesh>, std::shared_ptr<Texture>, std::shared_ptr<Texture>, std::shared_ptr<Buffer>);
+    TexturedMeshDrawable(std::shared_ptr<Mesh>,
+                         std::shared_ptr<Texture>,
+                         std::shared_ptr<Texture>,
+                         std::shared_ptr<Texture>,
+                         std::shared_ptr<Texture>,
+                         std::shared_ptr<Texture>,
+                         bool,
+                         std::shared_ptr<Buffer>,
+                         const LightIndicesList&);
 
     void prerender() const override;
 
-    std::shared_ptr<Texture> diffuseTexture;
+    std::shared_ptr<Texture> baseColorTexture;
+    std::shared_ptr<Texture> opacityTexture;
     std::shared_ptr<Texture> normalTexture;
+    std::shared_ptr<Texture> metallicOrSpecTexture;
+    std::shared_ptr<Texture> roughOrGlossTexture;
+    const LightIndicesList& lightsList;
+    bool isMetallicRoughWorkflow;
 };
 
 class SphereDrawable : public ColoredMeshDrawable

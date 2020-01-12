@@ -10,7 +10,7 @@ namespace trash
 namespace utils
 {
 
-class Ray
+struct Ray
 {
 public:
     glm::vec3 pos, dir;

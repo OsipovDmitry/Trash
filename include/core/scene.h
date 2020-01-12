@@ -2,10 +2,12 @@
 #define SCENE_H
 
 #include <memory>
+#include <vector>
 
 #include <utils/noncopyble.h>
 #include <utils/pimpl.h>
 
+#include <core/node.h>
 #include <core/coreglobal.h>
 #include <core/forwarddecl.h>
 
@@ -30,6 +32,7 @@ public:
 
     void attachLight(std::shared_ptr<Light>);
     bool detachLight(std::shared_ptr<Light>);
+    const LightsList& lights() const;
 
 private:
     std::unique_ptr<ScenePrivate> m_;

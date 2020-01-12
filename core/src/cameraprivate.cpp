@@ -11,6 +11,9 @@
 #include "nodeprivate.h"
 #include "drawables.h"
 
+#include "sceneprivate.h"
+#include <core/light.h>
+
 namespace trash
 {
 namespace core
@@ -36,13 +39,7 @@ const glm::mat4x4 &CameraPrivate::projectionMatrix() const
 
 void CameraPrivate::renderScene(uint64_t time, uint64_t dt)
 {
-    auto& renderer = Renderer::instance();
-    renderer.setViewport(viewport);
-    renderer.setViewMatrix(viewMatrix());
-    renderer.setProjectionMatrix(projectionMatrix());
-    renderer.setClearColor(clearColorBuffer, clearColor);
-    renderer.setClearDepth(clearDepthBuffer, clearDepth);
-
+    auto& scenePrivate = scene->m();
     utils::Frustum frustum(projectionMatrix() * viewMatrix());
 
     std::queue<std::shared_ptr<Node>> nodes;
@@ -61,6 +58,22 @@ void CameraPrivate::renderScene(uint64_t time, uint64_t dt)
         for (auto child : node->children())
             nodes.push(child);
     }
+
+    auto& renderer = Renderer::instance();
+
+    for (auto l : scenePrivate.lights)
+    {
+        renderer.draw(
+                    std::make_shared<SphereDrawable>(2, utils::BoundingSphere(glm::vec3(), 10.0f), glm::vec4(l->color(),1)),
+                    utils::Transform(glm::vec3(1,1,1), glm::quat(1,0,0,0), l->position()));
+    }
+
+    renderer.setViewport(viewport);
+    renderer.setViewMatrix(viewMatrix());
+    renderer.setProjectionMatrix(projectionMatrix());
+    renderer.setClearColor(clearColorBuffer, clearColor);
+    renderer.setClearDepth(clearDepthBuffer, clearDepth);
+    renderer.setLightsBuffer(scenePrivate.getLightsBuffer());
 
     renderer.render(nullptr);
 }

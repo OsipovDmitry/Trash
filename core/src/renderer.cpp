@@ -1,3 +1,5 @@
+#include <array>
+
 #include <QtGui/QOpenGLExtraFunctions>
 #include <QtGui/QOpenGLFramebufferObject>
 #include <QtGui/QImage>
@@ -69,6 +71,11 @@ GLuint RenderProgram::uniformBufferIndexByName(const std::string& name)
     return Renderer::instance().functions().glGetUniformBlockIndex(id, name.c_str());
 }
 
+void RenderProgram::setUniformBufferBinding(GLuint index, GLuint unit)
+{
+    Renderer::instance().functions().glUniformBlockBinding(id, index, unit);
+}
+
 GLint RenderProgram::uniformBufferDataSize(GLuint blockIndex)
 {
     GLint val = -1;
@@ -120,6 +127,13 @@ void RenderProgram::setUniform(GLint loc, GLint value)
     auto& functions = Renderer::instance().functions();
     functions.glUseProgram(id);
     functions.glUniform1i(loc, value);
+}
+
+void RenderProgram::setUniform(GLint loc, const glm::vec3& value)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glUseProgram(id);
+    functions.glUniform3fv(loc, 1, glm::value_ptr(value));
 }
 
 void RenderProgram::setUniform(GLint loc, const glm::vec4& value)
@@ -378,6 +392,7 @@ void Renderer::initializeResources()
 //        push(file, mdl);
 //        file.close();
 //    }
+
 }
 
 Renderer &Renderer::instance()
@@ -415,6 +430,14 @@ std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &ve
             }
 
             auto byteArray = file.readAll();
+            auto errorString = precompileShader(byteArray);
+            if (!errorString.empty())
+            {
+                std::cout << shader.second.toStdString() << ": " << errorString << std::endl;
+                isOk = false;
+                continue;
+            }
+
             const char *data = byteArray.data();
 
             shaderIds[i] = m_functions.glCreateShader(shader.first);
@@ -487,6 +510,54 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
         object = std::make_shared<Texture>(id);
         object->generateMipmaps();
         m_resourceStorage->store(filename, object);
+    }
+
+    return object;
+}
+
+std::shared_ptr<Texture> Renderer::loadTexture(const glm::vec3& value)
+{
+    const std::array<uint8_t, 3> color {
+                static_cast<uint8_t>(value.r * 255.0f + 0.5f),
+                static_cast<uint8_t>(value.g * 255.0f + 0.5f),
+                static_cast<uint8_t>(value.b * 255.0f + 0.5f) };
+
+    const std::string name = "colorTexture_" + std::to_string(color[0]) + "_" + std::to_string(color[1]) + "_" + std::to_string(color[2]);
+
+    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(name));
+    if (!object)
+    {
+        GLuint id;
+        m_functions.glGenTextures(1, &id);
+        m_functions.glBindTexture(GL_TEXTURE_2D, id);
+        m_functions.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, color.data());
+        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+        object = std::make_shared<Texture>(id);
+        m_resourceStorage->store(name, object);
+    }
+
+    return object;
+}
+
+std::shared_ptr<Texture> Renderer::loadTexture(float value)
+{
+    const auto color = static_cast<uint8_t>(value * 255.0f + 0.5f);
+    const std::string name = "colorTexture_" + std::to_string(color);
+
+    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(name));
+    if (!object)
+    {
+        GLuint id;
+        m_functions.glGenTextures(1, &id);
+        m_functions.glBindTexture(GL_TEXTURE_2D, id);
+        m_functions.glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, 1, 1, 0, GL_RED, GL_UNSIGNED_BYTE, &color);
+        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+
+        object = std::make_shared<Texture>(id);
+        m_resourceStorage->store(name, object);
     }
 
     return object;
@@ -574,6 +645,11 @@ void Renderer::readPixel(std::shared_ptr<Framebuffer> framebuffer, int xi, int y
     m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
 }
 
+std::shared_ptr<Buffer> Renderer::lightsBuffer() const
+{
+    return m_lightsBuffer;
+}
+
 void Renderer::setViewport(const glm::ivec4& value)
 {
     m_viewport = value;
@@ -582,6 +658,8 @@ void Renderer::setViewport(const glm::ivec4& value)
 void Renderer::setViewMatrix(const glm::mat4x4& value)
 {
     m_viewMatrix = value;
+    m_viewMatrixInverse = glm::inverse(m_viewMatrix);
+    m_viewPosition = glm::vec3(m_viewMatrixInverse * glm::vec4(0.f, 0.f, 0.f, 1.f));
 }
 
 void Renderer::setProjectionMatrix(const glm::mat4x4& value)
@@ -599,6 +677,11 @@ void Renderer::setClearDepth(bool state, float value)
 {
     m_clearDepthBit = state;
     m_clearDepth = value;
+}
+
+void Renderer::setLightsBuffer(std::shared_ptr<Buffer> lb)
+{
+   m_lightsBuffer = lb;
 }
 
 void Renderer::renderSolidLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
@@ -620,7 +703,15 @@ void Renderer::renderSolidLayer(DrawDataContainer::iterator begin, DrawDataConta
         renderProgram->setUniform(renderProgram->uniformLocation("u_viewMatrix"), m_viewMatrix);
         renderProgram->setUniform(renderProgram->uniformLocation("u_modelMatrix"), modelMatrix);
         renderProgram->setUniform(renderProgram->uniformLocation("u_normalMatrix"), normalMatrix);
-        renderProgram->setUniform(renderProgram->uniformLocation("u_light"), glm::vec4(1000, 1000, -1000, 1));
+        renderProgram->setUniform(renderProgram->uniformLocation("u_viewPosition"), m_viewPosition);
+
+        GLuint lightsBufferIndex = renderProgram->uniformBufferIndexByName("u_lightsBuffer");
+        if (lightsBufferIndex != (GLuint)-1)
+        {
+            renderProgram->setUniformBufferBinding(lightsBufferIndex, 1);
+            bindUniformBuffer(m_lightsBuffer, 1);
+
+        }
 
         drawable->prerender();
 
@@ -649,6 +740,46 @@ GLbitfield Renderer::calcClearMask() const
     if (m_clearDepthBit) clearMask |= GL_DEPTH_BUFFER_BIT;
 
     return clearMask;
+}
+
+std::string Renderer::precompileShader(QByteArray &text)
+{
+    static const QString includeString = "#include<";
+    static const QString closedBracket = ">";
+
+    std::set<QByteArray> includedFiles;
+
+    for (auto pos = text.indexOf(includeString); pos != -1; pos = text.indexOf(includeString, pos))
+    {
+        auto pos2 = text.indexOf(closedBracket, pos);
+        if (pos2 == -1)
+        {
+            return "Wrong order '<' and '>' in '#include'";
+        }
+
+        auto pos1 = pos + includeString.length();
+        auto includedFilename = text.mid(pos1, pos2-pos1);
+
+        if (includedFiles.count(includedFilename))
+        {
+            text = text.replace(pos, pos2-pos+1, "");
+            continue;
+        }
+
+        QFile includedfile(includedFilename);
+        if (!includedfile.open(QFile::ReadOnly))
+        {
+            return "Can't open included file \"" + includedFilename.toStdString() + "\"";
+        }
+
+        auto includedData = includedfile.readAll();
+        includedfile.close();
+
+        text = text.replace(pos, pos2-pos+1, includedData);
+        includedFiles.insert(includedFilename);
+    }
+
+    return "";
 }
 
 bool Renderer::DrawDataComparator::operator ()(const Renderer::DrawDataType& left, const Renderer::DrawDataType& right) const

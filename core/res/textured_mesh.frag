@@ -1,41 +1,31 @@
 #version 330 core
 
-//--------LIGHTS------------
-
-#define Light mat4
-
-#define LIGHT_POSITION(light) (light[0].xyz)
-#define LIGHT_DIRECTION(light) (light[1].xyz)
-#define LIGHT_COLOR(light) (light[2].xyz)
-#define LIGHT_ATTENUATION(light) (light[3].xyz)
-#define LIGHT_SPOT_COS_INNER(light) (light[0].w)
-#define LIGHT_SPOT_COS_OUTER(light) (light[1].w)
-#define LIGHT_TYPE(light) (int(light[2][3] + 0.5))
-
-#define LIGHT_TYPE_NONE (0)
-#define LIGHT_TYPE_POINT (1)
-#define LIGHT_TYPE_DIRECTION (2)
-#define LIGHT_TYPE_SPOT (3)
-#define LIGHT_TYPE_COUNT (4)
-
-const float s_isDirectionLightType[LIGHT_TYPE_COUNT] = float[LIGHT_TYPE_COUNT](0.0, 0.0, 1.0, 0.0);
-const float s_distanceAttenuationLightType[LIGHT_TYPE_COUNT] = float[LIGHT_TYPE_COUNT](0.0, 1.0, 0.0, 1.0);
-const float s_spotAttenuationLightType[LIGHT_TYPE_COUNT] = float[LIGHT_TYPE_COUNT](0.0, 0.0, 0.0, 1.0);
-
-vec3 toLightVector(in Light light, vec3 v) {
-    return mix(LIGHT_POSITION(light) - v, -LIGHT_DIRECTION(light), s_isDirectionLightType[LIGHT_TYPE(light)]);
-}
-
-//---------------------------
-
-uniform sampler2D u_diffuseMap;
+uniform sampler2D u_baseColorMap;
+uniform sampler2D u_opacityMap;
 uniform sampler2D u_normalMap;
+uniform sampler2D u_metallicMap;
+uniform sampler2D u_roughnessMap;
+
+#include<:/res/gammacorrection.glsl>
+#include<:/res/lights.glsl>
+#include<:/res/pbr.glsl>
+
+#define MAX_LIGHTS 8
+
+uniform int u_isMetallicRoughWorkflow;
+uniform int u_lightIndices[MAX_LIGHTS];
+
+layout (std140) uniform u_lightsBuffer
+{
+    mat4x4 u_lights[128];
+};
 
 in vec3 v_tangent;
 in vec3 v_binormal;
 in vec3 v_normal;
 in vec2 v_texCoord;
-in vec3 v_toLight;
+in vec3 v_toView;
+in vec3 v_toLight[MAX_LIGHTS];
 
 out vec4 fragColor;
 
@@ -44,12 +34,23 @@ void main(void)
     vec3 tangent = normalize(v_tangent);
     vec3 binormal = normalize(v_binormal);
     vec3 normal = normalize(v_normal);
-    vec3 toLight = normalize(v_toLight);
+    vec3 fragNormal = mat3(tangent, binormal, normal) * (texture(u_normalMap, v_texCoord).xyz * 2.0 - vec3(1.0, 1.0, 1.0));
+    vec3 toView = normalize(v_toView);
 
-    vec3 fragNormal = mat3(tangent, binormal, normal) * vec3(texture(u_normalMap, v_texCoord).xyz * 2.0 - vec3(1.0, 1.0, 1.0));
+    PbrData pbr = getPbrData(v_texCoord, u_isMetallicRoughWorkflow > 0);
 
-    vec3 diffuseColor = texture(u_diffuseMap, v_texCoord).xyz;
-    float diffuse = max(0.0, dot(toLight, fragNormal));
+    vec3 F0 = mix(vec3(dielectricSpecular), pbr.baseColor, pbr.metallic);
+    vec3 Lo = vec3(0.0);
 
-    fragColor = vec4(diffuseColor * diffuse, 1.0);
+    for (int i = 0; i < MAX_LIGHTS; i++)
+    {
+        Light light = u_lights[u_lightIndices[i]];
+        Lo += calcPbrLighting(pbr, F0, LIGHT_COLOR(light), fragNormal, normalize(v_toLight[i]), toView, lightAttenuation(light, v_toLight[i]));
+    }
+
+    vec3 color = Lo;
+    //vec3 color = vec3(pbr.roughness);
+
+    //color = color / (color + vec3(1.0));
+    fragColor = vec4(toSRGB(color), 1.0);
 }

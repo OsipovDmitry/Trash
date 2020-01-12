@@ -41,6 +41,8 @@ public:
     std::shared_ptr<NodeUserData> userData() const;
     void setUserData(std::shared_ptr<NodeUserData>);
 
+    const LightIndicesList& getLights() const;
+
 protected:
     void doAttach() override;
     void doDetach() override;

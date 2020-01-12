@@ -13,22 +13,36 @@ namespace core
 
 float LightPrivate::intensity(const glm::vec3& v) const
 {
-    static const std::array<float, numElementsLightType()> s_isDirectionLightType { 0.0, 0.0, 1.0, 0.0 };
-    static const std::array<float, numElementsLightType()> s_distanceAttenuationLightType { 0.0, 1.0, 0.0, 1.0 };
-    static const std::array<float, numElementsLightType()> s_spotAttenuationLightType { 0.0, 0.0, 0.0, 1.0 };
+    float attenaution = 1.0f;
+    glm::vec3 toLight = direction(v);
 
-    auto toLight = glm::mix(pos - v, -dir, s_isDirectionLightType[castFromLightType(type)]);
-    float distToLight = glm::length(toLight);
-    toLight = glm::normalize(toLight);
+    if ((type == LightType::Point) || (type == LightType::Spot))
+    {
+        float dist = glm::length(toLight);
+        glm::vec3 l = glm::normalize(toLight);
 
-    float distAtt = att.x * distToLight * distToLight + att.y * distToLight + att.z;
-    distAtt = distAtt * s_distanceAttenuationLightType[castFromLightType(type)];
+        attenaution *= 1.0f / (att.x * dist * dist + att.y * dist + att.z);
 
-    float spotAtt = (glm::dot(toLight, dir) - cosAngles.x) / (cosAngles.y - cosAngles.x);
-    spotAtt = 1.0f - glm::clamp(spotAtt, 0.0f, 1.0f);
-    spotAtt = spotAtt * s_spotAttenuationLightType[castFromLightType(type)];
+        if (type == LightType::Spot)
+        {
+            float cosAngle = glm::dot(-l, dir);
+            float spotAtt = (cosAngle - cosAngles.y) / (cosAngles.x - cosAngles.y);
+            spotAtt = glm::clamp(spotAtt, 0.0f, 1.0f);
+            attenaution *= spotAtt;
+        }
+    }
 
-    return distAtt * spotAtt;
+    return attenaution;
+}
+
+glm::vec3 LightPrivate::direction(const glm::vec3& v) const
+{
+    if ((type == LightType::Point) || (type == LightType::Spot))
+        return pos - v;
+    else if (type == LightType::Direction)
+        return -dir;
+    else
+        return glm::vec3(0.f, 0.f, 0.f);
 }
 
 glm::mat4x4 LightPrivate::pack() const
@@ -37,7 +51,7 @@ glm::mat4x4 LightPrivate::pack() const
                 glm::vec4(pos, cosAngles.x),
                 glm::vec4(dir, cosAngles.y),
                 glm::vec4(color, static_cast<float>(type)),
-                glm::vec4(att, 0.0)
+                glm::vec4(att, 0.0f)
                 );
 }
 

@@ -35,6 +35,13 @@ ENUMCLASS(VertexAttribute, uint32_t,
           BonesWeights,
           Tangent)
 
+ENUMCLASS(TextureUnit, int32_t,
+          BaseColor,
+          Opacity,
+          Normal,
+          Metallic,
+          Roughness)
+
 } // namespace
 } // namespace
 

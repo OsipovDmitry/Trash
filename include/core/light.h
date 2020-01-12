@@ -28,7 +28,7 @@ class CORESHARED_EXPORT Light
     PIMPL(Light)
 
 public:
-    Light();
+    Light(LightType = LightType::Point);
     virtual ~Light();
 
     LightType type() const;

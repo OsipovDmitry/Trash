@@ -6,13 +6,25 @@
 #include <set>
 
 #include <core/forwarddecl.h>
+#include <core/node.h>
 
-#include "renderer.h"
+#include "nodeprivate.h"
 
 namespace trash
 {
 namespace core
 {
+
+class SceneRootNode : public Node
+{
+public:
+    SceneRootNode(Scene*);
+    Scene *scene() const;
+private:
+    Scene *m_scene;
+};
+
+class Buffer;
 
 class ScenePrivate
 {
@@ -20,12 +32,11 @@ public:
     void dirtyLight(Light*);
     std::shared_ptr<Buffer> getLightsBuffer();
 
-
-    std::shared_ptr<Node> rootNode;
-    std::vector<std::shared_ptr<Light>> lights;
+    std::shared_ptr<SceneRootNode> rootNode;
+    LightsList lights;
     std::shared_ptr<Buffer> lightsUbo;
 
-    std::set<Light*> dirtyLights;
+    std::set<LightsList::difference_type> dirtyLights;
     bool dirtyAllLights;
 };
 

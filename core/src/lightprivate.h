@@ -22,6 +22,7 @@ public:
     Scene *scene;
 
     float intensity(const glm::vec3&) const;
+    glm::vec3 direction(const glm::vec3&) const;
     glm::mat4x4 pack() const;
 
 };

@@ -56,6 +56,11 @@ void Node::setUserData(std::shared_ptr<NodeUserData> data)
     m_->userData = data;
 }
 
+const LightIndicesList& Node::getLights() const
+{
+    return m_->getLights();
+}
+
 void Node::doAttach()
 {
     m_->dirtyGlobalTransform();

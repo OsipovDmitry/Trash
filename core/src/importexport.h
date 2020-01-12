@@ -9,6 +9,7 @@ namespace trash
 namespace core
 {
 
+void push(std::ofstream& stream, bool f);
 void push(std::ofstream& stream, float f);
 void push(std::ofstream& stream, uint16_t f);
 void push(std::ofstream& stream, int32_t f);
@@ -26,6 +27,7 @@ void push(std::ofstream& stream, std::shared_ptr<Model::Mesh> f);
 void push(std::ofstream& stream, std::shared_ptr<Model::Animation> a);
 void push(std::ofstream& stream, std::shared_ptr<Model> f);
 
+void pull(std::ifstream& stream, bool& f);
 void pull(std::ifstream& stream, float& f);
 void pull(std::ifstream& stream, uint16_t& f);
 void pull(std::ifstream& stream, int32_t& f);
