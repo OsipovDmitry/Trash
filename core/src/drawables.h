@@ -103,8 +103,12 @@ public:
     std::shared_ptr<Texture> normalTexture;
     std::shared_ptr<Texture> metallicOrSpecTexture;
     std::shared_ptr<Texture> roughOrGlossTexture;
+    std::shared_ptr<Texture> diffuseIBLMap;
+    std::shared_ptr<Texture> specularIBLMap;
+    std::shared_ptr<Texture> brdfLUTMap;
     const LightIndicesList& lightsList;
     bool isMetallicRoughWorkflow;
+    int32_t numSpecularIBLMapLods;
 };
 
 class SphereDrawable : public ColoredMeshDrawable

@@ -1,0 +1,6 @@
+1) remove Image::isLoaded method, refact Image::load
+2) develop 3d model format, refact importexport.cpp
+3) add Buffer::setSubData method, use it for update binesbuffer
+4) why aren't there setting up projMatrix to Renderer in CameraPrivate::pickNode ?
+5) Use current file path for pre-compile shaders
+

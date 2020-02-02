@@ -24,7 +24,7 @@ private:
     Scene *m_scene;
 };
 
-class Buffer;
+struct Buffer;
 
 class ScenePrivate
 {

@@ -40,7 +40,10 @@ ENUMCLASS(TextureUnit, int32_t,
           Opacity,
           Normal,
           Metallic,
-          Roughness)
+          Roughness,
+          DiffuseIBL,
+          SpecularIBL,
+          BrdfLUT)
 
 } // namespace
 } // namespace

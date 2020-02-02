@@ -137,8 +137,8 @@ TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m,
     , normalTexture(nt)
     , metallicOrSpecTexture(mt)
     , roughOrGlossTexture(rt)
-    , isMetallicRoughWorkflow(mrw)
     , lightsList(ll)
+    , isMetallicRoughWorkflow(mrw)
 {
     auto& renderer = Renderer::instance();
 
@@ -161,6 +161,12 @@ TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m,
 
     if (!roughOrGlossTexture)
         roughOrGlossTexture = renderer.loadTexture(0.6f);
+
+    diffuseIBLMap = renderer.loadTexture("textures/diffuse/diffuse.json");
+    specularIBLMap = renderer.loadTexture("textures/specular/specular.json");
+    brdfLUTMap = renderer.loadTexture(brdfLutTextureName);
+
+    numSpecularIBLMapLods = specularIBLMap->numMipmapLevels();
 }
 
 void TexturedMeshDrawable::prerender() const
@@ -185,6 +191,16 @@ void TexturedMeshDrawable::prerender() const
     renderer.bindTexture(roughOrGlossTexture, castFromTextureUnit(TextureUnit::Roughness));
 
     program->setUniform(program->uniformLocation("u_isMetallicRoughWorkflow"), isMetallicRoughWorkflow ? 1 : 0);
+
+    program->setUniform(program->uniformLocation("u_diffuseIBLMap"), castFromTextureUnit(TextureUnit::DiffuseIBL));
+    renderer.bindTexture(diffuseIBLMap, castFromTextureUnit(TextureUnit::DiffuseIBL));
+
+    program->setUniform(program->uniformLocation("u_specularIBLMap"), castFromTextureUnit(TextureUnit::SpecularIBL));
+    renderer.bindTexture(specularIBLMap, castFromTextureUnit(TextureUnit::SpecularIBL));
+    program->setUniform(program->uniformLocation("u_numSpecularIBLMapLods"), numSpecularIBLMapLods);
+
+    program->setUniform(program->uniformLocation("u_brdfLUT"), castFromTextureUnit(TextureUnit::BrdfLUT));
+    renderer.bindTexture(brdfLUTMap, castFromTextureUnit(TextureUnit::BrdfLUT));
 
     for (size_t i = 0; i < MAX_LIGHTS_PER_NODE; ++i)
     {

@@ -64,10 +64,13 @@ struct Texture : public ResourceStorage::Object
     GLenum target;
     GLuint id;
 
-    Texture(GLuint id_) : target(GL_TEXTURE_2D), id(id_) {}
+    Texture(GLuint id_, GLenum target_) : target(target_), id(id_) {}
     ~Texture() override;
 
     void generateMipmaps();
+    void setFilter(int32_t); // 1 - nearest // 2 - linear // 3 - trilinear
+    void setWrap(GLenum);
+    int32_t numMipmapLevels() const;
 };
 
 struct Buffer
@@ -214,6 +217,7 @@ public:
 
     std::shared_ptr<RenderProgram> loadRenderProgram(const std::string&, const std::string&);
     std::shared_ptr<Texture> loadTexture(const std::string&);
+    std::shared_ptr<Texture> loadTexture(const glm::vec4&);
     std::shared_ptr<Texture> loadTexture(const glm::vec3&);
     std::shared_ptr<Texture> loadTexture(float);
     std::shared_ptr<Model> loadModel(const std::string&);

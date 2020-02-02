@@ -14,7 +14,7 @@ HEADERS += \
     src/gameprivate.h \
     src/floor.h \
     src/person.h \
-    src/sphere.h
+    src/teapot.h
 
 SOURCES += \
     src/game.cpp \
@@ -23,7 +23,7 @@ SOURCES += \
     src/gameprivate.cpp \
     src/floor.cpp \
     src/person.cpp \
-    src/sphere.cpp
+    src/teapot.cpp
 
 LIBS += \
     -lcore

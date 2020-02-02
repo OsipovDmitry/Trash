@@ -46,8 +46,8 @@ PbrData getPbrData(in vec2 texCoord, in bool isMetaalicRoughWorkflow)
         float oneMinusSpecularStrength = 1.0 - max(specular.r, max(specular.g, specular.b));
         float metallic = solveMetallic(getPerceivedBrightness(diffuse), getPerceivedBrightness(specular), oneMinusSpecularStrength);
 
-        vec3 baseColorFromDiffuse = diffuse * (oneMinusSpecularStrength / (1.0 - dielectricSpecular) / max(1.0 - metallic, 1e-6));
-        vec3 baseColorFromSpecular = (specular - vec3(dielectricSpecular) * (1.0 - metallic)) * (1.0 / max(metallic, 1e-6));
+        vec3 baseColorFromDiffuse = diffuse * (oneMinusSpecularStrength / (1.0 - dielectricSpecular) / max(1.0 - metallic, 1e-3));
+        vec3 baseColorFromSpecular = (specular - vec3(dielectricSpecular) * (1.0 - metallic)) * (1.0 / max(metallic, 1e-3));
 
         pbr.baseColor = mix(baseColorFromDiffuse, baseColorFromSpecular, metallic * metallic);
         pbr.metallic = metallic;
@@ -111,7 +111,7 @@ vec3 calcPbrLighting(in PbrData pbr, in vec3 F0, in vec3 lightColor, in vec3 n, 
 
     vec3 numerator = NDF * G * F;
     float denominator = 4.0 * max(dot(n, v), 0.0) * max(dot(n, l), 0.0);
-    vec3 specular = numerator / max(denominator, 1e-6);
+    vec3 specular = numerator / max(denominator, 1e-3);
 
     float NdotL = max(dot(n, l), 0.0);
     return (kD * pbr.baseColor / PI + specular) * radiance * NdotL;

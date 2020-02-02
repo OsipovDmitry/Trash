@@ -57,12 +57,12 @@ void Light::setColor(const glm::vec3& value)
 {
     m_->color = value;
 
-    if (m_->scene)
-    {
-        auto& scenePrivate = m_->scene->m();
-        //scenePrivate.rootNode->m().dirtyLights();
-        //scenePrivate.dirtyLight(this);
-    }
+//    if (m_->scene)
+//    {
+//        auto& scenePrivate = m_->scene->m();
+//        scenePrivate.rootNode->m().dirtyLights();
+//        scenePrivate.dirtyLight(this);
+//    }
 }
 
 const glm::vec3& Light::attenuation() const

@@ -10,5 +10,9 @@
         <file>res/gammacorrection.glsl</file>
         <file>res/lights.glsl</file>
         <file>res/pbr.glsl</file>
+        <file>res/ibl.glsl</file>
+        <file>res/brdf_lut.png</file>
+        <file>res/brdf_lut.json</file>
+        <file>res/teapot.fbx</file>
     </qresource>
 </RCC>

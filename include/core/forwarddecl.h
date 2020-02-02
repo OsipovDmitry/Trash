@@ -19,6 +19,7 @@ class AbstractGame;
 class NodeUserData;
 class Node;
 class ModelNode;
+class TeapotNode;
 class SceneRootNode;
 class Camera;
 class Scene;

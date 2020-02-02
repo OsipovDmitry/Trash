@@ -7,6 +7,8 @@ DEFINES += \
     CORE_LIBRARY
 
 HEADERS += \
+    src/hdrloader/hdrloader.h \
+    src/rapidjson/*.h \
     ../include/utils/*.h \
     ../include/core/*.h \
     src/renderwidget.h \
@@ -23,11 +25,13 @@ HEADERS += \
     src/resources.h \
     src/importexport.h \
     src/sceneprivate.h \
-    src/lightprivate.h
-
-    src/cameraprivate.h
+    src/lightprivate.h \
+    src/cameraprivate.h \
+    src/image.h \
+    src/texture.inl
 
 SOURCES += \
+    src/hdrloader/hdrloader.cpp \
     src/abstractcontroller.cpp \
     src/renderwidget.cpp \
     src/core.cpp \
@@ -48,11 +52,13 @@ SOURCES += \
     src/scene.cpp \
     src/light.cpp \
     src/lightprivate.cpp \
-    src/sceneprivate.cpp
+    src/sceneprivate.cpp \
+    src/image.cpp \
+    src/teapotnode.cpp
 
 LIBS += \
-#    -lassimp-vc140-mt
-    -lassimp
+    -lassimp-vc140-mt
+#    -lassimp
 
 RESOURCES += \
     core.qrc

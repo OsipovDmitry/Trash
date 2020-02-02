@@ -5,10 +5,16 @@ uniform sampler2D u_opacityMap;
 uniform sampler2D u_normalMap;
 uniform sampler2D u_metallicMap;
 uniform sampler2D u_roughnessMap;
+uniform samplerCube u_diffuseIBLMap;
+uniform samplerCube u_specularIBLMap;
+uniform sampler2D u_brdfLUT;
+
+uniform int u_numSpecularIBLMapLods;
 
 #include<:/res/gammacorrection.glsl>
 #include<:/res/lights.glsl>
 #include<:/res/pbr.glsl>
+#include<:/res/ibl.glsl>
 
 #define MAX_LIGHTS 8
 
@@ -34,7 +40,7 @@ void main(void)
     vec3 tangent = normalize(v_tangent);
     vec3 binormal = normalize(v_binormal);
     vec3 normal = normalize(v_normal);
-    vec3 fragNormal = mat3(tangent, binormal, normal) * (texture(u_normalMap, v_texCoord).xyz * 2.0 - vec3(1.0, 1.0, 1.0));
+    vec3 fragNormal = normalize(mat3(tangent, binormal, normal) * (texture(u_normalMap, v_texCoord).xyz * 2.0 - vec3(1.0, 1.0, 1.0)));
     vec3 toView = normalize(v_toView);
 
     PbrData pbr = getPbrData(v_texCoord, u_isMetallicRoughWorkflow > 0);
@@ -48,9 +54,10 @@ void main(void)
         Lo += calcPbrLighting(pbr, F0, LIGHT_COLOR(light), fragNormal, normalize(v_toLight[i]), toView, lightAttenuation(light, v_toLight[i]));
     }
 
-    vec3 color = Lo;
-    //vec3 color = vec3(pbr.roughness);
+    vec3 color = vec3(0.0);
+    color += Lo;
+    color += calcIblLighting(pbr, F0, fragNormal, toView);
 
-    //color = color / (color + vec3(1.0));
+    color = color / (color + vec3(1.0));
     fragColor = vec4(toSRGB(color), 1.0);
 }

@@ -2,7 +2,6 @@
 
 #include <QtGui/QOpenGLExtraFunctions>
 #include <QtGui/QOpenGLFramebufferObject>
-#include <QtGui/QImage>
 #include <QtCore/QFile>
 
 #include <glm/gtc/type_ptr.hpp>
@@ -16,8 +15,9 @@
 #include "resourcestorage.h"
 #include "drawables.h"
 #include "resources.h"
-#include "model.inl"
 #include "importexport.h"
+#include "model.inl"
+#include "texture.inl"
 
 #include <iostream>
 
@@ -166,10 +166,51 @@ void Texture::generateMipmaps()
 {
     auto& functions = Renderer::instance().functions();
 
-    functions.glBindTexture(GL_TEXTURE_2D, id);
-    functions.glGenerateMipmap(GL_TEXTURE_2D);
-    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    functions.glBindTexture(target, id);
+    functions.glGenerateMipmap(target);
+    functions.glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+    functions.glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+}
+
+void Texture::setFilter(int32_t value)
+{
+    auto& functions = Renderer::instance().functions();
+
+    functions.glBindTexture(target, id);
+    if (value == 1) {
+        functions.glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        functions.glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+    }
+    else if (value == 2) {
+        functions.glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+        functions.glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
+    else if (value == 3) {
+        functions.glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+        functions.glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    }
+}
+
+void Texture::setWrap(GLenum wrap)
+{
+    auto& functions = Renderer::instance().functions();
+
+    functions.glBindTexture(target, id);functions.glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    functions.glTexParameteri(target, GL_TEXTURE_WRAP_S, static_cast<GLint>(wrap));
+    functions.glTexParameteri(target, GL_TEXTURE_WRAP_T, static_cast<GLint>(wrap));
+    functions.glTexParameteri(target, GL_TEXTURE_WRAP_R, static_cast<GLint>(wrap));
+}
+
+int32_t Texture::numMipmapLevels() const
+{
+    auto& functions = Renderer::instance().functions();
+
+    functions.glBindTexture(target, id);
+
+    GLint res;
+    functions.glGetTexParameteriv(target, GL_TEXTURE_MAX_LEVEL, &res);
+
+    return res;
 }
 
 Buffer::Buffer(GLsizeiptr size, GLvoid *data, GLenum usage)
@@ -353,8 +394,7 @@ Renderer::Renderer(QOpenGLExtraFunctions& functions, GLuint defaultFbo)
 
 void Renderer::initializeResources()
 {
-    auto standardTexture = loadTexture(standardDiffuseTextureName);
-    standardTexture->generateMipmaps();
+    m_functions.glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
 //    const float L = 1250;
 //    const float wrap = 7;
@@ -373,7 +413,6 @@ void Renderer::initializeResources()
 
 //    auto mat = std::make_shared<Model::Material>();
 //    mat->diffuseTexture = std::make_pair(std::string("textures/floor.jpg"), loadTexture("textures/floor.jpg"));
-//    mat->normalTexture = std::make_pair(std::string(":/res/normal.png"), loadTexture(":/res/normal.png"));
 
 //    auto mdl = std::make_shared<Model>();
 //    mdl->rootNode = std::make_shared<Model::Node>();
@@ -490,78 +529,7 @@ std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &ve
     return object;
 }
 
-std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
-{
-    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(filename));
-    if (!object)
-    {
-        QImage image;
-        if (!image.load(QString::fromStdString(filename)))
-            return nullptr;
-        image = image.convertToFormat(QImage::Format_RGBA8888);
 
-        GLuint id;
-        m_functions.glGenTextures(1, &id);
-        m_functions.glBindTexture(GL_TEXTURE_2D, id);
-        m_functions.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA8, image.width(), image.height(), 0, GL_RGBA, GL_UNSIGNED_BYTE, image.bits());
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-
-        object = std::make_shared<Texture>(id);
-        object->generateMipmaps();
-        m_resourceStorage->store(filename, object);
-    }
-
-    return object;
-}
-
-std::shared_ptr<Texture> Renderer::loadTexture(const glm::vec3& value)
-{
-    const std::array<uint8_t, 3> color {
-                static_cast<uint8_t>(value.r * 255.0f + 0.5f),
-                static_cast<uint8_t>(value.g * 255.0f + 0.5f),
-                static_cast<uint8_t>(value.b * 255.0f + 0.5f) };
-
-    const std::string name = "colorTexture_" + std::to_string(color[0]) + "_" + std::to_string(color[1]) + "_" + std::to_string(color[2]);
-
-    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(name));
-    if (!object)
-    {
-        GLuint id;
-        m_functions.glGenTextures(1, &id);
-        m_functions.glBindTexture(GL_TEXTURE_2D, id);
-        m_functions.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB8, 1, 1, 0, GL_RGB, GL_UNSIGNED_BYTE, color.data());
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-        object = std::make_shared<Texture>(id);
-        m_resourceStorage->store(name, object);
-    }
-
-    return object;
-}
-
-std::shared_ptr<Texture> Renderer::loadTexture(float value)
-{
-    const auto color = static_cast<uint8_t>(value * 255.0f + 0.5f);
-    const std::string name = "colorTexture_" + std::to_string(color);
-
-    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(name));
-    if (!object)
-    {
-        GLuint id;
-        m_functions.glGenTextures(1, &id);
-        m_functions.glBindTexture(GL_TEXTURE_2D, id);
-        m_functions.glTexImage2D(GL_TEXTURE_2D, 0, GL_R8, 1, 1, 0, GL_RED, GL_UNSIGNED_BYTE, &color);
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-        object = std::make_shared<Texture>(id);
-        m_resourceStorage->store(name, object);
-    }
-
-    return object;
-}
 
 std::shared_ptr<Model::Animation> Renderer::loadAnimation(const std::string& filename)
 {
@@ -580,8 +548,10 @@ std::shared_ptr<Model::Animation> Renderer::loadAnimation(const std::string& fil
 
 void Renderer::bindTexture(std::shared_ptr<Texture> texture, GLint unit)
 {
+    GLuint id = texture ? texture->id : 0;
+    GLenum target = texture ? texture->target : GL_TEXTURE_2D;
     m_functions.glActiveTexture(static_cast<GLenum>(GL_TEXTURE0+unit));
-    m_functions.glBindTexture(texture->target, texture->id);
+    m_functions.glBindTexture(target, id);
 }
 
 void Renderer::bindUniformBuffer(std::shared_ptr<Buffer> buffer, GLuint unit)

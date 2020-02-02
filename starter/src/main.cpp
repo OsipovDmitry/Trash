@@ -10,7 +10,7 @@
 
 int main(int argc, char *argv[])
 {
-    static const int widgetHeight = 200;
+    static const int widgetHeight = 720;
 
     QApplication a(argc, argv);
 
@@ -20,6 +20,7 @@ int main(int argc, char *argv[])
     {
         surfaceFormat.setVersion(3, 3);
         surfaceFormat.setProfile(QSurfaceFormat::CoreProfile);
+        surfaceFormat.setSamples(16);
     }
     else
     {
