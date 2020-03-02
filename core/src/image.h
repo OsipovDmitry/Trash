@@ -2,6 +2,7 @@
 #define IMAGELOADER_H
 
 #include <string>
+#include <memory>
 
 #include <QtOpenGL/QGL>
 
@@ -18,8 +19,6 @@ class Image
 public:
     Image() = default;
     virtual ~Image() = default;
-
-    virtual bool isLoaded() const = 0;
 
     virtual GLsizei width() const = 0;
     virtual GLsizei height() const = 0;

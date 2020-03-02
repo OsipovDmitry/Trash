@@ -24,6 +24,7 @@ ModelNodePrivate::ModelNodePrivate(Node& node)
 void ModelNodePrivate::doUpdate(uint64_t time, uint64_t dt)
 {
     NodePrivate::doUpdate(time, dt);
+    dirtyShadowMaps();
 
     if (model->numBones())
     {
@@ -33,13 +34,9 @@ void ModelNodePrivate::doUpdate(uint64_t time, uint64_t dt)
             startAnimation = false;
         }
 
-        std::vector<utils::Transform> bones;
+        std::vector<glm::mat3x4> bones;
         model->calcBoneTransforms(animationName, (time - timeStart + timeOffset) * 0.001f, bones);
-
-        void *pData = bonesBuffer->map(0, static_cast<GLsizeiptr>(bones.size()*sizeof(glm::mat3x4)), GL_MAP_WRITE_BIT);
-        for (size_t i = 0; i < bones.size(); ++i)
-            reinterpret_cast<glm::mat3x4*>(pData)[i] = glm::transpose(bones[i].operator glm::mat4x4());
-        bonesBuffer->unmap();
+        bonesBuffer->setSubData(0, static_cast<GLsizeiptr>(bones.size()*sizeof(glm::mat3x4)), bones.data());
     }
 }
 

@@ -1,5 +1,7 @@
 #version 330 core
 
+#define MAX_LIGHTS 8
+
 uniform sampler2D u_baseColorMap;
 uniform sampler2D u_opacityMap;
 uniform sampler2D u_normalMap;
@@ -8,22 +10,21 @@ uniform sampler2D u_roughnessMap;
 uniform samplerCube u_diffuseIBLMap;
 uniform samplerCube u_specularIBLMap;
 uniform sampler2D u_brdfLUT;
+uniform sampler2DArrayShadow u_shadowMaps;
 
 uniform int u_numSpecularIBLMapLods;
 
-#include<:/res/gammacorrection.glsl>
-#include<:/res/lights.glsl>
-#include<:/res/pbr.glsl>
-#include<:/res/ibl.glsl>
-
-#define MAX_LIGHTS 8
+#include<gammacorrection.glsl>
+#include<lights.glsl>
+#include<pbr.glsl>
+#include<ibl.glsl>
 
 uniform int u_isMetallicRoughWorkflow;
 uniform int u_lightIndices[MAX_LIGHTS];
 
 layout (std140) uniform u_lightsBuffer
 {
-    mat4x4 u_lights[128];
+    LightStruct u_lights[128];
 };
 
 in vec3 v_tangent;
@@ -32,8 +33,23 @@ in vec3 v_normal;
 in vec2 v_texCoord;
 in vec3 v_toView;
 in vec3 v_toLight[MAX_LIGHTS];
+in vec4 v_posLightSpace[MAX_LIGHTS];
 
 out vec4 fragColor;
+
+float lightShadow(in LightStruct light, in vec3 posInLightSpace, in int lightIdx)
+{
+    const int N = 1;
+
+    vec2 shadowMapSize = textureSize(u_shadowMaps, 0).xy;
+    float shadow = 0.0;
+    int x, y;
+    for (x = -N; x <= N; ++x)
+        for (y = -N; y <= N; ++y)
+            shadow += texture(u_shadowMaps, vec4(posInLightSpace.xy + vec2(x,y) / shadowMapSize, float(lightIdx), posInLightSpace.z));
+
+    return shadow / ((2*N+1) * (2*N+1));
+}
 
 void main(void)
 {
@@ -50,13 +66,16 @@ void main(void)
 
     for (int i = 0; i < MAX_LIGHTS; i++)
     {
-        Light light = u_lights[u_lightIndices[i]];
-        Lo += calcPbrLighting(pbr, F0, LIGHT_COLOR(light), fragNormal, normalize(v_toLight[i]), toView, lightAttenuation(light, v_toLight[i]));
+        int lightIdx = u_lightIndices[i];
+        LightStruct light = u_lights[lightIdx];
+
+        float shadow = LIGHT_IS_SHADOW_ENABLED(light) ? lightShadow(light, v_posLightSpace[i].xyz / v_posLightSpace[i].w, lightIdx) : 1.0;
+        Lo += calcPbrLighting(pbr, F0, LIGHT_COLOR(light), fragNormal, normalize(v_toLight[i]), toView, lightAttenuation(light, v_toLight[i])) * shadow;
     }
 
     vec3 color = vec3(0.0);
     color += Lo;
-    color += calcIblLighting(pbr, F0, fragNormal, toView);
+    //color += 0.2 * calcIblLighting(pbr, F0, fragNormal, toView);
 
     color = color / (color + vec3(1.0));
     fragColor = vec4(toSRGB(color), 1.0);

@@ -1,8 +1,10 @@
 #include <queue>
 
 #include <core/modelnode.h>
+#include <core/drawablenode.h>
 
 #include "modelnodeprivate.h"
+#include "drawablenodeprivate.h"
 #include "renderer.h"
 #include "drawables.h"
 
@@ -48,18 +50,18 @@ ModelNode::ModelNode(const std::string &filename)
                 isMetallicRoughTexture = mesh->material->isMetallicRoughWorkflow;
             }
 
-            auto meshNode = std::make_shared<Node>();
+            auto meshNode = std::make_shared<DrawableNode>();
             auto& meshNodePrivate = meshNode->m();
             meshNode->setTransform(transform);
-            meshNodePrivate.addDrawable(std::make_shared<TexturedMeshDrawable>(mesh->mesh,
-                                                                               diffuseTexture,
-                                                                               opacityTexture,
-                                                                               normalTexture,
-                                                                               metallicTexture,
-                                                                               roughTexture,
-                                                                               isMetallicRoughTexture,
-                                                                               mPrivate.bonesBuffer,
-                                                                               meshNodePrivate.lights));
+            meshNode->addDrawable(std::make_shared<TexturedMeshDrawable>(mesh->mesh,
+                                                                         diffuseTexture,
+                                                                         opacityTexture,
+                                                                         normalTexture,
+                                                                         metallicTexture,
+                                                                         roughTexture,
+                                                                         isMetallicRoughTexture,
+                                                                         mPrivate.bonesBuffer,
+                                                                         meshNodePrivate.lightIndices));
             attach(meshNode);
 
             minimalBoundingSphere += transform * mesh->mesh->boundingSphere;
@@ -71,6 +73,11 @@ ModelNode::ModelNode(const std::string &filename)
 
     for (auto meshNode : children())
         meshNode->m().minimalBoundingSphere = meshNode->transform().inverse() * minimalBoundingSphere;
+}
+
+bool ModelNode::isModelNode() const
+{
+    return true;
 }
 
 void ModelNode::showBones(bool state)

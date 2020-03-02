@@ -20,7 +20,6 @@ class NodeUserData;
 class Node;
 class ModelNode;
 class TeapotNode;
-class SceneRootNode;
 class Camera;
 class Scene;
 class Light;
@@ -28,7 +27,7 @@ class Light;
 enum class LightType : uint32_t;
 
 using LightsList = std::vector<std::shared_ptr<Light>>;
-static const size_t MAX_LIGHTS_PER_NODE = 8;
+const int32_t MAX_LIGHTS_PER_NODE = 8;
 using LightIndicesList = std::array<int32_t, MAX_LIGHTS_PER_NODE>;
 
 } // namespace

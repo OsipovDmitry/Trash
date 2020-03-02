@@ -1,6 +1,10 @@
-1) remove Image::isLoaded method, refact Image::load
-2) develop 3d model format, refact importexport.cpp
-3) add Buffer::setSubData method, use it for update binesbuffer
-4) why aren't there setting up projMatrix to Renderer in CameraPrivate::pickNode ?
-5) Use current file path for pre-compile shaders
-
+done 1) remove Image::isLoaded method, refact Image::load
+2) improve 3d model format, refact importexport.cpp
+done 3) add Buffer::setSubData method, use it for update bonesbuffer
+done 4) why aren't there setting up projMatrix to Renderer in CameraPrivate::pickNode ?
+done 5) Use current file path for pre-compile shaders
+6) develop shadow maps
+7) change Model::Animation representation
+8) remove scale from utils::Transform
+9) add supporting viewProjection and modelViewProjection matrices in shaders
+10) improve rendering pipline in Renderer class. Now we have a conflict when we are trying to render shadow maps and common scene.

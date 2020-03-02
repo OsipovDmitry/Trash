@@ -14,5 +14,6 @@
         <file>res/brdf_lut.png</file>
         <file>res/brdf_lut.json</file>
         <file>res/teapot.fbx</file>
+        <file>res/empty.frag</file>
     </qresource>
 </RCC>

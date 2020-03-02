@@ -1,5 +1,4 @@
-
-#include<:/res/gammacorrection.glsl>
+#include<gammacorrection.glsl>
 
 struct PbrData
 {

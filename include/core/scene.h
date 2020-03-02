@@ -32,7 +32,7 @@ public:
 
     void attachLight(std::shared_ptr<Light>);
     bool detachLight(std::shared_ptr<Light>);
-    const LightsList& lights() const;
+    std::shared_ptr<LightsList> lights() const;
 
 private:
     std::unique_ptr<ScenePrivate> m_;

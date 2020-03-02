@@ -1,12 +1,19 @@
-#define Light mat4
+struct LightStruct
+{
+    mat4x4 params;
+    mat4x4 matrix;
+};
 
-#define LIGHT_POSITION(light) (light[0].xyz)
-#define LIGHT_DIRECTION(light) (light[1].xyz)
-#define LIGHT_COLOR(light) (light[2].xyz)
-#define LIGHT_ATTENUATION(light) (light[3].xyz)
-#define LIGHT_SPOT_COS_INNER(light) (light[0].w)
-#define LIGHT_SPOT_COS_OUTER(light) (light[1].w)
-#define LIGHT_TYPE(light) (int(light[2][3] + 0.5))
+#define LIGHT_POSITION(light) (light.params[0].xyz)
+#define LIGHT_DIRECTION(light) (light.params[1].xyz)
+#define LIGHT_COLOR(light) (light.params[2].xyz)
+#define LIGHT_ATTENUATION(light) (light.params[3].xyz)
+#define LIGHT_SPOT_COS_INNER(light) (light.params[0].w)
+#define LIGHT_SPOT_COS_OUTER(light) (light.params[1].w)
+#define LIGHT_TYPE(light) (int(light.params[2][3] + 0.5))
+#define LIGHT_IS_SHADOW_ENABLED(light) (light.params[3][3] > 0.0)
+#define LIGHT_MATRIX(light) (light.matrix)
+
 
 #define LIGHT_TYPE_NONE (0)
 #define LIGHT_TYPE_POINT (1)
@@ -14,8 +21,7 @@
 #define LIGHT_TYPE_SPOT (3)
 #define LIGHT_TYPE_COUNT (4)
 
-
-vec3 toLightVector(in Light light, vec3 v)
+vec3 toLightVector(in LightStruct light, vec3 v)
 {
     int type = LIGHT_TYPE(light);
     if ((type == LIGHT_TYPE_POINT) || (type == LIGHT_TYPE_SPOT))
@@ -26,7 +32,7 @@ vec3 toLightVector(in Light light, vec3 v)
         return vec3(0.0, 0.0, 0.0);
 }
 
-float lightAttenuation(in Light light, vec3 toLight)
+float lightAttenuation(in LightStruct light, vec3 toLight)
 {
     float att = 1.0;
     int type = LIGHT_TYPE(light);

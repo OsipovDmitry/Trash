@@ -22,11 +22,23 @@ Node::~Node()
 {
 }
 
+bool Node::isDrawableNode() const
+{
+    return false;
+}
+
+bool Node::isModelNode() const
+{
+    return false;
+}
+
 void Node::setTransform(const utils::Transform& value)
 {
+    m_->dirtyShadowMaps(); // before transformation
     m_->transform = value;
     m_->dirtyGlobalTransform();
-    m_->dirtyLights();
+    m_->dirtyLightIndices();
+    m_->dirtyShadowMaps(); // after transformation
     if (parent())
         parent()->m_->dirtyBoundingSphere();
 }
@@ -56,23 +68,20 @@ void Node::setUserData(std::shared_ptr<NodeUserData> data)
     m_->userData = data;
 }
 
-const LightIndicesList& Node::getLights() const
-{
-    return m_->getLights();
-}
-
 void Node::doAttach()
 {
     m_->dirtyGlobalTransform();
-    m_->dirtyLights();
+    m_->dirtyLightIndices();
+    m_->dirtyShadowMaps();
     if (parent())
         parent()->m_->dirtyBoundingSphere();
 }
 
 void Node::doDetach()
 {
+    m_->dirtyLightIndices();
+    m_->dirtyShadowMaps();
     m_->dirtyGlobalTransform();
-    m_->dirtyLights();
     if (parent())
         parent()->m_->dirtyBoundingSphere();
 }

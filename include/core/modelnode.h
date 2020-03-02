@@ -19,6 +19,8 @@ class CORESHARED_EXPORT ModelNode : public Node
 public:
     ModelNode(const std::string&);
 
+    bool isModelNode() const override;
+
     void showBones(bool);
 
 //    void copyAnimation(std::shared_ptr<ModelNode>, const std::string&);

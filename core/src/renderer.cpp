@@ -7,6 +7,8 @@
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
 
+#include <utils/fileinfo.h>
+
 #include <core/core.h>
 
 #include "coreprivate.h"
@@ -195,10 +197,34 @@ void Texture::setWrap(GLenum wrap)
 {
     auto& functions = Renderer::instance().functions();
 
-    functions.glBindTexture(target, id);functions.glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    functions.glBindTexture(target, id);
     functions.glTexParameteri(target, GL_TEXTURE_WRAP_S, static_cast<GLint>(wrap));
     functions.glTexParameteri(target, GL_TEXTURE_WRAP_T, static_cast<GLint>(wrap));
     functions.glTexParameteri(target, GL_TEXTURE_WRAP_R, static_cast<GLint>(wrap));
+}
+
+void Texture::setCompareMode(GLenum value)
+{
+    auto& functions = Renderer::instance().functions();
+
+    functions.glBindTexture(target, id);
+    functions.glTexParameteri(target, GL_TEXTURE_COMPARE_MODE, static_cast<GLint>(value));
+}
+
+void Texture::setCompareFunc(GLenum value)
+{
+    auto& functions = Renderer::instance().functions();
+
+    functions.glBindTexture(target, id);
+    functions.glTexParameteri(target, GL_TEXTURE_COMPARE_FUNC, static_cast<GLint>(value));
+}
+
+void Texture::setBorderColor(const glm::vec4& value)
+{
+    auto& functions = Renderer::instance().functions();
+
+    functions.glBindTexture(target, id);
+    functions.glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, glm::value_ptr(value));
 }
 
 int32_t Texture::numMipmapLevels() const
@@ -228,6 +254,13 @@ Buffer::Buffer(GLsizeiptr size, GLvoid *data, GLenum usage)
 Buffer::~Buffer()
 {
     Renderer::instance().functions().glDeleteBuffers(1, &id);
+}
+
+void Buffer::setSubData(GLintptr offset, GLsizeiptr size, const void* data)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glBindBuffer(GL_ARRAY_BUFFER, id);
+    functions.glBufferSubData(GL_ARRAY_BUFFER, offset, size, data);
 }
 
 void *Buffer::map(GLintptr offset, GLsizeiptr size, GLbitfield access)
@@ -322,65 +355,167 @@ void Mesh::attachIndexBuffer(std::shared_ptr<IndexBuffer> b)
     indexBuffers.insert(b);
 }
 
-Framebuffer::Framebuffer(GLint internalFormat)
-    : colorTexture(0)
-    , depthTexture(0)
-    , colorTextureInternalFormat(internalFormat)
+Renderbuffer::Renderbuffer(GLenum internalFormat, GLsizei width, GLsizei height)
 {
     auto& functions = Renderer::instance().functions();
+    functions.glGenRenderbuffers(1, &id);
+    functions.glBindRenderbuffer(GL_RENDERBUFFER, id);
+    functions.glRenderbufferStorage(GL_RENDERBUFFER, internalFormat, width, height);
+}
 
+Renderbuffer::~Renderbuffer()
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glDeleteRenderbuffers(1, &id);
+}
+
+Framebuffer::Framebuffer()
+{
+    auto& functions = Renderer::instance().functions();
     functions.glGenFramebuffers(1, &id);
 }
 
 Framebuffer::~Framebuffer()
 {
+    detachColor();
+    detachDepth();
+
     auto& functions = Renderer::instance().functions();
-
-    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
-    functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
-    functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-    QOpenGLFramebufferObject::bindDefault();
-
-    if (depthTexture)
-        functions.glDeleteTextures(1, &depthTexture);
-
-    if (colorTexture)
-        functions.glDeleteTextures(1, &colorTexture);
-
     functions.glDeleteFramebuffers(1, &id);
 }
 
-void Framebuffer::resize(int width, int height)
+void Framebuffer::detachColor()
 {
-    auto& functions = Renderer::instance().functions();
-
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
-    functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
-    functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-
-    if (depthTexture)
-        functions.glDeleteTextures(1, &depthTexture);
 
     if (colorTexture)
-        functions.glDeleteTextures(1, &colorTexture);
+    {
+        if (colorTexture->target == GL_TEXTURE_2D || colorTexture->target == GL_TEXTURE_CUBE_MAP)
+            functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
+        else if (colorTexture->target == GL_TEXTURE_2D_ARRAY)
+            functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 0, 0, 0);
+    }
+    else if (colorRenderbuffer)
+    {
+        functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, 0);
+    }
 
-    functions.glGenTextures(1, &depthTexture);
-    functions.glBindTexture(GL_TEXTURE_2D, depthTexture);
-    functions.glTexImage2D(GL_TEXTURE_2D, 0, GL_DEPTH_COMPONENT32, width, height, 0, GL_DEPTH_COMPONENT, GL_UNSIGNED_BYTE, nullptr);
-    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    functions.glBindTexture(GL_TEXTURE_2D, 0);
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
 
-    functions.glGenTextures(1, &colorTexture);
-    functions.glBindTexture(GL_TEXTURE_2D, colorTexture);
-    functions.glTexImage2D(GL_TEXTURE_2D, 0, colorTextureInternalFormat, width, height, 0, GL_RGB, GL_UNSIGNED_BYTE, nullptr);
-    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    functions.glBindTexture(GL_TEXTURE_2D, 0);
+    colorTexture = nullptr;
+    colorRenderbuffer = nullptr;
+}
 
-    functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, depthTexture, 0);
-    functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, colorTexture, 0);
-    QOpenGLFramebufferObject::bindDefault();
+void Framebuffer::detachDepth()
+{
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+
+    if (depthTexture)
+    {
+        if (depthTexture->target == GL_TEXTURE_2D || depthTexture->target == GL_TEXTURE_CUBE_MAP)
+            functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
+        else if (depthTexture->target == GL_TEXTURE_2D_ARRAY)
+            functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, 0, 0, 0);
+    }
+    else if (depthRenderbuffer)
+    {
+        functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
+    }
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
+
+    depthTexture = nullptr;
+    depthRenderbuffer = nullptr;
+}
+
+void Framebuffer::attachColor(std::shared_ptr<Texture> texture, uint32_t layer)
+{
+    detachColor();
+
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+
+    if (texture->target == GL_TEXTURE_2D)
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture->id, 0);
+    else if (texture->target == GL_TEXTURE_CUBE_MAP)
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, 0);
+    else if (texture->target == GL_TEXTURE_2D_ARRAY)
+        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture->id, 0, static_cast<GLint>(layer));
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
+    colorTexture = texture;
+}
+
+void Framebuffer::attachColor(std::shared_ptr<Renderbuffer> renderbuffer)
+{
+    detachColor();
+
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+    functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, renderbuffer->id);
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
+
+    colorRenderbuffer = renderbuffer;
+}
+
+void Framebuffer::attachDepth(std::shared_ptr<Texture> texture, uint32_t layer)
+{
+    detachDepth();
+
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+
+    if (texture->target == GL_TEXTURE_2D)
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture->id, 0);
+    else if (texture->target == GL_TEXTURE_CUBE_MAP)
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, 0);
+    else if (texture->target == GL_TEXTURE_2D_ARRAY)
+        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture->id, 0, static_cast<GLint>(layer));
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
+    depthTexture = texture;
+}
+
+void Framebuffer::attachDepth(std::shared_ptr<Renderbuffer> renderbuffer)
+{
+    detachDepth();
+
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+    functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderbuffer->id);
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
+
+    depthRenderbuffer = renderbuffer;
+}
+
+void Framebuffer::setDrawBuffer(GLenum value)
+{
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+    functions.glDrawBuffers(1, &value);
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
+}
+
+void Framebuffer::setReadBuffer(GLenum value)
+{
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+    functions.glReadBuffer(value);
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
 }
 
 Renderer::Renderer(QOpenGLExtraFunctions& functions, GLuint defaultFbo)
@@ -395,6 +530,9 @@ Renderer::Renderer(QOpenGLExtraFunctions& functions, GLuint defaultFbo)
 void Renderer::initializeResources()
 {
     m_functions.glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
+    m_functions.glEnable(GL_CULL_FACE);
+
+    m_brdfLutMap = loadTexture(brdfLutTextureName);
 
 //    const float L = 1250;
 //    const float wrap = 7;
@@ -444,15 +582,20 @@ QOpenGLExtraFunctions& Renderer::functions()
     return m_functions;
 }
 
+GLuint Renderer::defaultFbo() const
+{
+    return m_defaultFbo;
+}
+
 std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &vertexFile, const std::string &fragmentFile)
 {
     const std::string key = vertexFile+fragmentFile;
     auto object = std::dynamic_pointer_cast<RenderProgram>(m_resourceStorage->get(key));
     if (!object)
     {
-        std::array<std::pair<GLenum, QString>, 2> shaderFilenames {
-            std::make_pair(GL_VERTEX_SHADER, QString::fromStdString(vertexFile)),
-            std::make_pair(GL_FRAGMENT_SHADER, QString::fromStdString(fragmentFile))
+        std::array<std::pair<GLenum, std::string>, 2> shaderFilenames {
+            std::make_pair(GL_VERTEX_SHADER, vertexFile),
+            std::make_pair(GL_FRAGMENT_SHADER, fragmentFile)
         };
 
         GLuint shaderIds[2];
@@ -460,7 +603,9 @@ std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &ve
         for (size_t i = 0; i < 2; ++i)
         {
             auto& shader = shaderFilenames[i];
-            QFile file(shader.second);
+            auto dir = utils::fileDir(shader.second);
+
+            QFile file(QString::fromStdString(shader.second));
 
             if (!file.open(QFile::ReadOnly))
             {
@@ -469,10 +614,10 @@ std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &ve
             }
 
             auto byteArray = file.readAll();
-            auto errorString = precompileShader(byteArray);
+            auto errorString = precompileShader(QString::fromStdString(dir), byteArray);
             if (!errorString.empty())
             {
-                std::cout << shader.second.toStdString() << ": " << errorString << std::endl;
+                std::cout << shader.second << ": " << errorString << std::endl;
                 isOk = false;
                 continue;
             }
@@ -491,7 +636,7 @@ std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &ve
                 {
                     char *infoLog = static_cast<char*>(malloc(sizeof(char) * static_cast<unsigned int>(infoLen)));
                     m_functions.glGetShaderInfoLog(shaderIds[i], infoLen, nullptr, infoLog);
-                    std::cout << shader.second.toStdString() << ": " << infoLog << std::endl;
+                    std::cout << shader.second << ": " << infoLog << std::endl;
                     free(infoLog);
                 }
                 m_functions.glDeleteShader(shaderIds[i]);
@@ -570,6 +715,7 @@ void Renderer::render(std::shared_ptr<Framebuffer> framebuffer)
     using RenderMethod = void(Renderer::*)(DrawDataContainer::iterator, DrawDataContainer::iterator);
     static const std::array<RenderMethod, numElementsLayerId()> renderMethods {
         &Renderer::renderSolidLayer, // render selection layer as solid
+        &Renderer::renderShadowLayer, // render shadows layer as solid
         &Renderer::renderSolidLayer,
         &Renderer::renderTransparentLayer
     };
@@ -615,11 +761,6 @@ void Renderer::readPixel(std::shared_ptr<Framebuffer> framebuffer, int xi, int y
     m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
 }
 
-std::shared_ptr<Buffer> Renderer::lightsBuffer() const
-{
-    return m_lightsBuffer;
-}
-
 void Renderer::setViewport(const glm::ivec4& value)
 {
     m_viewport = value;
@@ -628,6 +769,7 @@ void Renderer::setViewport(const glm::ivec4& value)
 void Renderer::setViewMatrix(const glm::mat4x4& value)
 {
     m_viewMatrix = value;
+    m_viewProjMatrix = m_projMatrix * m_viewMatrix;
     m_viewMatrixInverse = glm::inverse(m_viewMatrix);
     m_viewPosition = glm::vec3(m_viewMatrixInverse * glm::vec4(0.f, 0.f, 0.f, 1.f));
 }
@@ -635,6 +777,7 @@ void Renderer::setViewMatrix(const glm::mat4x4& value)
 void Renderer::setProjectionMatrix(const glm::mat4x4& value)
 {
     m_projMatrix = value;
+    m_viewProjMatrix = m_projMatrix * m_viewMatrix;
 }
 
 void Renderer::setClearColor(bool state, const glm::vec4& value)
@@ -651,13 +794,42 @@ void Renderer::setClearDepth(bool state, float value)
 
 void Renderer::setLightsBuffer(std::shared_ptr<Buffer> lb)
 {
-   m_lightsBuffer = lb;
+    m_lightsBuffer = lb;
+}
+
+void Renderer::setShadowMaps(std::shared_ptr<Texture> sm)
+{
+    m_shadowMaps = sm;
+}
+
+void Renderer::setIBLMaps(std::shared_ptr<Texture> dm, std::shared_ptr<Texture> sm)
+{
+    m_IBLDiffuseMap = dm;
+    m_IBLSpecularMap = sm;
+
+    m_numIBLSpecularMapsMipmaps = m_IBLSpecularMap ? m_IBLSpecularMap->numMipmapLevels() : 0;
+}
+
+void Renderer::renderShadowLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
+{
+    m_functions.glEnable(GL_DEPTH_TEST);
+    m_functions.glCullFace(GL_FRONT);
+    setupAndRender(begin, end);
 }
 
 void Renderer::renderSolidLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
 {
     m_functions.glEnable(GL_DEPTH_TEST);
+    m_functions.glCullFace(GL_BACK);
+    setupAndRender(begin, end);
+}
 
+void Renderer::renderTransparentLayer(DrawDataContainer::iterator, DrawDataContainer::iterator)
+{
+}
+
+void Renderer::setupAndRender(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
+{
     for (; begin != end; ++begin)
     {
         auto drawable = begin->first;
@@ -668,19 +840,65 @@ void Renderer::renderSolidLayer(DrawDataContainer::iterator begin, DrawDataConta
 
         glm::mat4x4 modelMatrix = transform.operator glm::mat4x4();
         glm::mat3x3 normalMatrix = glm::inverseTranspose(modelMatrix);
+        glm::mat4x4 modelViewMatrix = m_viewMatrix * modelMatrix;
+        glm::mat4x4 modelViewProjMatrix = m_viewProjMatrix * modelMatrix;
 
-        renderProgram->setUniform(renderProgram->uniformLocation("u_projMatrix"), m_projMatrix);
-        renderProgram->setUniform(renderProgram->uniformLocation("u_viewMatrix"), m_viewMatrix);
-        renderProgram->setUniform(renderProgram->uniformLocation("u_modelMatrix"), modelMatrix);
-        renderProgram->setUniform(renderProgram->uniformLocation("u_normalMatrix"), normalMatrix);
-        renderProgram->setUniform(renderProgram->uniformLocation("u_viewPosition"), m_viewPosition);
+        auto projMatrixLoc = renderProgram->uniformLocation("u_projMatrix");
+        if (projMatrixLoc != -1) renderProgram->setUniform(projMatrixLoc, m_projMatrix);
 
-        GLuint lightsBufferIndex = renderProgram->uniformBufferIndexByName("u_lightsBuffer");
-        if (lightsBufferIndex != (GLuint)-1)
+        auto viewMatrixLoc = renderProgram->uniformLocation("u_viewMatrix");
+        if (viewMatrixLoc != -1) renderProgram->setUniform(viewMatrixLoc, m_viewMatrix);
+
+        auto viewProjMatrixLoc = renderProgram->uniformLocation("u_viewProjMatrix");
+        if (viewProjMatrixLoc != -1) renderProgram->setUniform(viewProjMatrixLoc, m_viewProjMatrix);
+
+        auto modelMatrixLoc = renderProgram->uniformLocation("u_modelMatrix");
+        if (modelMatrixLoc != -1) renderProgram->setUniform(modelMatrixLoc, modelMatrix);
+
+        auto normalMatrixLoc = renderProgram->uniformLocation("u_normalMatrix");
+        if (normalMatrixLoc != -1) renderProgram->setUniform(normalMatrixLoc, normalMatrix);
+
+        auto modelViewMatrixLoc = renderProgram->uniformLocation("u_modelViewMatrix");
+        if (modelViewMatrixLoc != -1) renderProgram->setUniform(modelViewMatrixLoc, modelViewMatrix);
+
+        auto modelViewProjMatrixLoc = renderProgram->uniformLocation("u_modelViewProjMatrix");
+        if (modelViewProjMatrixLoc != -1) renderProgram->setUniform(modelViewProjMatrixLoc, modelViewProjMatrix);
+
+        auto viewPositionLoc = renderProgram->uniformLocation("u_viewPosition");
+        if (viewPositionLoc != -1) renderProgram->setUniform(viewPositionLoc, m_viewPosition);
+
+        auto iblDiffuseMapLoc = renderProgram->uniformLocation("u_diffuseIBLMap");
+        if ((iblDiffuseMapLoc != -1) && m_IBLDiffuseMap) {
+            renderProgram->setUniform(iblDiffuseMapLoc, castFromTextureUnit(TextureUnit::DiffuseIBL));
+            bindTexture(m_IBLDiffuseMap, castFromTextureUnit(TextureUnit::DiffuseIBL));
+        }
+
+        auto iblSpecularMapLoc = renderProgram->uniformLocation("u_specularIBLMap");
+        if ((iblSpecularMapLoc != -1) && m_IBLSpecularMap) {
+            renderProgram->setUniform(iblSpecularMapLoc, castFromTextureUnit(TextureUnit::SpecularIBL));
+            bindTexture(m_IBLSpecularMap, castFromTextureUnit(TextureUnit::SpecularIBL));
+        }
+
+        auto numIBLSpecularMapsMipmapsLoc = renderProgram->uniformLocation("u_numSpecularIBLMapLods");
+        if (numIBLSpecularMapsMipmapsLoc != -1) renderProgram->setUniform(numIBLSpecularMapsMipmapsLoc, m_numIBLSpecularMapsMipmaps);
+
+        auto brdfLutMapLoc = renderProgram->uniformLocation("u_brdfLUT");
+        if ((brdfLutMapLoc != -1) && m_brdfLutMap) {
+            renderProgram->setUniform(brdfLutMapLoc, castFromTextureUnit(TextureUnit::BrdfLUT));
+            bindTexture(m_brdfLutMap, castFromTextureUnit(TextureUnit::BrdfLUT));
+        }
+
+        auto lightsBufferIndex = renderProgram->uniformBufferIndexByName("u_lightsBuffer");
+        if ((lightsBufferIndex != static_cast<GLuint>(-1)) && m_lightsBuffer)
         {
             renderProgram->setUniformBufferBinding(lightsBufferIndex, 1);
             bindUniformBuffer(m_lightsBuffer, 1);
+        }
 
+        auto shadowMapsLoc = renderProgram->uniformLocation("u_shadowMaps");
+        if ((shadowMapsLoc != -1) && m_shadowMaps) {
+            renderProgram->setUniform(shadowMapsLoc, castFromTextureUnit(TextureUnit::ShadowMaps));
+            bindTexture(m_shadowMaps, castFromTextureUnit(TextureUnit::ShadowMaps));
         }
 
         drawable->prerender();
@@ -698,11 +916,6 @@ void Renderer::renderSolidLayer(DrawDataContainer::iterator begin, DrawDataConta
     }
 }
 
-void Renderer::renderTransparentLayer(DrawDataContainer::iterator, DrawDataContainer::iterator)
-{
-
-}
-
 GLbitfield Renderer::calcClearMask() const
 {
     GLbitfield clearMask = 0;
@@ -712,7 +925,7 @@ GLbitfield Renderer::calcClearMask() const
     return clearMask;
 }
 
-std::string Renderer::precompileShader(QByteArray &text)
+std::string Renderer::precompileShader(const QString &dir, QByteArray &text)
 {
     static const QString includeString = "#include<";
     static const QString closedBracket = ">";
@@ -736,7 +949,7 @@ std::string Renderer::precompileShader(QByteArray &text)
             continue;
         }
 
-        QFile includedfile(includedFilename);
+        QFile includedfile(dir + includedFilename);
         if (!includedfile.open(QFile::ReadOnly))
         {
             return "Can't open included file \"" + includedFilename.toStdString() + "\"";

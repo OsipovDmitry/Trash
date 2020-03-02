@@ -25,7 +25,7 @@ Camera::~Camera()
 
 PickData Camera::pickNode(int32_t xi, int32_t yi)
 {
-    return m_->pickNode(xi, yi);
+    return m_->pickScene(xi, yi);
 }
 
 void Camera::setViewport(const glm::ivec4& size)

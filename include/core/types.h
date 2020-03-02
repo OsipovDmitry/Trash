@@ -7,6 +7,8 @@
 
 #include <utils/enumclass.h>
 
+#include "forwarddecl.h"
+
 namespace trash
 {
 namespace core
@@ -43,7 +45,8 @@ ENUMCLASS(TextureUnit, int32_t,
           Roughness,
           DiffuseIBL,
           SpecularIBL,
-          BrdfLUT)
+          BrdfLUT,
+          ShadowMaps)
 
 } // namespace
 } // namespace

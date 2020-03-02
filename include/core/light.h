@@ -49,6 +49,8 @@ public:
     const glm::vec2& spotAngles() const;
     void setSpotAngles(const glm::vec2&); // vec2(inner, outer)
 
+    bool isShadowMapEnabled() const;
+    void enableShadowMap(bool);
 
 private:
     std::unique_ptr<LightPrivate> m_;

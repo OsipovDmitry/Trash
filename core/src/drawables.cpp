@@ -1,3 +1,5 @@
+#include <glm/gtc/type_ptr.hpp>
+
 #include <utils/frustum.h>
 
 #include "renderer.h"
@@ -46,6 +48,11 @@ std::shared_ptr<SelectionDrawable> MeshDrawable::selectionDrawable(uint32_t id) 
     return std::make_shared<SelectionMeshDrawable>(geometry, bonesBuffer, id);
 }
 
+std::shared_ptr<ShadowDrawable> MeshDrawable::shadowDrawable() const
+{
+    return std::make_shared<ShadowMeshDrawable>(geometry, bonesBuffer);
+}
+
 void MeshDrawable::prerender() const
 {
     Drawable::prerender();
@@ -84,23 +91,53 @@ std::shared_ptr<Mesh> SelectionMeshDrawable::mesh() const
     return geometry;
 }
 
-std::shared_ptr<SelectionDrawable> SelectionMeshDrawable::selectionDrawable(uint32_t) const
-{
-    return nullptr;
-}
-
 void SelectionMeshDrawable::prerender() const
 {
     auto& renderer = Renderer::instance();
 
     GLuint bonesBufferIndex = program->uniformBufferIndexByName("u_bonesBuffer");
-    if (bonesBuffer && (bonesBufferIndex != (GLuint)-1))
+    if (bonesBuffer && (bonesBufferIndex != static_cast<GLuint>(-1)))
     {
         program->setUniformBufferBinding(bonesBufferIndex, 0);
         renderer.bindUniformBuffer(bonesBuffer, 0);
     }
 
     program->setUniform(program->uniformLocation("u_color"), idToColor(id));
+}
+
+ShadowMeshDrawable::ShadowMeshDrawable(std::shared_ptr<Mesh> m, std::shared_ptr<Buffer> bb)
+    : ShadowDrawable()
+    , geometry(m)
+    , bonesBuffer(bb)
+{
+    auto& renderer = Renderer::instance();
+
+    if (bonesBuffer)
+        program = renderer.loadRenderProgram(shadowMeshRenderProgramName.first, shadowMeshRenderProgramName.second);
+    else
+        program = renderer.loadRenderProgram(shadowStaticMeshRenderProgramName.first, shadowStaticMeshRenderProgramName.second);
+}
+
+std::shared_ptr<RenderProgram> ShadowMeshDrawable::renderProgram() const
+{
+    return program;
+}
+
+std::shared_ptr<Mesh> ShadowMeshDrawable::mesh() const
+{
+    return geometry;
+}
+
+void ShadowMeshDrawable::prerender() const
+{
+    auto& renderer = Renderer::instance();
+
+    GLuint bonesBufferIndex = program->uniformBufferIndexByName("u_bonesBuffer");
+    if (bonesBuffer && (bonesBufferIndex != static_cast<GLuint>(-1)))
+    {
+        program->setUniformBufferBinding(bonesBufferIndex, 0);
+        renderer.bindUniformBuffer(bonesBuffer, 0);
+    }
 }
 
 ColoredMeshDrawable::ColoredMeshDrawable(std::shared_ptr<Mesh> m, const glm::vec4& c, std::shared_ptr<Buffer> bb)
@@ -130,14 +167,14 @@ TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m,
                                            std::shared_ptr<Texture> rt,
                                            bool mrw,
                                            std::shared_ptr<Buffer> bb,
-                                           const LightIndicesList& ll)
+                                           std::shared_ptr<LightIndicesList> ll)
     : MeshDrawable(nullptr, m, bb)
     , baseColorTexture(bct)
     , opacityTexture(ot)
     , normalTexture(nt)
     , metallicOrSpecTexture(mt)
     , roughOrGlossTexture(rt)
-    , lightsList(ll)
+    , lightIndicesList(ll)
     , isMetallicRoughWorkflow(mrw)
 {
     auto& renderer = Renderer::instance();
@@ -151,22 +188,16 @@ TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m,
         baseColorTexture = renderer.loadTexture(standardDiffuseTextureName);
 
     if (!opacityTexture)
-        opacityTexture = renderer.loadTexture(1.0f);
+        opacityTexture = renderer.createTexture2D(GL_R16F, 1, 1, GL_RED, GL_FLOAT, &standardOpacityTexture.second, standardOpacityTexture.first);
 
     if (!normalTexture)
-        normalTexture = renderer.loadTexture(glm::vec3(.5f, .5f, 1.f));
+        normalTexture = renderer.createTexture2D(GL_RGB16F, 1, 1, GL_RGB, GL_FLOAT, glm::value_ptr(standardNormalTexture.second), standardNormalTexture.first);
 
     if (!metallicOrSpecTexture)
-        metallicOrSpecTexture = renderer.loadTexture(0.0f);
+        metallicOrSpecTexture = renderer.createTexture2D(GL_R16F, 1, 1, GL_RED, GL_FLOAT, &standardMetallicTexture.second, standardMetallicTexture.first);
 
     if (!roughOrGlossTexture)
-        roughOrGlossTexture = renderer.loadTexture(0.6f);
-
-    diffuseIBLMap = renderer.loadTexture("textures/diffuse/diffuse.json");
-    specularIBLMap = renderer.loadTexture("textures/specular/specular.json");
-    brdfLUTMap = renderer.loadTexture(brdfLutTextureName);
-
-    numSpecularIBLMapLods = specularIBLMap->numMipmapLevels();
+        roughOrGlossTexture = renderer.createTexture2D(GL_R16F, 1, 1, GL_RED, GL_FLOAT, &standardRoughnessTexture.second, standardRoughnessTexture.first);
 }
 
 void TexturedMeshDrawable::prerender() const
@@ -192,19 +223,9 @@ void TexturedMeshDrawable::prerender() const
 
     program->setUniform(program->uniformLocation("u_isMetallicRoughWorkflow"), isMetallicRoughWorkflow ? 1 : 0);
 
-    program->setUniform(program->uniformLocation("u_diffuseIBLMap"), castFromTextureUnit(TextureUnit::DiffuseIBL));
-    renderer.bindTexture(diffuseIBLMap, castFromTextureUnit(TextureUnit::DiffuseIBL));
-
-    program->setUniform(program->uniformLocation("u_specularIBLMap"), castFromTextureUnit(TextureUnit::SpecularIBL));
-    renderer.bindTexture(specularIBLMap, castFromTextureUnit(TextureUnit::SpecularIBL));
-    program->setUniform(program->uniformLocation("u_numSpecularIBLMapLods"), numSpecularIBLMapLods);
-
-    program->setUniform(program->uniformLocation("u_brdfLUT"), castFromTextureUnit(TextureUnit::BrdfLUT));
-    renderer.bindTexture(brdfLUTMap, castFromTextureUnit(TextureUnit::BrdfLUT));
-
-    for (size_t i = 0; i < MAX_LIGHTS_PER_NODE; ++i)
+    for (size_t i = 0; i < lightIndicesList->size(); ++i)
     {
-        program->setUniform(program->uniformLocation("u_lightIndices["+std::to_string(i)+"]"), lightsList[i]);
+        program->setUniform(program->uniformLocation("u_lightIndices["+std::to_string(i)+"]"), lightIndicesList->at(i));
     }
 }
 

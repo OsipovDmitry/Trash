@@ -34,6 +34,7 @@ class Drawable;
 
 ENUMCLASS(LayerId, uint32_t,
           Selection,
+          Shadows,
           SolidGeometry,
           TransparencyGeometry)
 
@@ -70,6 +71,9 @@ struct Texture : public ResourceStorage::Object
     void generateMipmaps();
     void setFilter(int32_t); // 1 - nearest // 2 - linear // 3 - trilinear
     void setWrap(GLenum);
+    void setCompareMode(GLenum);
+    void setCompareFunc(GLenum);
+    void setBorderColor(const glm::vec4&);
     int32_t numMipmapLevels() const;
 };
 
@@ -82,8 +86,10 @@ struct Buffer
     Buffer(GLsizeiptr, GLvoid*, GLenum);
     virtual ~Buffer();
 
+    void setSubData(GLintptr, GLsizeiptr, const void*);
+
     void *map(GLintptr, GLsizeiptr, GLbitfield);
-    void unmap();
+    static void unmap();
 };
 
 struct VertexBuffer : public Buffer
@@ -121,19 +127,38 @@ struct Mesh
     void attachIndexBuffer(std::shared_ptr<IndexBuffer>);
 };
 
+struct Renderbuffer
+{
+    NONCOPYBLE(Renderbuffer)
+
+    GLuint id;
+
+    Renderbuffer(GLenum, GLsizei, GLsizei);
+    ~Renderbuffer();
+};
+
 struct Framebuffer
 {
     NONCOPYBLE(Framebuffer)
 
     GLuint id;
-    GLuint colorTexture;
-    GLuint depthTexture;
-    GLint colorTextureInternalFormat;
+    std::shared_ptr<Texture> colorTexture, depthTexture;
+    std::shared_ptr<Renderbuffer> colorRenderbuffer, depthRenderbuffer;
 
-    Framebuffer(GLint);
+    Framebuffer();
     ~Framebuffer();
 
-    void resize(int, int);
+    void detachColor();
+    void detachDepth();
+
+    void attachColor(std::shared_ptr<Texture>, uint32_t = 0);
+    void attachColor(std::shared_ptr<Renderbuffer>);
+
+    void attachDepth(std::shared_ptr<Texture>, uint32_t = 0);
+    void attachDepth(std::shared_ptr<Renderbuffer>);
+
+    void setDrawBuffer(GLenum);
+    void setReadBuffer(GLenum);
 };
 
 struct Model : public ResourceStorage::Object
@@ -149,7 +174,7 @@ struct Model : public ResourceStorage::Object
     std::vector<std::string> boneNames;
 
     uint32_t numBones() const;
-    bool calcBoneTransforms(const std::string&, float, std::vector<utils::Transform>&) const;
+    bool calcBoneTransforms(const std::string&, float, std::vector<glm::mat3x4>&) const;
 };
 
 struct Model::Material
@@ -214,12 +239,12 @@ public:
 
     static Renderer& instance();
     QOpenGLExtraFunctions& functions();
+    GLuint defaultFbo() const;
 
     std::shared_ptr<RenderProgram> loadRenderProgram(const std::string&, const std::string&);
     std::shared_ptr<Texture> loadTexture(const std::string&);
-    std::shared_ptr<Texture> loadTexture(const glm::vec4&);
-    std::shared_ptr<Texture> loadTexture(const glm::vec3&);
-    std::shared_ptr<Texture> loadTexture(float);
+    std::shared_ptr<Texture> createTexture2D(GLenum, GLint, GLint, GLenum, GLenum, const void*, const std::string& = "");
+    std::shared_ptr<Texture> createTexture2DArray(GLenum, GLint, GLint, GLint, GLenum, GLenum, const void*, const std::string& = "");
     std::shared_ptr<Model> loadModel(const std::string&);
     std::shared_ptr<Model::Animation> loadAnimation(const std::string&);
 
@@ -231,14 +256,15 @@ public:
     void render(std::shared_ptr<Framebuffer>);
 
     void readPixel(std::shared_ptr<Framebuffer>, int, int, uint8_t&, uint8_t&, uint8_t&, uint8_t&, float&) const;
-    std::shared_ptr<Buffer> lightsBuffer() const;
 
     void setViewport(const glm::ivec4&);
     void setViewMatrix(const glm::mat4x4&);
     void setProjectionMatrix(const glm::mat4x4&);
-    void setClearColor(bool, const glm::vec4&);
-    void setClearDepth(bool, float);
+    void setClearColor(bool, const glm::vec4& = glm::vec4(0.f, 0.f, 0.f, 1.f));
+    void setClearDepth(bool, float = 1.f);
     void setLightsBuffer(std::shared_ptr<Buffer>);
+    void setShadowMaps(std::shared_ptr<Texture>);
+    void setIBLMaps(std::shared_ptr<Texture>, std::shared_ptr<Texture>);
 
 private:
     using DrawDataType = std::pair<std::shared_ptr<Drawable>, utils::Transform>;
@@ -250,25 +276,29 @@ private:
     };
     using DrawDataContainer = std::multiset<DrawDataType, DrawDataComparator>;
 
+    void renderShadowLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
     void renderSolidLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
     void renderTransparentLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
+    void setupAndRender(DrawDataContainer::iterator, DrawDataContainer::iterator);
 
     GLbitfield calcClearMask() const;
-    static std::string precompileShader(QByteArray&);
+    static std::string precompileShader(const QString& dir, QByteArray&);
 
     QOpenGLExtraFunctions& m_functions;
     GLuint m_defaultFbo;
     std::unique_ptr<ResourceStorage> m_resourceStorage;
     DrawDataContainer m_drawData;
-    glm::mat4x4 m_projMatrix;
-    glm::mat4x4 m_viewMatrix, m_viewMatrixInverse;
+    glm::mat4x4 m_projMatrix, m_viewMatrix, m_viewMatrixInverse, m_viewProjMatrix;
     glm::ivec4 m_viewport;
     glm::vec3 m_viewPosition;
+    std::shared_ptr<Buffer> m_lightsBuffer = nullptr;
+    std::shared_ptr<Texture> m_shadowMaps = nullptr;
+    std::shared_ptr<Texture> m_IBLDiffuseMap = nullptr, m_IBLSpecularMap = nullptr, m_brdfLutMap;
+    int32_t m_numIBLSpecularMapsMipmaps = 0;
 
     bool m_clearColorBit = true, m_clearDepthBit = true;
     glm::vec4 m_clearColor = glm::vec4(0.f, 0.f, 0.f, 1.f);
     float m_clearDepth = 1.0f;
-    std::shared_ptr<Buffer> m_lightsBuffer = nullptr;
 
     friend class RenderWidget;
 };

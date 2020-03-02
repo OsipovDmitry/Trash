@@ -32,6 +32,9 @@ public:
     Node(NodePrivate*);
     ~Node() override;
 
+    virtual bool isDrawableNode() const;
+    virtual bool isModelNode() const;
+
     void setTransform(const utils::Transform&);
     const utils::Transform& transform() const;
     const utils::Transform& globalTransform() const;
@@ -40,8 +43,6 @@ public:
 
     std::shared_ptr<NodeUserData> userData() const;
     void setUserData(std::shared_ptr<NodeUserData>);
-
-    const LightIndicesList& getLights() const;
 
 protected:
     void doAttach() override;

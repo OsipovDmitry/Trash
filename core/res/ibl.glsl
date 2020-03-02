@@ -1,6 +1,6 @@
 
-#include<:/res/pbr.glsl>
-#include<:/res/gammacorrection.glsl>
+#include<pbr.glsl>
+#include<gammacorrection.glsl>
 
 vec3 fresnelSchlickRoughness(float cosTheta, vec3 F0, float roughness)
 {

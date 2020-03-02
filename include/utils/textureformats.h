@@ -70,6 +70,7 @@ inline bool stringToWrap(const std::string& str, GLenum& wrap)
 {
     static const std::unordered_map<std::string, GLenum> s_table {
         {"GL_CLAMP_TO_EDGE", GL_CLAMP_TO_EDGE},
+        {"GL_CLAMP_TO_BORDER", GL_CLAMP_TO_BORDER},
         {"GL_MIRRORED_REPEAT", GL_MIRRORED_REPEAT},
         {"GL_REPEAT", GL_REPEAT}
     };

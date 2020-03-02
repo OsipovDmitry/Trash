@@ -12,6 +12,7 @@ namespace core
 {
 
 class SelectionDrawable;
+class ShadowDrawable;
 
 class Drawable
 {
@@ -21,7 +22,8 @@ public:
     virtual LayerId layerId() const = 0;
     virtual std::shared_ptr<RenderProgram> renderProgram() const = 0;
     virtual std::shared_ptr<Mesh> mesh() const = 0;
-    virtual std::shared_ptr<SelectionDrawable> selectionDrawable(uint32_t) const = 0;
+    virtual std::shared_ptr<SelectionDrawable> selectionDrawable(uint32_t) const { return nullptr; }
+    virtual std::shared_ptr<ShadowDrawable> shadowDrawable() const { return nullptr; }
 
     virtual void prerender() const {}
     virtual void postrender() const {}
@@ -40,6 +42,12 @@ public:
     static glm::vec4 idToColor(uint32_t id);
 };
 
+class ShadowDrawable : public Drawable
+{
+public:
+    LayerId layerId() const override { return LayerId::Shadows; }
+};
+
 class MeshDrawable : public Drawable
 {
 public:
@@ -49,6 +57,7 @@ public:
     std::shared_ptr<RenderProgram> renderProgram() const override;
     std::shared_ptr<Mesh> mesh() const override;
     std::shared_ptr<SelectionDrawable> selectionDrawable(uint32_t) const override;
+    std::shared_ptr<ShadowDrawable> shadowDrawable() const override;
 
     void prerender() const override;
 
@@ -64,7 +73,21 @@ public:
 
     std::shared_ptr<RenderProgram> renderProgram() const override;
     std::shared_ptr<Mesh> mesh() const override;
-    std::shared_ptr<SelectionDrawable> selectionDrawable(uint32_t) const override;
+
+    void prerender() const override;
+
+    std::shared_ptr<RenderProgram> program;
+    std::shared_ptr<Mesh> geometry;
+    std::shared_ptr<Buffer> bonesBuffer;
+};
+
+class ShadowMeshDrawable : public ShadowDrawable
+{
+public:
+    ShadowMeshDrawable(std::shared_ptr<Mesh>, std::shared_ptr<Buffer>);
+
+    std::shared_ptr<RenderProgram> renderProgram() const override;
+    std::shared_ptr<Mesh> mesh() const override;
 
     void prerender() const override;
 
@@ -94,7 +117,7 @@ public:
                          std::shared_ptr<Texture>,
                          bool,
                          std::shared_ptr<Buffer>,
-                         const LightIndicesList&);
+                         std::shared_ptr<LightIndicesList>);
 
     void prerender() const override;
 
@@ -103,12 +126,9 @@ public:
     std::shared_ptr<Texture> normalTexture;
     std::shared_ptr<Texture> metallicOrSpecTexture;
     std::shared_ptr<Texture> roughOrGlossTexture;
-    std::shared_ptr<Texture> diffuseIBLMap;
-    std::shared_ptr<Texture> specularIBLMap;
-    std::shared_ptr<Texture> brdfLUTMap;
-    const LightIndicesList& lightsList;
+    std::shared_ptr<LightIndicesList> lightIndicesList;
     bool isMetallicRoughWorkflow;
-    int32_t numSpecularIBLMapLods;
+
 };
 
 class SphereDrawable : public ColoredMeshDrawable

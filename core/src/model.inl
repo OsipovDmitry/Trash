@@ -306,9 +306,9 @@ uint32_t Model::numBones() const
     return static_cast<uint32_t>(boneTransforms.size());
 }
 
-bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, std::vector<utils::Transform>& transforms) const
+bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, std::vector<glm::mat3x4> &transforms) const
 {
-    transforms.resize(numBones(), utils::Transform());
+    transforms.resize(numBones(), glm::mat3x4(1.0f));
 
     auto iter = animations.find(animName);
     if (iter == animations.end())
@@ -378,7 +378,11 @@ bool Model::calcBoneTransforms(const std::string &animName, float timeInSecs, st
             }
 
             globalTransform *= boneTransform;
-            transforms[static_cast<size_t>(node->boneIndex)] = globalTransform * boneTransforms[static_cast<size_t>(node->boneIndex)];
+            //transforms[static_cast<size_t>(node->boneIndex)] = globalTransform * boneTransforms[static_cast<size_t>(node->boneIndex)];
+            transforms[static_cast<size_t>(node->boneIndex)] = glm::transpose(
+                        (globalTransform * boneTransforms[static_cast<size_t>(node->boneIndex)]).operator glm::mat4x4()
+                    );
+
         }
         else {
             globalTransform *= node->transform;

@@ -55,9 +55,6 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
                     images[0] = Image::load(dir + object["Image"].GetString());
                     if (images[0] == nullptr)
                         return false;
-
-                    if (!images[0]->isLoaded())
-                        return false;
                 }
                 else if (target == GL_TEXTURE_CUBE_MAP)
                 {
@@ -71,9 +68,6 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
                     for (size_t i = 0; i < 6; ++i)
                     {
                         if (images[i] == nullptr)
-                            return false;
-
-                        if (!images[i]->isLoaded())
                             return false;
                     }
                 }
@@ -179,9 +173,6 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
             if (image == nullptr)
                 return nullptr;
 
-            if (!image->isLoaded())
-                return nullptr;
-
             GLenum internalFormat;
             if (!utils::formatAndTypeToInternalFormat(image->format(), image->type(), internalFormat))
                 return nullptr;
@@ -201,64 +192,56 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
     return object;
 }
 
-std::shared_ptr<Texture> Renderer::loadTexture(const glm::vec4 &value)
+std::shared_ptr<Texture> Renderer::createTexture2D(GLenum internalFormat,
+                                                   GLint width,
+                                                   GLint height,
+                                                   GLenum format,
+                                                   GLenum type,
+                                                   const void *data,
+                                                   const std::string &resourceName)
 {
-    const std::string name = "colorTexture_" + std::to_string(value.r) + "_" + std::to_string(value.g) + "_" + std::to_string(value.b) + "_" + std::to_string(value.a);
-
-    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(name));
+    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(resourceName));
     if (!object)
     {
         GLuint id;
         m_functions.glGenTextures(1, &id);
         m_functions.glBindTexture(GL_TEXTURE_2D, id);
-        m_functions.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA16F, 1, 1, 0, GL_RGBA, GL_FLOAT, glm::value_ptr(value));
+        m_functions.glTexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(internalFormat), width, height, 0, format, type, data);
         m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
         object = std::make_shared<Texture>(id, GL_TEXTURE_2D);
-        m_resourceStorage->store(name, object);
+
+        if (!resourceName.empty())
+            m_resourceStorage->store(resourceName, object);
     }
 
     return object;
 }
 
-std::shared_ptr<Texture> Renderer::loadTexture(const glm::vec3& value)
+std::shared_ptr<Texture> Renderer::createTexture2DArray(GLenum internalFormat,
+                                                        GLint width,
+                                                        GLint height,
+                                                        GLint numLayers,
+                                                        GLenum format,
+                                                        GLenum type,
+                                                        const void *data,
+                                                        const std::string &resourceName)
 {
-    const std::string name = "colorTexture_" + std::to_string(value.r) + "_" + std::to_string(value.g) + "_" + std::to_string(value.b);
-
-    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(name));
+    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(resourceName));
     if (!object)
     {
         GLuint id;
         m_functions.glGenTextures(1, &id);
-        m_functions.glBindTexture(GL_TEXTURE_2D, id);
-        m_functions.glTexImage2D(GL_TEXTURE_2D, 0, GL_RGB16F, 1, 1, 0, GL_RGB, GL_FLOAT, glm::value_ptr(value));
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        m_functions.glBindTexture(GL_TEXTURE_2D_ARRAY, id);
+        m_functions.glTexImage3D(GL_TEXTURE_2D_ARRAY, 0, static_cast<GLint>(internalFormat), width, height, numLayers, 0, format, type, data);
+        m_functions.glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+        m_functions.glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-        object = std::make_shared<Texture>(id, GL_TEXTURE_2D);
-        m_resourceStorage->store(name, object);
-    }
+        object = std::make_shared<Texture>(id, GL_TEXTURE_2D_ARRAY);
 
-    return object;
-}
-
-std::shared_ptr<Texture> Renderer::loadTexture(float value)
-{
-    const std::string name = "colorTexture_" + std::to_string(value);
-
-    auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(name));
-    if (!object)
-    {
-        GLuint id;
-        m_functions.glGenTextures(1, &id);
-        m_functions.glBindTexture(GL_TEXTURE_2D, id);
-        m_functions.glTexImage2D(GL_TEXTURE_2D, 0, GL_R16F, 1, 1, 0, GL_RED, GL_FLOAT, &value);
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-
-        object = std::make_shared<Texture>(id, GL_TEXTURE_2D);
-        m_resourceStorage->store(name, object);
+        if (!resourceName.empty())
+            m_resourceStorage->store(resourceName, object);
     }
 
     return object;

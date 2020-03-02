@@ -1,6 +1,6 @@
 #version 330 core
 
-#include<:/res/lights.glsl>
+#include<lights.glsl>
 
 #define MAX_LIGHTS 8
 
@@ -18,7 +18,7 @@ uniform int u_lightIndices[MAX_LIGHTS];
 
 layout (std140) uniform u_lightsBuffer
 {
-    mat4x4 u_lights[128];
+    LightStruct u_lights[128];
 };
 
 out vec3 v_tangent;
@@ -27,6 +27,7 @@ out vec3 v_normal;
 out vec2 v_texCoord;
 out vec3 v_toView;
 out vec3 v_toLight[MAX_LIGHTS];
+out vec4 v_posLightSpace[MAX_LIGHTS];
 
 void main(void)
 {
@@ -41,5 +42,8 @@ void main(void)
     v_toView = u_viewPosition - pos.xyz;
 
     for (int i = 0; i < MAX_LIGHTS; i++)
+    {
         v_toLight[i] = (u_lightIndices[i] >= 0) ? toLightVector(u_lights[u_lightIndices[i]], pos.xyz) : vec3(0.0, 0.0, 0.0);
+        v_posLightSpace[i] = (u_lightIndices[i] >= 0) ? LIGHT_MATRIX(u_lights[u_lightIndices[i]]) * pos : vec4(0.0, 0.0, 0.0, 1.0);
+    }
 }

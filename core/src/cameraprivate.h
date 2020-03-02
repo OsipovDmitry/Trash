@@ -35,7 +35,7 @@ public:
     const glm::mat4x4& projectionMatrix() const;
 
     void renderScene(uint64_t, uint64_t);
-    PickData pickNode(int32_t, int32_t);
+    PickData pickScene(int32_t, int32_t);
 };
 
 } // namespace

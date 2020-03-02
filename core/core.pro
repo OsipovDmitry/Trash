@@ -28,7 +28,8 @@ HEADERS += \
     src/lightprivate.h \
     src/cameraprivate.h \
     src/image.h \
-    src/texture.inl
+    src/texture.inl \
+    src/drawablenodeprivate.h
 
 SOURCES += \
     src/hdrloader/hdrloader.cpp \
@@ -54,11 +55,13 @@ SOURCES += \
     src/lightprivate.cpp \
     src/sceneprivate.cpp \
     src/image.cpp \
-    src/teapotnode.cpp
+    src/teapotnode.cpp \
+    src/drawablenode.cpp \
+    src/drawablenodeprivate.cpp
 
 LIBS += \
-    -lassimp-vc140-mt
-#    -lassimp
+#    -lassimp-vc140-mt
+    -lassimp
 
 RESOURCES += \
     core.qrc

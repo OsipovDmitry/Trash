@@ -3,6 +3,7 @@
 #include <QImage>
 
 #include <utils/fileinfo.h>
+#include <utils/noncopyble.h>
 
 #include "hdrloader/hdrloader.h"
 #include "image.h"
@@ -14,15 +15,23 @@ namespace core
 
 class QtImage : public Image
 {
+    NONCOPYBLE(QtImage)
+
 public:
-    QtImage(const std::string& filename)
+    QtImage(QImage&& img)
         : Image()
-        , m_img(QString::fromStdString(filename))
+        , m_img(std::move(img))
     {
         m_img = m_img.convertToFormat(m_img.hasAlphaChannel() ? QImage::Format_RGBA8888 : QImage::Format_RGB888);
     }
 
-    bool isLoaded() const override { return !m_img.isNull(); }
+    static std::shared_ptr<QtImage> load(const std::string& filename) {
+        QImage img(QString::fromStdString(filename));
+        if (img.isNull())
+            return nullptr;
+
+        return std::make_shared<QtImage>(std::move(img));
+    }
 
     GLsizei width() const override { return m_img.width(); }
     GLsizei height() const override { return m_img.height(); }
@@ -37,14 +46,22 @@ private:
 
 class HdrImage : public Image
 {
+    NONCOPYBLE(HdrImage)
+
 public:
-    HdrImage(const std::string& filename)
+    HdrImage(HDRLoaderResult&& result)
         : Image()
+        , m_img(std::move(result))
     {
-        HDRLoader::load(filename.c_str(), m_img);
     }
 
-    bool isLoaded() const override { return m_img.width && m_img.height && !m_img.cols.empty(); }
+    static std::shared_ptr<HdrImage> load(const std::string& filename) {
+        HDRLoaderResult result;
+        if (!HDRLoader::load(filename.c_str(), result))
+            return nullptr;
+
+        return std::make_shared<HdrImage>(std::move(result));
+    }
 
     GLsizei width() const override { return m_img.width; }
     GLsizei height() const override { return m_img.height; }
@@ -64,9 +81,9 @@ std::shared_ptr<Image> Image::load(const std::string& filename)
     std::shared_ptr<Image> result;
 
     if (ext == "hdr")
-        result = std::make_shared<HdrImage>(filename);
+        result = HdrImage::load(filename);
     else
-        result = std::make_shared<QtImage>(filename);
+        result = QtImage::load(filename);
 
     return result;
 }

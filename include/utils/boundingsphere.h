@@ -4,7 +4,6 @@
 #include <vector>
 
 #include "../glm/vec4.hpp"
-#include "../glm/gtc/vec1.hpp"
 
 #include "transform.h"
 

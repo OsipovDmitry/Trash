@@ -36,16 +36,16 @@ void Game::doInitialize()
 {
     m_->scene = std::make_shared<Scene>();
 
-    const int N = 7;
-    for (int x = 0; x < N; ++x)
-        for (int y = 0; y < N; ++y)
-        {
-            auto teapot = std::make_shared<Teapot>(glm::vec3(1.0f, 1.0f, 1.0f), static_cast<float>(y) / (N-1), static_cast<float>(x) / (N-1));
-            teapot->graphicsNode()->setTransform(utils::Transform(glm::vec3(1.f, 1.f, 1.f),
-                                                                  glm::quat(1.f, 0.f, 0.f, 0.f),
-                                                                  glm::vec3((x - (N-1)*.5f) * 4, (y - (N-1)*.5f) * 4, 0.f)));
-            m_->scene->attachObject(teapot);
-        }
+//    const int N = 7;
+//    for (int x = 0; x < N; ++x)
+//        for (int y = 0; y < N; ++y)
+//        {
+//            auto teapot = std::make_shared<Teapot>(glm::vec3(1.0f, 1.0f, 1.0f), static_cast<float>(y) / (N-1), static_cast<float>(x) / (N-1));
+//            teapot->graphicsNode()->setTransform(utils::Transform(glm::vec3(1.f, 1.f, 1.f),
+//                                                                  glm::quat(1.f, 0.f, 0.f, 0.f),
+//                                                                  glm::vec3((x - (N-1)*.5f) * 4, (y - (N-1)*.5f) * 4, 0.f)));
+//            m_->scene->attachObject(teapot);
+//        }
 
 
 
@@ -64,16 +64,18 @@ void Game::doInitialize()
     m_->floor = std::make_shared<Floor>();
     m_->scene->attachObject(m_->floor);
 
-//    for (float z = -1250; z <= 1250; z += 400)
-//        for (float x = -1250; x <= 1250; x += 400)
-//        {
-//            auto l = std::make_shared<core::Light>(core::LightType::Direction);
-//            //l->setAttenuation(glm::vec3(0.0, 0.003, 1));
-//            //l->setPosition(glm::vec3(x,500,z));
-//            l->setDirection(glm::normalize(glm::vec3(0.0f, -0.1f, -1.0f)));
 
-//            m_->scene->camera()->scene()->attachLight(l);
-//        }
+    std::vector<glm::vec3> qwe {glm::vec3(-800,1000,-800), /*glm::vec3(800,1000,800), glm::vec3(-800,1000,800), glm::vec3(800,1000,-800)*/ };
+    for (const auto& p: qwe)
+        {
+            auto l = std::make_shared<core::Light>(/*core::LightType::Direction*/);
+            l->setAttenuation(glm::vec3(0.0, 0.001, 1));
+            l->setPosition(p);
+            l->setDirection(-p/*glm::vec3(0.0,-1.0,0.0)*/);
+            l->setSpotAngles(glm::vec2(0.2f, 1.55f));
+
+            m_->scene->camera()->scene()->attachLight(l);
+        }
 
 
 
@@ -103,23 +105,23 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
 //                                                   glm::vec3(0.0f, 0.0f, 0.0f),
 //                                                   glm::vec3(0.0f, 1.0f, 0.0f)));
 
-    for (auto l : m_->scene->camera()->scene()->lights())
-    {
-        l->setColor(glm::vec3(1,1,1));
-    }
+//    for (auto l : m_->scene->camera()->scene()->lights())
+//    {
+//        l->setColor(glm::vec3(1,1,1));
+//    }
 
-    if (!m_->acivePerson.expired())
-    {
-        auto& lights = m_->scene->camera()->scene()->lights();
-        auto& activeLights = m_->acivePerson.lock()->graphicsNode()->getLights();
-        for (auto idx : activeLights)
-        {
-            if (idx >= 0)
-            {
-                lights.at(idx)->setColor(glm::vec3(1,0,0));
-            }
-        }
-    }
+//    if (!m_->acivePerson.expired())
+//    {
+//        auto& lights = m_->scene->camera()->scene()->lights();
+//        auto& activeLights = m_->acivePerson.lock()->graphicsNode()->getLights();
+//        for (auto idx : activeLights)
+//        {
+//            if (idx >= 0)
+//            {
+//                lights.at(idx)->setColor(glm::vec3(1,0,0));
+//            }
+//        }
+//    }
 }
 
 void Game::doMouseClick(int x, int y)

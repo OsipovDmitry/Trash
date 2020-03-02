@@ -11,10 +11,8 @@ namespace core
 {
 
 Scene::Scene()
-    : m_(std::make_unique<ScenePrivate>())
+    : m_(std::make_unique<ScenePrivate>(this))
 {
-    m_->rootNode = std::make_shared<SceneRootNode>(this);
-    m_->dirtyAllLights = false;
 }
 
 Scene::~Scene()
@@ -37,11 +35,26 @@ void Scene::attachLight(std::shared_ptr<Light> light)
     if (lightPrivate.scene)
         lightPrivate.scene->detachLight(light);
 
-    m_->lights.push_back(light);
     lightPrivate.scene = this;
-    m_->dirtyAllLights = true;
 
-    m_->rootNode->m().dirtyLights();
+    if (!m_->freeLights.empty())
+    {
+        auto freeIndexIt = m_->freeLights.begin();
+        auto index = *freeIndexIt;
+        m_->freeLights.erase(freeIndexIt);
+        m_->lights->at(static_cast<size_t>(index)) = light;
+        m_->dirtyLights.insert(index);
+        m_->dirtyShadowMaps.insert(index);
+
+    }
+    else
+    {
+        m_->lights->push_back(light);
+        m_->allLightsAreDirty = true;
+        m_->allShadowMapsAreDirty = true;
+    }
+
+    m_->rootNode->m().dirtyLightIndices();
 }
 
 bool Scene::detachLight(std::shared_ptr<Light> light)
@@ -51,15 +64,15 @@ bool Scene::detachLight(std::shared_ptr<Light> light)
     if (this != lightPrivate.scene)
         return false;
 
-    m_->lights.erase(std::find(m_->lights.begin(), m_->lights.end(), light));
+    auto lightIter = std::find(m_->lights->begin(), m_->lights->end(), light);
+    m_->freeLights.insert(std::distance(m_->lights->begin(), lightIter));
     lightPrivate.scene = nullptr;
-    m_->dirtyAllLights = true;
 
-    m_->rootNode->m().dirtyLights();
+    m_->rootNode->m().dirtyLightIndices();
     return true;
 }
 
-const LightsList& Scene::lights() const
+std::shared_ptr<LightsList> Scene::lights() const
 {
     return m_->lights;
 }
