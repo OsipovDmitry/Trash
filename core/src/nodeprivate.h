@@ -15,8 +15,6 @@ namespace trash
 namespace core
 {
 
-class Drawable;
-
 class NodePrivate
 {
 public:
@@ -28,7 +26,7 @@ public:
     void dirtyLightIndices();
     void dirtyShadowMaps();
 
-    virtual utils::BoundingSphere getLocalBoundingSphere() { return utils::BoundingSphere(); }
+    virtual const utils::BoundingSphere& getLocalBoundingSphere() { return emptyLocalBoundingSphere; }
 
     virtual void doUpdate(uint64_t, uint64_t) {}
     virtual void doPick(uint32_t) {}
@@ -44,11 +42,12 @@ public:
     utils::Transform transform, globalTransform;
     utils::BoundingSphere minimalBoundingSphere, boundingSphere;
 
-    std::shared_ptr<Drawable> bSphereDrawable;
     std::shared_ptr<NodeUserData> userData;
 
     bool isGlobalTransformDirty;
     bool isBoundingSphereDirty;
+
+    static const utils::BoundingSphere emptyLocalBoundingSphere;
 };
 
 } // namespace

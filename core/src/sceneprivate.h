@@ -36,6 +36,9 @@ class ScenePrivate
 public:
     ScenePrivate(Scene*);
 
+    void attachLight(std::shared_ptr<Light>);
+    bool detachLight(std::shared_ptr<Light>);
+
     void dirtyLightParams(Light*);
     std::shared_ptr<Buffer> getLightParamsBuffer();
     void updateLightParams();
@@ -43,24 +46,25 @@ public:
     void dirtyShadowMap(Light*);
     std::shared_ptr<Texture> getLightsShadowMaps();
     void updateShadowMaps();
-
     void updateShadowMap(std::shared_ptr<Light>);
 
-    void renderScene(uint64_t, uint64_t, const CameraPrivate&);
+    void renderScene(uint64_t, uint64_t, trash::core::CameraPrivate &);
     PickData pickScene(int32_t, int32_t, const trash::core::CameraPrivate &);
 
+    std::pair<float, float> calculateZPlanes(const glm::mat4x4&, float) const;
+
+    Scene& thisScene;
     std::shared_ptr<SceneRootNode> rootNode;
     std::shared_ptr<LightsList> lights;
     std::shared_ptr<Buffer> lightsUbo;
     std::shared_ptr<Texture> lightsShadowMaps;
 
-    static const float ShadowMapZNear;
-    static const float ShadowMapZFar;
+    static const float CameraMinZNear;
+    static const float ShadowMapMinZNear;
     static const int32_t ShadowMapSize;
 
-    std::set<uint32_t> freeLights;
+    std::set<uint32_t> freeLightIndices;
     std::set<uint32_t> dirtyLights, dirtyShadowMaps;
-    bool allLightsAreDirty, allShadowMapsAreDirty;
 };
 
 } // namespace

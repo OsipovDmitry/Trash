@@ -22,7 +22,7 @@ DrawableNodePrivate::DrawableNodePrivate(Node &node)
 
 }
 
-utils::BoundingSphere DrawableNodePrivate::getLocalBoundingSphere()
+const utils::BoundingSphere &DrawableNodePrivate::getLocalBoundingSphere()
 {
     if (isLocalBoundingSphereDirty)
     {
@@ -49,6 +49,8 @@ void DrawableNodePrivate::doUpdate(uint64_t, uint64_t)
     auto& renderer = Renderer::instance();
     for (auto& drawable : drawables)
         renderer.draw(drawable, getGlobalTransform());
+
+    //renderer.draw(std::make_shared<SphereDrawable>(8, getLocalBoundingSphere(), glm::vec4(0.8f, .0f, .0f, 1.0f)), getGlobalTransform());
 }
 
 void DrawableNodePrivate::doPick(uint32_t id)
@@ -106,17 +108,20 @@ void DrawableNodePrivate::updateLightIndices()
         for (size_t lightIndex = 0; lightIndex < lightsList->size(); ++lightIndex)
         {
             auto light = lightsList->at(lightIndex);
-            float lightIntensity = light->m().intensity(getGlobalTransform().translation);
-            for (int32_t i = 0; i < MAX_LIGHTS_PER_NODE; ++i)
+            if (light)
             {
-                if (intesities[static_cast<size_t>(i)] < lightIntensity)
+                float lightIntensity = light->m().intensity(getGlobalTransform().translation);
+                for (int32_t i = 0; i < MAX_LIGHTS_PER_NODE; ++i)
                 {
-                    std::copy_backward(intesities.begin()+i, intesities.end()-1, intesities.end());
-                    std::copy_backward(lightIndices->begin()+i, lightIndices->end()-1, lightIndices->end());
+                    if (intesities[static_cast<size_t>(i)] < lightIntensity)
+                    {
+                        std::copy_backward(intesities.begin()+i, intesities.end()-1, intesities.end());
+                        std::copy_backward(lightIndices->begin()+i, lightIndices->end()-1, lightIndices->end());
 
-                    intesities[static_cast<size_t>(i)] = lightIntensity;
-                    lightIndices->at(static_cast<size_t>(i)) = static_cast<int32_t>(lightIndex);
-                    break;
+                        intesities[static_cast<size_t>(i)] = lightIntensity;
+                        lightIndices->at(static_cast<size_t>(i)) = static_cast<int32_t>(lightIndex);
+                        break;
+                    }
                 }
             }
         }

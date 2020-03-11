@@ -39,7 +39,7 @@ out vec4 fragColor;
 
 float lightShadow(in LightStruct light, in vec3 posInLightSpace, in int lightIdx)
 {
-    const int N = 1;
+    const int N = 2;
 
     vec2 shadowMapSize = textureSize(u_shadowMaps, 0).xy;
     float shadow = 0.0;
@@ -75,7 +75,7 @@ void main(void)
 
     vec3 color = vec3(0.0);
     color += Lo;
-    //color += 0.2 * calcIblLighting(pbr, F0, fragNormal, toView);
+    //color += calcIblLighting(pbr, F0, fragNormal, toView);
 
     color = color / (color + vec3(1.0));
     fragColor = vec4(toSRGB(color), 1.0);

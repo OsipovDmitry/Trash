@@ -6,6 +6,7 @@
 #include <glm/mat4x4.hpp>
 
 #include <core/forwarddecl.h>
+#include <utils/frustum.h>
 
 namespace trash
 {
@@ -20,22 +21,28 @@ class LightPrivate
 public:
     glm::vec3 pos, dir, color, att;
     glm::vec2 angles, cosAngles;
-    std::shared_ptr<Framebuffer> shadowMapFramebuffer;
-    int32_t shadowMapSize;
     LightType type;
-    bool shadowMapIsEnabled;
 
     Scene *scene;
     Light *thisLight;
+
+    std::shared_ptr<Framebuffer> shadowMapFramebuffer;
+    glm::mat4x4 matrix;
+    std::pair<float, float> zPlanes;
+    bool matrixIsDirty;
+    bool shadowMapIsEnabled;
 
     LightPrivate(Light*, LightType);
     float intensity(const glm::vec3&) const;
     glm::vec3 direction(const glm::vec3&) const;
     glm::mat4x4 packParams() const;
-    glm::mat4x4 matrix(float, float) const;
+    glm::mat4x4 getMatrix();
+    glm::mat4x4 calcMatrix(const std::pair<float, float>&) const;
     void attachShadowMap(std::shared_ptr<Texture>, uint32_t);
+    void setZPlanes(const std::pair<float, float>&);
 
     void dirtyScene();
+    void dirtyMatrix();
 
 };
 

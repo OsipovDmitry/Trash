@@ -6,22 +6,23 @@
 
 #include <core/light.h>
 #include <core/camera.h>
+#include <core/drawablenode.h>
+#include <core/scene.h>
 
 #include "renderer.h"
 #include "drawables.h"
 #include "cameraprivate.h"
+#include "drawablenodeprivate.h"
 #include "sceneprivate.h"
 #include "lightprivate.h"
-
-#include <QtGui/QOpenGLExtraFunctions>
 
 namespace trash
 {
 namespace core
 {
 
-const float ScenePrivate::ShadowMapZNear = 20.0f;
-const float ScenePrivate::ShadowMapZFar = 3000.0f;
+const float ScenePrivate::CameraMinZNear = 1000.0f;
+const float ScenePrivate::ShadowMapMinZNear = 20.0f;
 const int32_t ScenePrivate::ShadowMapSize = 512;
 
 SceneRootNode::SceneRootNode(Scene *scene)
@@ -36,30 +37,86 @@ Scene *SceneRootNode::scene() const
 }
 
 ScenePrivate::ScenePrivate(Scene *scene)
-    : rootNode(std::make_shared<SceneRootNode>(scene))
+    : thisScene(*scene)
+    , rootNode(std::make_shared<SceneRootNode>(scene))
     , lights(std::make_shared<LightsList>())
-    , allLightsAreDirty(true)
-    , allShadowMapsAreDirty(true)
 {
+}
+
+void ScenePrivate::attachLight(std::shared_ptr<Light> light)
+{
+    auto& lightPrivate = light->m();
+    if (lightPrivate.scene)
+        lightPrivate.scene->detachLight(light);
+
+    lightPrivate.scene = &thisScene;
+
+    if (!freeLightIndices.empty())
+    {
+        auto freeIndexIt = freeLightIndices.begin();
+        auto index = *freeIndexIt;
+        freeLightIndices.erase(freeIndexIt);
+        lights->at(static_cast<size_t>(index)) = light;
+        dirtyLights.insert(index);
+        dirtyShadowMaps.insert(index);
+
+    }
+    else
+    {
+        lights->push_back(light);
+        auto numLights = lights->size();
+        lights->resize(numLights+32);
+        for (size_t i = 0; i < 32; ++i)
+            freeLightIndices.insert(numLights+i);
+
+        for (size_t i = 0; i < numLights; ++i)
+        {
+            dirtyLights.insert(i);
+            dirtyShadowMaps.insert(i);
+        }
+
+        size_t bufferSize = 2 * sizeof(glm::mat4x4) * lights->size();
+        lightsUbo = std::make_shared<Buffer>(bufferSize, nullptr, GL_STATIC_DRAW);
+
+        auto& renderer = Renderer::instance();
+        lightsShadowMaps = renderer.createTexture2DArray(GL_DEPTH_COMPONENT16, ShadowMapSize, ShadowMapSize, static_cast<GLint>(lights->size()), GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
+        lightsShadowMaps->setWrap(GL_CLAMP_TO_BORDER);
+        lightsShadowMaps->setBorderColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
+        lightsShadowMaps->setCompareMode(GL_COMPARE_REF_TO_TEXTURE);
+        lightsShadowMaps->setCompareFunc(GL_LEQUAL);
+    }
+
+    rootNode->m().dirtyLightIndices();
+}
+
+bool ScenePrivate::detachLight(std::shared_ptr<Light> light)
+{
+    auto& lightPrivate = light->m();
+
+    if (&thisScene != lightPrivate.scene)
+        return false;
+
+    auto lightIter = std::find(lights->begin(), lights->end(), light);
+    freeLightIndices.insert(std::distance(lights->begin(), lightIter));
+    *lightIter = nullptr;
+    lightPrivate.scene = nullptr;
+
+    rootNode->m().dirtyLightIndices();
+    return true;
 }
 
 void ScenePrivate::dirtyLightParams(Light *light)
 {
-    if (light == nullptr)
-        allLightsAreDirty = true;
-    else
-        dirtyLights.insert(static_cast<uint32_t>(std::distance(
-                                                     lights->begin(),
-                                                     std::find_if(lights->begin(), lights->end(),
-                                                                  [light](const std::shared_ptr<trash::core::Light>& l){ return l.get() == light; }))
-                           ));
+    dirtyLights.insert(static_cast<uint32_t>(std::distance(
+                                                 lights->begin(),
+                                                 std::find_if(lights->begin(), lights->end(),
+                                                              [light](const std::shared_ptr<trash::core::Light>& l){ return l.get() == light; }))
+                                             ));
 }
 
 std::shared_ptr<Buffer> ScenePrivate::getLightParamsBuffer()
 {
-    if (allLightsAreDirty || !dirtyLights.empty())
-        updateLightParams();
-
+    updateLightParams();
     return lightsUbo;
 }
 
@@ -70,85 +127,49 @@ void ScenePrivate::updateLightParams()
                                         0.0f, 0.0f, 0.5f, 0.0f,
                                         0.5f, 0.5f, 0.5f, 1.0f);
 
-    if (allLightsAreDirty)
+    for (auto lightIdx : dirtyLights)
     {
-        size_t bufferSize = 2 * sizeof(glm::mat4x4) * lights->size();
-        lightsUbo = std::make_shared<Buffer>(bufferSize, nullptr, GL_STATIC_DRAW);
-        auto *p = reinterpret_cast<glm::mat4x4*>(lightsUbo->map(0, static_cast<GLsizeiptr>(bufferSize), GL_MAP_WRITE_BIT));
-        for (size_t i = 0; i < lights->size(); ++i)
-        {
-            p[2*i+0] = lights->at(i)->m().packParams();
-            p[2*i+1] = biasMatrix * lights->at(i)->m().matrix(ShadowMapZNear, ShadowMapZFar);
-
-        }
-        lightsUbo->unmap();
-    }
-    else
-    {
-        for (auto lightIdx : dirtyLights)
+        auto light = lights->at(lightIdx);
+        if (light)
         {
             auto dataOffset = 2 * lightIdx * sizeof(glm::mat4x4);
             auto dataSize = 2 * sizeof(glm::mat4x4);
             auto *p = reinterpret_cast<glm::mat4x4*>(lightsUbo->map(dataOffset, dataSize, GL_MAP_WRITE_BIT));
-            p[0] = lights->at(lightIdx)->m().packParams();
-            p[1] = biasMatrix * lights->at(lightIdx)->m().matrix(ShadowMapZNear, ShadowMapZFar);
+            p[0] = light->m().packParams();
+            p[1] = biasMatrix * light->m().getMatrix();
             lightsUbo->unmap();
         }
     }
 
-    allLightsAreDirty = false;
     dirtyLights.clear();
 }
 
 void ScenePrivate::dirtyShadowMap(Light *light)
 {
-    if (light == nullptr)
-        allShadowMapsAreDirty = true;
-    else
-        dirtyShadowMaps.insert(static_cast<uint32_t>(std::distance(
+    dirtyShadowMaps.insert(static_cast<uint32_t>(std::distance(
                                                      lights->begin(),
                                                      std::find_if(lights->begin(), lights->end(),
                                                                   [light](const std::shared_ptr<trash::core::Light>& l){ return l.get() == light; }))
-                              ));
+                                                 ));
 }
 
 std::shared_ptr<Texture> ScenePrivate::getLightsShadowMaps()
 {
-    if (allShadowMapsAreDirty || !dirtyShadowMaps.empty())
-        updateShadowMaps();
-
+    updateShadowMaps();
     return lightsShadowMaps;
 }
 
 void ScenePrivate::updateShadowMaps()
-{
-    auto& renderer = Renderer::instance();
-    if (allShadowMapsAreDirty)
+{   
+    for (auto lightIdx : dirtyShadowMaps)
     {
-        lightsShadowMaps = renderer.createTexture2DArray(GL_DEPTH_COMPONENT16, ShadowMapSize, ShadowMapSize, static_cast<GLint>(lights->size()), GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-        lightsShadowMaps->setWrap(GL_CLAMP_TO_BORDER);
-        lightsShadowMaps->setBorderColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
-        lightsShadowMaps->setCompareMode(GL_COMPARE_REF_TO_TEXTURE);
-        lightsShadowMaps->setCompareFunc(GL_LEQUAL);
-
-        for (size_t lightIdx = 0; lightIdx < lights->size(); ++lightIdx)
+        auto light = lights->at(lightIdx);
+        if (light)
         {
-            auto light = lights->at(lightIdx);
             light->m().attachShadowMap(lightsShadowMaps, static_cast<uint32_t>(lightIdx));
             updateShadowMap(light);
         }
     }
-    else
-    {
-        for (auto lightIdx : dirtyShadowMaps)
-        {
-            auto light = lights->at(lightIdx);
-            light->m().attachShadowMap(lightsShadowMaps, static_cast<uint32_t>(lightIdx));
-            updateShadowMap(light);
-        }
-    }
-
-    allShadowMapsAreDirty = false;
     dirtyShadowMaps.clear();
 }
 
@@ -158,9 +179,8 @@ void ScenePrivate::updateShadowMap(std::shared_ptr<Light> light)
         return;
 
     auto& lightPrivate = light->m();
-
-    auto lightMatrix = lightPrivate.matrix(ShadowMapZNear, ShadowMapZFar);
-    utils::Frustum frustum(lightMatrix);
+    lightPrivate.setZPlanes(calculateZPlanes(lightPrivate.calcMatrix({0.f, 1.f}), ShadowMapMinZNear));
+    utils::Frustum frustum(lightPrivate.getMatrix());
 
     std::queue<std::shared_ptr<Node>> nodes;
     nodes.push(rootNode);
@@ -182,7 +202,7 @@ void ScenePrivate::updateShadowMap(std::shared_ptr<Light> light)
     auto& renderer = Renderer::instance();
     renderer.setViewport(glm::ivec4(0, 0, ShadowMapSize, ShadowMapSize));
     renderer.setViewMatrix(glm::mat4x4(1.0f));
-    renderer.setProjectionMatrix(lightMatrix);
+    renderer.setProjectionMatrix(lightPrivate.getMatrix());
     renderer.setClearColor(false);
     renderer.setClearDepth(true, 1.0f);
     renderer.setLightsBuffer(nullptr);
@@ -190,9 +210,10 @@ void ScenePrivate::updateShadowMap(std::shared_ptr<Light> light)
     renderer.render(lightPrivate.shadowMapFramebuffer);
 }
 
-void ScenePrivate::renderScene(uint64_t time, uint64_t dt, const CameraPrivate& cameraPrivate)
+void ScenePrivate::renderScene(uint64_t time, uint64_t dt, CameraPrivate& cameraPrivate)
 {
-    utils::Frustum frustum(cameraPrivate.projectionMatrix() * cameraPrivate.viewMatrix());
+    cameraPrivate.setZPlanes(calculateZPlanes(cameraPrivate.calcProjectionMatrix({0.f, 1.f}) * cameraPrivate.getViewMatrix(), CameraMinZNear));
+    utils::Frustum frustum(cameraPrivate.getProjectionMatrix() * cameraPrivate.getViewMatrix());
 
     std::queue<std::shared_ptr<Node>> nodes;
     nodes.push(rootNode);
@@ -218,16 +239,20 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt, const CameraPrivate& 
 
     for (auto l : *lights)
     {
-        renderer.draw(
+        if (l)
+        {
+            renderer.draw(
                     std::make_shared<SphereDrawable>(2, utils::BoundingSphere(glm::vec3(), 10.0f), glm::vec4(l->color(),1)),
                     utils::Transform(glm::vec3(1,1,1), glm::quat(1,0,0,0), l->position()));
 
-        renderer.draw(std::make_shared<FrustumDrawable>(utils::Frustum(l->m().matrix(ScenePrivate::ShadowMapZNear, ScenePrivate::ShadowMapZFar)), glm::vec4(l->color(),1)), utils::Transform());
+            //renderer.draw(std::make_shared<FrustumDrawable>(utils::Frustum(l->m().getMatrix()), glm::vec4(l->color(),1)), utils::Transform());
+
+        }
     }
 
     renderer.setViewport(cameraPrivate.viewport);
-    renderer.setViewMatrix(cameraPrivate.viewMatrix());
-    renderer.setProjectionMatrix(cameraPrivate.projectionMatrix());
+    renderer.setViewMatrix(cameraPrivate.getViewMatrix());
+    renderer.setProjectionMatrix(cameraPrivate.getProjectionMatrix());
     renderer.setClearColor(cameraPrivate.clearColorBuffer, cameraPrivate.clearColor);
     renderer.setClearDepth(cameraPrivate.clearDepthBuffer, cameraPrivate.clearDepth);
     renderer.setIBLMaps(renderer.loadTexture("textures/diffuse/diffuse.json"), renderer.loadTexture("textures/specular/specular.json"));
@@ -235,11 +260,6 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt, const CameraPrivate& 
     renderer.setShadowMaps(shadowMaps);
 
     renderer.render(nullptr);
-
-    auto& funcs = renderer.functions();
-    funcs.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, renderer.defaultFbo());
-    funcs.glBindFramebuffer(GL_READ_FRAMEBUFFER, lights->at(0)->m().shadowMapFramebuffer->id);
-    funcs.glBlitFramebuffer(0,0,512,512,0,0,512,512, GL_COLOR_BUFFER_BIT, GL_NEAREST);
 }
 
 PickData ScenePrivate::pickScene(int32_t xi, int32_t yi, const CameraPrivate& cameraPrivate)
@@ -248,8 +268,8 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi, const CameraPrivate& ca
 
     auto& renderer = Renderer::instance();
     renderer.setViewport(cameraPrivate.viewport);
-    renderer.setViewMatrix(cameraPrivate.projectionMatrix());
-    renderer.setViewMatrix(cameraPrivate.viewMatrix());
+    renderer.setViewMatrix(cameraPrivate.getProjectionMatrix());
+    renderer.setViewMatrix(cameraPrivate.getViewMatrix());
     renderer.setClearColor(true, SelectionDrawable::idToColor(backgroundId));
     renderer.setClearDepth(true, 1.0f);
     renderer.setLightsBuffer(nullptr);
@@ -258,7 +278,7 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi, const CameraPrivate& ca
     const float x = static_cast<float>(xi - cameraPrivate.viewport.x) / static_cast<float>(cameraPrivate.viewport.z) * 2.0f - 1.0f;
     const float y = (1.0f - static_cast<float>(yi - cameraPrivate.viewport.y) / static_cast<float>(cameraPrivate.viewport.w)) * 2.0f - 1.0f;
 
-    auto viewProjectionMatrixInverse = glm::inverse(cameraPrivate.projectionMatrix() * cameraPrivate.viewMatrix());
+    auto viewProjectionMatrixInverse = glm::inverse(cameraPrivate.getProjectionMatrix() * cameraPrivate.getViewMatrix());
 
     glm::vec4 p0 = viewProjectionMatrixInverse * glm::vec4(x, y, -1.0f, 1.0f);
     glm::vec4 p1 = viewProjectionMatrixInverse * glm::vec4(x, y, 1.0f, 1.0f);
@@ -310,6 +330,38 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi, const CameraPrivate& ca
         localCoord = node->globalTransform().inverse() * glm::vec3(p0.x, p0.y, p0.z);
 
     return PickData{node, localCoord};
+}
+
+std::pair<float, float> ScenePrivate::calculateZPlanes(const glm::mat4x4& viewProjMatrix, float minZNear) const
+{
+    utils::OpenFrustum openFrustum(viewProjMatrix);
+    float zNear = +FLT_MAX, zFar = -FLT_MAX;
+
+    std::queue<std::shared_ptr<Node>> nodes;
+    nodes.push(rootNode);
+
+    while (!nodes.empty())
+    {
+        auto node = nodes.front();
+        nodes.pop();
+
+        if (!openFrustum.contain(node->globalTransform() * node->boundingSphere()))
+            continue;
+
+        if (node->isDrawableNode())
+        {
+            auto drawableNode = std::dynamic_pointer_cast<DrawableNode>(node);
+            const utils::BoundingSphere bSphere = drawableNode->globalTransform() * drawableNode->m().getLocalBoundingSphere();
+            const float distToSphere = openFrustum.planes.at(4).distanceTo(bSphere.center());
+            zNear = glm::min(zNear, distToSphere - bSphere.radius());
+            zFar = glm::max(zFar, distToSphere + bSphere.radius());
+        }
+
+        for (auto child : node->children())
+            nodes.push(child);
+    }
+
+    return { glm::max(zNear, minZNear), zFar };
 }
 
 } // namespace

@@ -29,6 +29,7 @@ void Light::setType(LightType value)
 {
     m_->type = value;
     m_->dirtyScene();
+    m_->dirtyMatrix();
 }
 
 const glm::vec3& Light::color() const
@@ -62,6 +63,7 @@ void Light::setPosition(const glm::vec3& value)
 {
     m_->pos = value;
     m_->dirtyScene();
+    m_->dirtyMatrix();
 }
 
 const glm::vec3& Light::direction() const
@@ -73,6 +75,7 @@ void Light::setDirection(const glm::vec3& value)
 {
     m_->dir = glm::normalize(value);
     m_->dirtyScene();
+    m_->dirtyMatrix();
 }
 
 const glm::vec2& Light::spotAngles() const
@@ -83,8 +86,9 @@ const glm::vec2& Light::spotAngles() const
 void Light::setSpotAngles(const glm::vec2& value)
 {
     m_->angles = value;
-    m_->cosAngles = glm::cos(m_->angles);
+    m_->cosAngles = glm::cos(0.5f*m_->angles);
     m_->dirtyScene();
+    m_->dirtyMatrix();
 }
 
 bool Light::isShadowMapEnabled() const

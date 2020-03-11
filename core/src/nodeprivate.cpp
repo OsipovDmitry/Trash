@@ -2,13 +2,13 @@
 
 #include "nodeprivate.h"
 #include "sceneprivate.h"
-#include "drawables.h"
-#include "renderer.h"
 
 namespace trash
 {
 namespace core
 {
+
+const utils::BoundingSphere NodePrivate::emptyLocalBoundingSphere = utils::BoundingSphere();
 
 NodePrivate::NodePrivate(Node &node)
     : thisNode(node)
@@ -74,10 +74,6 @@ const utils::BoundingSphere &NodePrivate::getBoundingSphere()
         for (auto child : thisNode.children())
             boundingSphere += child->transform() * child->boundingSphere();
         isBoundingSphereDirty = false;
-
-//        drawables.erase(bSphereDrawable);
-//        bSphereDrawable = std::make_shared<SphereDrawable>(8, boundingSphere, glm::vec4(0.8f, .0f, .0f, 1.0f));
-//        drawables.insert(bSphereDrawable);
     }
     return boundingSphere;
 }

@@ -10,6 +10,7 @@ namespace trash
 namespace core
 {
 
+class Drawable;
 struct Texture;
 using ShadowMapsList = std::array<std::shared_ptr<Texture>, MAX_LIGHTS_PER_NODE>;
 
@@ -18,7 +19,7 @@ class DrawableNodePrivate : public NodePrivate
 public:
     DrawableNodePrivate(Node&);
 
-    utils::BoundingSphere getLocalBoundingSphere() override;
+    const utils::BoundingSphere& getLocalBoundingSphere() override;
     std::shared_ptr<LightIndicesList> getLightIndices();
 
     void doUpdate(uint64_t, uint64_t) override;

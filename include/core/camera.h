@@ -49,8 +49,8 @@ public:
     void setViewMatrix(const glm::mat4x4&);
 
     const glm::mat4x4& projectionMatrix() const;
-    void setProjectionMatrixAsOrtho(float = -1.0f, float = +1.0f);
-    void setProjectionMatrixAsPerspective(float, float, float);
+    void setProjectionMatrixAsOrtho(float);
+    void setProjectionMatrixAsPerspective(float);
 
 private:
     std::unique_ptr<CameraPrivate> m_;

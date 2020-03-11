@@ -64,15 +64,14 @@ void Game::doInitialize()
     m_->floor = std::make_shared<Floor>();
     m_->scene->attachObject(m_->floor);
 
-
-    std::vector<glm::vec3> qwe {glm::vec3(-800,1000,-800), /*glm::vec3(800,1000,800), glm::vec3(-800,1000,800), glm::vec3(800,1000,-800)*/ };
+    std::vector<glm::vec3> qwe {glm::vec3(-1000,800,-1000), glm::vec3(1000,800,1000), glm::vec3(1000,800,-1000), /*glm::vec3(-1000,800,1000)*/ };
     for (const auto& p: qwe)
         {
-            auto l = std::make_shared<core::Light>(/*core::LightType::Direction*/);
+            auto l = std::make_shared<core::Light>();
             l->setAttenuation(glm::vec3(0.0, 0.001, 1));
             l->setPosition(p);
             l->setDirection(-p/*glm::vec3(0.0,-1.0,0.0)*/);
-            l->setSpotAngles(glm::vec2(0.2f, 1.55f));
+            l->setSpotAngles(glm::vec2(0.4f , 1.5f));
 
             m_->scene->camera()->scene()->attachLight(l);
         }
@@ -80,7 +79,8 @@ void Game::doInitialize()
 
 
     const float r = 350;
-    m_->scene->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.25f, 1000.0f, 5000.0f);
+    m_->scene->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.25f);
+    //m_->scene->camera()->setProjectionMatrixAsOrtho(2000.0f);
     m_->scene->camera()->setViewMatrix(glm::lookAt(glm::vec3(5 * r, 4 * r, -5 * r), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 
 //    const float r = 6;
@@ -129,6 +129,9 @@ void Game::doMouseClick(int x, int y)
     auto pickData = m_->scene->camera()->pickNode(x, y);
     if (pickData.node)
     {
+        auto sc = m_->scene->camera()->scene();
+        sc->detachLight(sc->lights()->at(0));
+
         auto object = m_->scene->findObject(pickData.node.get());
         if (object == m_->floor)
         {

@@ -31,7 +31,7 @@ PickData Camera::pickNode(int32_t xi, int32_t yi)
 void Camera::setViewport(const glm::ivec4& size)
 {
     m_->viewport = size;
-    m_->projMatrixDirty = true;
+    m_->projMatrixIsDirty = true;
 }
 
 const glm::ivec4& Camera::viewport() const
@@ -63,7 +63,7 @@ std::shared_ptr<const Scene> Camera::scene() const
 
 const glm::mat4x4& Camera::viewMatrix() const
 {
-    return m_->viewMatrix();
+    return m_->getViewMatrix();
 }
 
 void Camera::setViewMatrix(const glm::mat4x4& value)
@@ -73,24 +73,21 @@ void Camera::setViewMatrix(const glm::mat4x4& value)
 
 const glm::mat4x4& Camera::projectionMatrix() const
 {
-    return m_->projectionMatrix();
+    return m_->getProjectionMatrix();
 }
 
-void Camera::setProjectionMatrixAsOrtho(float zNear, float zFar)
+void Camera::setProjectionMatrixAsOrtho(float height)
 {
-    m_->zNear = zNear;
-    m_->zFar = zFar;
+    m_->halfHeight = height * .5f;
     m_->projMatrixAsOrtho = true;
-    m_->projMatrixDirty = true;
+    m_->projMatrixIsDirty = true;
 }
 
-void Camera::setProjectionMatrixAsPerspective(float fov, float zNear, float zFar)
+void Camera::setProjectionMatrixAsPerspective(float fov)
 {
     m_->fov = fov;
-    m_->zNear = zNear;
-    m_->zFar = zFar;
     m_->projMatrixAsOrtho = false;
-    m_->projMatrixDirty = true;
+    m_->projMatrixIsDirty = true;
 }
 
 } // namespace

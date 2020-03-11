@@ -20,22 +20,35 @@ namespace trash
 namespace core
 {
 
-const glm::mat4x4 &CameraPrivate::viewMatrix() const
+void CameraPrivate::setZPlanes(const std::pair<float, float>& value)
+{
+    zNear = value.first;
+    zFar = value.second;
+    projMatrixIsDirty = true;
+}
+
+const glm::mat4x4 &CameraPrivate::getViewMatrix() const
 {
     return viewMatrixCache;
 }
 
-const glm::mat4x4 &CameraPrivate::projectionMatrix() const
+const glm::mat4x4 &CameraPrivate::getProjectionMatrix() const
 {
-    if (projMatrixDirty)
+    if (projMatrixIsDirty)
     {
-        const float aspect = static_cast<float>(viewport.z) / static_cast<float>(viewport.w);
-
-        projMatrixCache = projMatrixAsOrtho ?
-                    glm::ortho(-aspect, +aspect, -1.0f, +1.0f, zNear, zFar) :
-                    glm::perspective(fov, aspect, zNear, zFar);
+        projMatrixCache = calcProjectionMatrix({zNear, zFar});
+        projMatrixIsDirty = false;
     }
     return projMatrixCache;
+}
+
+glm::mat4x4 CameraPrivate::calcProjectionMatrix(const std::pair<float, float>& zDistances) const
+{
+    const float aspect = static_cast<float>(viewport.z) / static_cast<float>(viewport.w);
+
+    return projMatrixAsOrtho ?
+                glm::ortho(-aspect * halfHeight, +aspect * halfHeight, -halfHeight, +halfHeight, zDistances.first, zDistances.second) :
+                glm::perspective(fov, aspect, zDistances.first, zDistances.second);
 }
 
 void CameraPrivate::renderScene(uint64_t time, uint64_t dt)
