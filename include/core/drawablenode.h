@@ -1,9 +1,7 @@
 #ifndef DRAWABLENODE_H
 #define DRAWABLENODE_H
 
-#include <string>
-
-#include "node.h"
+#include <core/node.h>
 
 namespace trash
 {

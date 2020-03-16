@@ -4,3 +4,5 @@ SUBDIRS += \
     core \
     game \
     starter
+
+HEADERS +=

@@ -64,7 +64,7 @@ bool HDRLoader::load(const char *fileName, HDRLoaderResult &res)
 	}
 
 	int w, h;
-	if (!sscanf(reso, "-Y %ld +X %ld", &h, &w)) {
+    if (!sscanf(reso, "-Y %d +X %d", &h, &w)) {
 		fclose(file);
 		return false;
 	}

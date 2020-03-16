@@ -23,7 +23,7 @@ namespace core
 
 const float ScenePrivate::CameraMinZNear = 1000.0f;
 const float ScenePrivate::ShadowMapMinZNear = 20.0f;
-const int32_t ScenePrivate::ShadowMapSize = 512;
+const int32_t ScenePrivate::ShadowMapSize = 1024;
 
 SceneRootNode::SceneRootNode(Scene *scene)
     : Node(new NodePrivate(*this))
@@ -40,6 +40,7 @@ ScenePrivate::ScenePrivate(Scene *scene)
     : thisScene(*scene)
     , rootNode(std::make_shared<SceneRootNode>(scene))
     , lights(std::make_shared<LightsList>())
+    , backgroundDrawable(std::make_shared<BackgroundDrawable>())
 {
 }
 
@@ -241,12 +242,11 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt, CameraPrivate& camera
     {
         if (l)
         {
-            renderer.draw(
-                    std::make_shared<SphereDrawable>(2, utils::BoundingSphere(glm::vec3(), 10.0f), glm::vec4(l->color(),1)),
-                    utils::Transform(glm::vec3(1,1,1), glm::quat(1,0,0,0), l->position()));
+//            renderer.draw(
+//                    std::make_shared<SphereDrawable>(2, utils::BoundingSphere(glm::vec3(), 10.0f), glm::vec4(l->color(),1)),
+//                    utils::Transform(glm::vec3(1,1,1), glm::quat(1,0,0,0), l->position()));
 
             //renderer.draw(std::make_shared<FrustumDrawable>(utils::Frustum(l->m().getMatrix()), glm::vec4(l->color(),1)), utils::Transform());
-
         }
     }
 
@@ -259,7 +259,14 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt, CameraPrivate& camera
     renderer.setLightsBuffer(getLightParamsBuffer());
     renderer.setShadowMaps(shadowMaps);
 
+    renderer.draw(backgroundDrawable, utils::Transform());
     renderer.render(nullptr);
+
+//    auto f = renderer.functions();
+//    f.glBindFramebuffer(GL_READ_FRAMEBUFFER, lights->at(2)->m().shadowMapFramebuffer->id);
+//    f.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, renderer.defaultFbo());
+//    f.glBlitFramebuffer(0,0,1024,1024,0,0,1024,1024,GL_COLOR_BUFFER_BIT,GL_NEAREST);
+
 }
 
 PickData ScenePrivate::pickScene(int32_t xi, int32_t yi, const CameraPrivate& cameraPrivate)

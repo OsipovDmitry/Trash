@@ -10,7 +10,7 @@
 
 int main(int argc, char *argv[])
 {
-    static const int widgetHeight = 100;
+    static const int widgetHeight = 720;
 
     QApplication a(argc, argv);
 

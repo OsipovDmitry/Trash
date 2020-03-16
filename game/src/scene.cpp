@@ -16,7 +16,8 @@ namespace game
 Scene::Scene()
     : m_camera(std::make_shared<core::Camera>())
 {
-    core::Core::instance().graphicsController().addCamera(0, m_camera);
+    auto& graphicsController = core::Core::instance().graphicsController();
+    graphicsController.addCamera(0, m_camera);
 }
 
 Scene::~Scene()

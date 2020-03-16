@@ -294,5 +294,48 @@ FrustumDrawable::FrustumDrawable(const utils::Frustum &frustum, const glm::vec4&
     geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
 }
 
+BackgroundDrawable::BackgroundDrawable()
+{
+    static const std::vector<float> vertices {
+        -1.f, -1.f,
+        +1.f, -1.f,
+        -1.f, +1.f,
+        +1.f, +1.f,
+
+    };
+    static const std::vector<uint32_t> indices {
+        0, 1, 2, 3
+    };
+
+    auto& renderer = Renderer::instance();
+
+    geometry = std::make_shared<Mesh>();
+    geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(4, 2, vertices.data(), GL_STATIC_DRAW));
+    geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_TRIANGLE_STRIP, 4, indices.data(), GL_STATIC_DRAW));
+
+    program = renderer.loadRenderProgram(backgroundRenderProgramName.first, backgroundRenderProgramName.second);
+}
+
+std::shared_ptr<RenderProgram> BackgroundDrawable::renderProgram() const
+{
+    return program;
+}
+
+std::shared_ptr<Mesh> BackgroundDrawable::mesh() const
+{
+    return geometry;
+}
+
+void BackgroundDrawable::prerender() const
+{
+    Drawable::prerender();
+
+    auto& renderer = Renderer::instance();
+    const auto& view = renderer.viewMatrix();
+    const auto& proj = renderer.projectionMatrix();
+    program->setUniform(program->uniformLocation("u_backgroundMatrix"), glm::mat4x4(glm::inverse(glm::mat3x3(view))) * glm::inverse(proj));
+    program->setUniform(program->uniformLocation("u_roughness"), 0.05f);
+}
+
 } // namespace
 } // namespace

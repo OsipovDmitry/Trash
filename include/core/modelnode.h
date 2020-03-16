@@ -3,7 +3,7 @@
 
 #include <string>
 
-#include "node.h"
+#include <core/node.h>
 
 namespace trash
 {

@@ -143,6 +143,21 @@ public:
     FrustumDrawable(const utils::Frustum&, const glm::vec4&);
 };
 
+class BackgroundDrawable : public Drawable
+{
+public:
+    BackgroundDrawable();
+
+    LayerId layerId() const override { return LayerId::Background; }
+    std::shared_ptr<RenderProgram> renderProgram() const override;
+    std::shared_ptr<Mesh> mesh() const override;
+
+    virtual void prerender() const override;
+
+    std::shared_ptr<RenderProgram> program;
+    std::shared_ptr<Mesh> geometry;
+};
+
 } // namespace
 } // namespace
 

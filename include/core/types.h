@@ -7,7 +7,7 @@
 
 #include <utils/enumclass.h>
 
-#include "forwarddecl.h"
+#include <core/forwarddecl.h>
 
 namespace trash
 {

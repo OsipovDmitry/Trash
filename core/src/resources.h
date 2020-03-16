@@ -10,6 +10,8 @@ namespace trash
 namespace core
 {
 
+const std::pair<std::string, std::string> backgroundRenderProgramName { ":/res/background.vert", ":/res/background.frag" };
+
 const std::pair<std::string, std::string> coloreredMeshRenderProgramName { ":/res/colored_mesh.vert", ":/res/colored_mesh.frag" };
 const std::pair<std::string, std::string> coloreredStaticMeshRenderProgramName { ":/res/colored_static_mesh.vert", ":/res/colored_mesh.frag" };
 

@@ -48,14 +48,14 @@ public:
         return true;
     }
 
-    const T *parent() const { return m_parent; }
-    T *parent() { return m_parent; }
-
     int relationDegree(std::shared_ptr<const T> grandParent) const
     {
         if (grandParent.get() == this) return 0;
         return (m_parent) ? 1 + m_parent->relationDegree(grandParent) : -1;
     }
+
+    const T *parent() const { return m_parent; }
+    T *parent() { return m_parent; }
 
     const std::vector<std::shared_ptr<T>>& children() const { return m_children; }
     std::vector<std::shared_ptr<T>>& children() { return m_children; }

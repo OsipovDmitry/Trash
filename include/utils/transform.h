@@ -53,6 +53,11 @@ public:
     {
         return Transform(*this).invert();
     }
+
+    static Transform fromScale(const glm::vec3& value) { return Transform(value, glm::quat(1.0f, 0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 0.0f, 0.0f)); }
+    static Transform fromScale(float value) { return fromScale(glm::vec3(value, value, value)); }
+    static Transform fromRotation(const glm::quat& value) { return Transform(glm::vec3(1.0f, 1.0f, 1.0f), value, glm::vec3(0.0f, 0.0f, 0.0f)); }
+    static Transform fromTranslation(const glm::vec3& value) { return Transform(glm::vec3(1.0f, 1.0f, 1.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), value); }
 };
 
 } // namespace

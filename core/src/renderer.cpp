@@ -131,6 +131,13 @@ void RenderProgram::setUniform(GLint loc, GLint value)
     functions.glUniform1i(loc, value);
 }
 
+void RenderProgram::setUniform(GLint loc, float value)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glUseProgram(id);
+    functions.glUniform1f(loc, value);
+}
+
 void RenderProgram::setUniform(GLint loc, const glm::vec3& value)
 {
     auto& functions = Renderer::instance().functions();
@@ -239,7 +246,7 @@ int32_t Texture::numMipmapLevels() const
     return res;
 }
 
-Buffer::Buffer(GLsizeiptr size, GLvoid *data, GLenum usage)
+Buffer::Buffer(GLsizeiptr size, const GLvoid *data, GLenum usage)
     : id(0)
 {
     auto& functions = Renderer::instance().functions();
@@ -275,14 +282,14 @@ void Buffer::unmap()
     Renderer::instance().functions().glUnmapBuffer(GL_ARRAY_BUFFER);
 }
 
-VertexBuffer::VertexBuffer(uint32_t nv, uint32_t nc, float *data, GLenum usage)
+VertexBuffer::VertexBuffer(uint32_t nv, uint32_t nc, const float *data, GLenum usage)
     : Buffer(static_cast<GLsizeiptr>(nv*nc*sizeof(float)), data, usage)
     , numVertices(nv)
     , numComponents(nc)
 {
 }
 
-IndexBuffer::IndexBuffer(GLenum primitiveType_, uint32_t numIndices_, uint32_t *data, GLenum usage)
+IndexBuffer::IndexBuffer(GLenum primitiveType_, uint32_t numIndices_, const uint32_t *data, GLenum usage)
     : Buffer(static_cast<GLsizeiptr>(numIndices_ * sizeof(uint32_t)), data, usage)
     , numIndices(numIndices_)
     , primitiveType(primitiveType_)
@@ -534,8 +541,8 @@ void Renderer::initializeResources()
 
     m_brdfLutMap = loadTexture(brdfLutTextureName);
 
-//    const float L = 1250;
-//    const float wrap = 7;
+//    const float L = 2500;
+//    const float wrap = 14;
 //    std::vector<glm::vec3> pos {glm::vec3(-L, 0.0f, -L), glm::vec3(-L, 0.0f, +L), glm::vec3(+L, 0.0f, -L), glm::vec3(+L, 0.0f, +L)};
 //    std::vector<glm::vec3> t {glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f)};
 //    std::vector<glm::vec3> n {glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f)};
@@ -716,6 +723,7 @@ void Renderer::render(std::shared_ptr<Framebuffer> framebuffer)
     static const std::array<RenderMethod, numElementsLayerId()> renderMethods {
         &Renderer::renderSolidLayer, // render selection layer as solid
         &Renderer::renderShadowLayer, // render shadows layer as solid
+        &Renderer::renderBackgroundLayer,
         &Renderer::renderSolidLayer,
         &Renderer::renderTransparentLayer
     };
@@ -810,10 +818,27 @@ void Renderer::setIBLMaps(std::shared_ptr<Texture> dm, std::shared_ptr<Texture> 
     m_numIBLSpecularMapsMipmaps = m_IBLSpecularMap ? m_IBLSpecularMap->numMipmapLevels() : 0;
 }
 
+const glm::mat4x4 &Renderer::viewMatrix() const
+{
+    return m_viewMatrix;
+}
+
+const glm::mat4x4 &Renderer::projectionMatrix() const
+{
+    return m_projMatrix;
+}
+
 void Renderer::renderShadowLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
 {
     m_functions.glEnable(GL_DEPTH_TEST);
     m_functions.glCullFace(GL_FRONT);
+    setupAndRender(begin, end);
+}
+
+void Renderer::renderBackgroundLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
+{
+    m_functions.glDisable(GL_DEPTH_TEST);
+    m_functions.glCullFace(GL_BACK);
     setupAndRender(begin, end);
 }
 

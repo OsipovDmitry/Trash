@@ -15,5 +15,8 @@
         <file>res/brdf_lut.json</file>
         <file>res/teapot.fbx</file>
         <file>res/empty.frag</file>
+        <file>res/background.frag</file>
+        <file>res/background.vert</file>
+        <file>res/font.png</file>
     </qresource>
 </RCC>

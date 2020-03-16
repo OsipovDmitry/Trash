@@ -35,6 +35,7 @@ class Drawable;
 ENUMCLASS(LayerId, uint32_t,
           Selection,
           Shadows,
+          Background,
           SolidGeometry,
           TransparencyGeometry)
 
@@ -54,6 +55,7 @@ struct RenderProgram : public ResourceStorage::Object
     GLint uniformLocation(const std::string&);
 
     void setUniform(GLint, GLint);
+    void setUniform(GLint, float);
     void setUniform(GLint, const glm::vec3&);
     void setUniform(GLint, const glm::vec4&);
     void setUniform(GLint, const glm::mat3x3&);
@@ -83,7 +85,7 @@ struct Buffer
 
     GLuint id;
 
-    Buffer(GLsizeiptr, GLvoid*, GLenum);
+    Buffer(GLsizeiptr, const GLvoid*, GLenum);
     virtual ~Buffer();
 
     void setSubData(GLintptr, GLsizeiptr, const void*);
@@ -97,7 +99,7 @@ struct VertexBuffer : public Buffer
     uint32_t numVertices;
     uint32_t numComponents;
 
-    VertexBuffer(uint32_t, uint32_t, float*, GLenum);
+    VertexBuffer(uint32_t, uint32_t, const float*, GLenum);
 };
 
 struct IndexBuffer : public Buffer
@@ -105,7 +107,7 @@ struct IndexBuffer : public Buffer
     uint32_t numIndices;
     GLenum primitiveType;
 
-    IndexBuffer(GLenum, uint32_t, uint32_t*, GLenum);
+    IndexBuffer(GLenum, uint32_t, const uint32_t*, GLenum);
 };
 
 struct Mesh
@@ -266,6 +268,9 @@ public:
     void setShadowMaps(std::shared_ptr<Texture>);
     void setIBLMaps(std::shared_ptr<Texture>, std::shared_ptr<Texture>);
 
+    const glm::mat4x4& viewMatrix() const;
+    const glm::mat4x4& projectionMatrix() const;
+
 private:
     using DrawDataType = std::pair<std::shared_ptr<Drawable>, utils::Transform>;
     struct DrawDataComparator
@@ -277,6 +282,7 @@ private:
     using DrawDataContainer = std::multiset<DrawDataType, DrawDataComparator>;
 
     void renderShadowLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
+    void renderBackgroundLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
     void renderSolidLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
     void renderTransparentLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
     void setupAndRender(DrawDataContainer::iterator, DrawDataContainer::iterator);

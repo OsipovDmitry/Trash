@@ -75,7 +75,7 @@ void main(void)
 
     vec3 color = vec3(0.0);
     color += Lo;
-    //color += calcIblLighting(pbr, F0, fragNormal, toView);
+    color += 0.2 * calcIblLighting(pbr, F0, fragNormal, toView);
 
     color = color / (color + vec3(1.0));
     fragColor = vec4(toSRGB(color), 1.0);

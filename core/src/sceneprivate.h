@@ -29,6 +29,7 @@ struct Buffer;
 struct Texture;
 struct Framebuffer;
 
+class Drawable;
 class CameraPrivate;
 
 class ScenePrivate
@@ -58,6 +59,7 @@ public:
     std::shared_ptr<LightsList> lights;
     std::shared_ptr<Buffer> lightsUbo;
     std::shared_ptr<Texture> lightsShadowMaps;
+    std::shared_ptr<Drawable> backgroundDrawable;
 
     static const float CameraMinZNear;
     static const float ShadowMapMinZNear;

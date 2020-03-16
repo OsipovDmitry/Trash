@@ -31,8 +31,9 @@ LightPrivate::LightPrivate(Light* l, LightType lightType)
 
 {
     shadowMapFramebuffer = std::make_shared<Framebuffer>();
-    shadowMapFramebuffer->setDrawBuffer(GL_NONE);
-    shadowMapFramebuffer->setReadBuffer(GL_NONE);
+    shadowMapFramebuffer->attachColor(Renderer::instance().createTexture2D(GL_RGBA8, 1024,1024,GL_RGBA,GL_UNSIGNED_BYTE,nullptr));
+    //shadowMapFramebuffer->setDrawBuffer(GL_NONE);
+    //shadowMapFramebuffer->setReadBuffer(GL_NONE);
 }
 
 float LightPrivate::intensity(const glm::vec3& v) const
@@ -47,13 +48,13 @@ float LightPrivate::intensity(const glm::vec3& v) const
 
         attenaution *= 1.0f / (att.x * dist * dist + att.y * dist + att.z);
 
-        if (type == LightType::Spot)
-        {
-            float cosAngle = glm::dot(-l, dir);
-            float spotAtt = (cosAngle - cosAngles.y) / (cosAngles.x - cosAngles.y);
-            spotAtt = glm::clamp(spotAtt, 0.0f, 1.0f);
-            attenaution *= spotAtt;
-        }
+//        if (type == LightType::Spot)
+//        {
+//            float cosAngle = glm::dot(-l, dir);
+//            float spotAtt = (cosAngle - cosAngles.y) / (cosAngles.x - cosAngles.y);
+//            spotAtt = glm::clamp(spotAtt, 0.0f, 1.0f);
+//            attenaution *= spotAtt;
+//        }
     }
 
     return attenaution;

@@ -18,6 +18,8 @@ class AudioController;
 class AbstractGame;
 class NodeUserData;
 class Node;
+class DrawableNode;
+class BackgroundNode;
 class ModelNode;
 class TeapotNode;
 class Camera;

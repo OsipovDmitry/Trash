@@ -3,7 +3,7 @@
 
 #include <glm/vec3.hpp>
 
-#include "modelnode.h"
+#include <core/modelnode.h>
 
 namespace trash
 {
