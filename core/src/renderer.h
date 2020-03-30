@@ -231,6 +231,21 @@ struct Model::Node : public utils::TreeNode<Node>
     }
 };
 
+struct Font : public ResourceStorage::Object
+{
+    struct Character { uint16_t x, y, width, height, advance; int16_t originX, originY;
+                       Character(uint16_t x_, uint16_t y_, uint16_t w_, uint16_t h_, int16_t ox_, int16_t oy_, uint16_t a_) :
+                           x(x_), y(y_), width(w_), height(h_), originX(ox_), originY(oy_), advance(a_) {}};
+
+    std::shared_ptr<Texture> texture;
+    std::string name = "";
+    std::unordered_map<char, std::shared_ptr<Character>> characters;
+    uint16_t size = 0;
+    uint16_t width = 0, height = 0;
+    bool isBold = false;
+    bool isItalic = false;
+};
+
 class Renderer
 {
     NONCOPYBLE(Renderer)
@@ -249,6 +264,7 @@ public:
     std::shared_ptr<Texture> createTexture2DArray(GLenum, GLint, GLint, GLint, GLenum, GLenum, const void*, const std::string& = "");
     std::shared_ptr<Model> loadModel(const std::string&);
     std::shared_ptr<Model::Animation> loadAnimation(const std::string&);
+    std::shared_ptr<Font> loadFont(const std::string&);
 
     // binding
     void bindTexture(std::shared_ptr<Texture>, GLint);

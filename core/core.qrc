@@ -17,6 +17,10 @@
         <file>res/empty.frag</file>
         <file>res/background.frag</file>
         <file>res/background.vert</file>
-        <file>res/font.png</file>
+        <file>res/PurisaDesc.json</file>
+        <file>res/PursiaTex.json</file>
+        <file>res/PursiaTex.png</file>
+        <file>res/text.frag</file>
+        <file>res/text.vert</file>
     </qresource>
 </RCC>

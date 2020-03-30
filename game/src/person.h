@@ -12,7 +12,6 @@ namespace trash
 namespace game
 {
 
-
 class Person : public Object
 {
 public:

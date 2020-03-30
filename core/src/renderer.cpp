@@ -698,6 +698,86 @@ std::shared_ptr<Model::Animation> Renderer::loadAnimation(const std::string& fil
     return object;
 }
 
+std::shared_ptr<Font> Renderer::loadFont(const std::string& filename)
+{
+    auto object = std::dynamic_pointer_cast<Font>(m_resourceStorage->get(filename));
+    if (!object)
+    {
+        QFile file(QString::fromStdString(filename));
+        if (!file.open(QFile::ReadOnly))
+            return nullptr;
+
+        auto byteArray = file.readAll();
+
+        rapidjson::Document document;
+        document.Parse(byteArray);
+
+        if (!document.HasMember("texture") ||
+                !document.HasMember("size") ||
+                !document.HasMember("width") ||
+                !document.HasMember("height") ||
+                !document.HasMember("characters"))
+            return nullptr;
+
+        const std::string dir = utils::fileDir(filename);
+
+        object = std::make_shared<Font>();
+        object->texture = loadTexture(dir + document["texture"].GetString());
+        if (!object->texture)
+            return nullptr;
+
+        object->size = document["size"].GetUint();
+        object->width = document["width"].GetUint();
+        object->height = document["height"].GetUint();
+
+        // chech that width and height are equal texture's size
+
+        if (document.HasMember("name"))
+            object->name = document["name"].GetString();
+
+        if (document.HasMember("bold"))
+            object->isBold = document["bold"].GetBool();
+
+        if (document.HasMember("italic"))
+            object->isItalic = document["italic"].GetBool();
+
+        if (document.HasMember("characters"))
+        {
+            rapidjson::Document::ValueType& characters = document["characters"];
+            for (auto it = characters.MemberBegin(); it != characters.MemberEnd(); ++it)
+            {
+                const std::string name = it->name.GetString();
+                if (name.length() != 1)
+                    return nullptr;
+
+                auto& value = it->value;
+                if (!value.HasMember("x") ||
+                        !value.HasMember("y") ||
+                        !value.HasMember("width") ||
+                        !value.HasMember("height") ||
+                        !value.HasMember("originX") ||
+                        !value.HasMember("originY") ||
+                        !value.HasMember("advance"))
+                    return nullptr;
+
+                object->characters[static_cast<size_t>(name.at(0))] = std::make_shared<Font::Character>(
+                        value["x"].GetUint(),
+                        value["y"].GetUint(),
+                        value["width"].GetUint(),
+                        value["height"].GetUint(),
+                        value["originX"].GetInt(),
+                        value["originY"].GetInt(),
+                        value["advance"].GetUint());
+            }
+        }
+
+        m_resourceStorage->store(filename, object);
+    }
+
+    return object;
+}
+
+
 void Renderer::bindTexture(std::shared_ptr<Texture> texture, GLint unit)
 {
     GLuint id = texture ? texture->id : 0;
@@ -849,8 +929,14 @@ void Renderer::renderSolidLayer(DrawDataContainer::iterator begin, DrawDataConta
     setupAndRender(begin, end);
 }
 
-void Renderer::renderTransparentLayer(DrawDataContainer::iterator, DrawDataContainer::iterator)
+void Renderer::renderTransparentLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
 {
+    m_functions.glEnable(GL_DEPTH_TEST);
+    m_functions.glCullFace(GL_BACK);
+    m_functions.glEnable(GL_BLEND);
+    m_functions.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
+    setupAndRender(begin, end);
+    m_functions.glDisable(GL_BLEND);
 }
 
 void Renderer::setupAndRender(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)

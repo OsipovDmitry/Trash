@@ -9,3 +9,6 @@ done 6) develop shadow maps
 9) add supporting viewProjection and modelViewProjection matrices in shaders
 10) improve rendering pipline in Renderer class. Now we have a conflict when we are trying to render shadow maps and common scene
 11) ScenePrivate::renderScene updates all dirty shadow maps. It should update shadow maps that are needed in this frame
+done 12) develop BackgroundDrawable
+done 13) develop TextNode, loading fonts (https://evanw.github.io/font-texture-generator/)
+14) why is base color black when there are no lighting ? 

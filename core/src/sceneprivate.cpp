@@ -7,6 +7,7 @@
 #include <core/light.h>
 #include <core/camera.h>
 #include <core/drawablenode.h>
+#include <core/textnode.h>
 #include <core/scene.h>
 
 #include "renderer.h"
@@ -23,12 +24,15 @@ namespace core
 
 const float ScenePrivate::CameraMinZNear = 1000.0f;
 const float ScenePrivate::ShadowMapMinZNear = 20.0f;
-const int32_t ScenePrivate::ShadowMapSize = 1024;
+const int32_t ScenePrivate::ShadowMapSize = 512;
 
 SceneRootNode::SceneRootNode(Scene *scene)
     : Node(new NodePrivate(*this))
     , m_scene(scene)
 {
+    auto text = std::make_shared<TextNode>("Hello,\nWorld!", TextNodeAlignment::Center, TextNodeAlignment::Negative, glm::vec4(.3f, .3f, 1.f, 1.f));
+    text->setTransform(utils::Transform::fromTranslation(glm::vec3(0.0f, 250.0f, 0.0f)) * utils::Transform::fromScale(450.0f));
+    attach(text);
 }
 
 Scene *SceneRootNode::scene() const
@@ -222,6 +226,8 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt, CameraPrivate& camera
     // TODO: update only lights that are used in this frame
     auto shadowMaps = getLightsShadowMaps();
 
+    auto& renderer = Renderer::instance();
+
     while (!nodes.empty())
     {
         auto node = nodes.front();
@@ -235,8 +241,6 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt, CameraPrivate& camera
         for (auto child : node->children())
             nodes.push(child);
     }
-
-    auto& renderer = Renderer::instance();
 
     for (auto l : *lights)
     {

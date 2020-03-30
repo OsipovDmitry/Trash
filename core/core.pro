@@ -29,7 +29,8 @@ HEADERS += \
     src/cameraprivate.h \
     src/image.h \
     src/texture.inl \
-    src/drawablenodeprivate.h
+    src/drawablenodeprivate.h \
+    src/textnodeprivate.h
 
 SOURCES += \
     src/hdrloader/hdrloader.cpp \
@@ -57,7 +58,9 @@ SOURCES += \
     src/image.cpp \
     src/teapotnode.cpp \
     src/drawablenode.cpp \
-    src/drawablenodeprivate.cpp
+    src/drawablenodeprivate.cpp \
+    src/textnode.cpp \
+    src/textnodeprivate.cpp
 
 LIBS += \
 #    -lassimp-vc140-mt

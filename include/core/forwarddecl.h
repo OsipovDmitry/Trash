@@ -19,7 +19,7 @@ class AbstractGame;
 class NodeUserData;
 class Node;
 class DrawableNode;
-class BackgroundNode;
+class TextNode;
 class ModelNode;
 class TeapotNode;
 class Camera;
@@ -27,6 +27,7 @@ class Scene;
 class Light;
 
 enum class LightType : uint32_t;
+enum class TextNodeAlignment : uint8_t;
 
 using LightsList = std::vector<std::shared_ptr<Light>>;
 const int32_t MAX_LIGHTS_PER_NODE = 8;

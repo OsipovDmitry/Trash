@@ -1,5 +1,8 @@
+#include <algorithm>
+
 #include <utils/transform.h>
 #include <core/modelnode.h>
+#include <core/textnode.h>
 
 #include "person.h"
 
@@ -12,8 +15,11 @@ Person::Person(const std::string &modelFilename)
     : Object(std::make_shared<ObjectUserData>(*this))
 {
     m_modelNode = std::make_shared<core::ModelNode>(modelFilename);
-
     m_graphicsNode->attach(m_modelNode);
+
+//    auto textNode = std::make_shared<core::TextNode>(modelFilename.substr(0, modelFilename.find('.')), core::TextNodeAlignment::Center, core::TextNodeAlignment::Negative);
+//    textNode->setTransform(utils::Transform::fromTranslation(glm::vec3(0,350.f,0)) * utils::Transform::fromScale(210.0f));
+//    m_graphicsNode->attach(textNode);
 
     m_modelNode->playAnimation("idle");
     m_state = 0;

@@ -2,7 +2,6 @@
 #define MODELNODEPRIVATE_H
 
 #include <string>
-#include <vector>
 
 #include "nodeprivate.h"
 

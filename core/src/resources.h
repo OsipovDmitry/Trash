@@ -12,6 +12,8 @@ namespace core
 
 const std::pair<std::string, std::string> backgroundRenderProgramName { ":/res/background.vert", ":/res/background.frag" };
 
+const std::pair<std::string, std::string> textRenderProgramName { ":/res/text.vert", ":/res/text.frag" };
+
 const std::pair<std::string, std::string> coloreredMeshRenderProgramName { ":/res/colored_mesh.vert", ":/res/colored_mesh.frag" };
 const std::pair<std::string, std::string> coloreredStaticMeshRenderProgramName { ":/res/colored_static_mesh.vert", ":/res/colored_mesh.frag" };
 
@@ -20,6 +22,7 @@ const std::pair<std::string, std::string> texturedStaticMeshRenderProgramName { 
 
 const std::pair<std::string, std::string> shadowMeshRenderProgramName { ":/res/colored_mesh.vert", ":/res/empty.frag" };
 const std::pair<std::string, std::string> shadowStaticMeshRenderProgramName { ":/res/colored_static_mesh.vert", ":/res/empty.frag" };
+
 
 const std::string teapotModelName(":/res/teapot.fbx");
 const std::string standardDiffuseTextureName(":/res/chess.png");

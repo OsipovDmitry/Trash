@@ -158,6 +158,23 @@ public:
     std::shared_ptr<Mesh> geometry;
 };
 
+class TextDrawable : public Drawable
+{
+public:
+    TextDrawable(std::shared_ptr<Font>, const std::string&, TextNodeAlignment, TextNodeAlignment, const glm::vec4&, float, utils::BoundingSphere&);
+
+    LayerId layerId() const override { return LayerId::TransparencyGeometry; }
+    std::shared_ptr<RenderProgram> renderProgram() const override;
+    std::shared_ptr<Mesh> mesh() const override;
+
+    virtual void prerender() const override;
+
+    std::shared_ptr<RenderProgram> program;
+    std::shared_ptr<Mesh> geometry;
+    std::shared_ptr<Texture> fontMap;
+    glm::vec4 color;
+};
+
 } // namespace
 } // namespace
 

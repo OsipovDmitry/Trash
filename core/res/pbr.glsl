@@ -27,10 +27,10 @@ float solveMetallic(in float diffuse, in float specular, in float oneMinusSpecul
     return clamp((-b+sqrt(D)) / (2.0*a), 0.0, 1.0);
 }
 
-PbrData getPbrData(in vec2 texCoord, in bool isMetaalicRoughWorkflow)
+PbrData getPbrData(in vec2 texCoord, in bool isMetallicRoughWorkflow)
 {
     PbrData pbr;
-    if (isMetaalicRoughWorkflow)
+    if (isMetallicRoughWorkflow)
     {
         pbr.baseColor = toLinearRGB(texture(u_baseColorMap, texCoord).rgb);
         pbr.metallic = texture(u_metallicMap, texCoord).r;

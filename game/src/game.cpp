@@ -96,8 +96,6 @@ void Game::doInitialize()
 
     m_->scene->camera()->scene()->attachLight(l);
 
-
-
     const float r = 400;
     m_->scene->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.4f);
     //m_->scene->camera()->setProjectionMatrixAsOrtho(2000.0f);
@@ -121,7 +119,7 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
     m_->scene->update(time, dt);
 
     const float r = 300;
-    const float t = time * 0.00005f;
+    const float t = time * 0.00005f + 10.0f;
     m_->scene->camera()->setViewMatrix(glm::lookAt(glm::vec3(11 * r * cos(t), 3 * r, -11 * r * sin(t)), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 
 //    for (auto l : m_->scene->camera()->scene()->lights())
