@@ -5,6 +5,7 @@
 #include <unordered_map>
 #include <unordered_set>
 #include <set>
+#include <deque>
 #include <functional>
 
 #include <QtOpenGL/QGL>
@@ -285,23 +286,26 @@ public:
     void setIBLMaps(std::shared_ptr<Texture>, std::shared_ptr<Texture>);
 
     const glm::mat4x4& viewMatrix() const;
+    const glm::vec3& viewPosition() const;
     const glm::mat4x4& projectionMatrix() const;
 
 private:
     using DrawDataType = std::pair<std::shared_ptr<Drawable>, utils::Transform>;
-    struct DrawDataComparator
-    {
-        using is_transparent = void;
-        bool operator ()(const DrawDataType&, const DrawDataType&) const;
-        bool operator ()(const DrawDataType&, LayerId) const;
-    };
-    using DrawDataContainer = std::multiset<DrawDataType, DrawDataComparator>;
+    using DrawDataLayerContainer = std::deque<DrawDataType>;
+    using DrawDataContainer = std::array<DrawDataLayerContainer, numElementsLayerId()>;
 
-    void renderShadowLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
-    void renderBackgroundLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
-    void renderSolidLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
-    void renderTransparentLayer(DrawDataContainer::iterator, DrawDataContainer::iterator);
-    void setupAndRender(DrawDataContainer::iterator, DrawDataContainer::iterator);
+    enum class FaceRenderOrder
+    {
+        OnlyFront,
+        OnlyBack,
+        IndirectOrder
+    };
+
+    void renderShadowLayer(DrawDataLayerContainer&);
+    void renderBackgroundLayer(DrawDataLayerContainer&);
+    void renderSolidLayer(DrawDataLayerContainer&);
+    void renderTransparentLayer(DrawDataLayerContainer&);
+    void setupAndRender(DrawDataLayerContainer&, FaceRenderOrder);
 
     GLbitfield calcClearMask() const;
     static std::string precompileShader(const QString& dir, QByteArray&);

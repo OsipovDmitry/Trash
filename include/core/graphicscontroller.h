@@ -22,10 +22,9 @@ class CORESHARED_EXPORT GraphicsController : public AbstractController
     PIMPL(GraphicsController)
 
 public:
-    void addCamera(uint32_t, std::shared_ptr<Camera>);
-    void removeCamera(uint32_t);
-    std::shared_ptr<const Camera> camera(uint32_t) const;
-    std::shared_ptr<Camera> camera(uint32_t);
+    void setMainScene(std::shared_ptr<Scene>);
+    std::shared_ptr<Scene> mainScene();
+    std::shared_ptr<const Scene> mainScene() const;
 
 protected:
     void doWork(std::shared_ptr<Message>) override;

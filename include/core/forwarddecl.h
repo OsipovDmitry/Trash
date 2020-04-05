@@ -18,6 +18,7 @@ class AudioController;
 class AbstractGame;
 class NodeUserData;
 class Node;
+class AutoTransformNode;
 class DrawableNode;
 class TextNode;
 class ModelNode;

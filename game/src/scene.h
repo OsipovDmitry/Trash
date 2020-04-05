@@ -22,8 +22,8 @@ public:
     Scene();
     ~Scene();
 
-    std::shared_ptr<core::Camera> camera();
-    std::shared_ptr<const core::Camera> camera() const;
+    std::shared_ptr<core::Scene> scene();
+    std::shared_ptr<const core::Scene> scene() const;
 
     void detachObject(std::shared_ptr<Object>);
     void attachObject(std::shared_ptr<Object>, std::shared_ptr<core::Node> = nullptr);
@@ -34,7 +34,7 @@ public:
 
 protected:
     std::unordered_set<std::shared_ptr<Object>> m_objects;
-    std::shared_ptr<core::Camera> m_camera;
+    std::shared_ptr<core::Scene> m_scene;
 
 };
 

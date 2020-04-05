@@ -121,9 +121,27 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
                     return nullptr;
             }
 
+            int32_t numGeneratedMimmaps = numMipmaps;
+            bool autoGenMipmaps = false;
+            int filter = (numMipmaps > 1) ? 3 : 2;
+
+            if (document.HasMember("AutoGenMipmaps"))
+            {
+                autoGenMipmaps = document["AutoGenMipmaps"].GetBool();
+                if (autoGenMipmaps)
+                {
+                    filter = 3;
+                    numGeneratedMimmaps = 1 + glm::floor(glm::log2(static_cast<float>(glm::max(images[0]->width(), images[0]->height()))));
+                }
+            }
+
+            if (document.HasMember("Filter"))
+                filter = document["Filter"].GetInt();
+
+
             m_functions.glBindTexture(target, id);
-            m_functions.glTexStorage2D(target, numMipmaps, internalFormat, images[0]->width(), images[0]->height());
-            m_functions.glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, numMipmaps-1);
+            m_functions.glTexStorage2D(target, numGeneratedMimmaps, internalFormat, images[0]->width(), images[0]->height());
+            m_functions.glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, numGeneratedMimmaps-1);
 
             loadImages(m_functions, target, 0, images);
 
@@ -141,20 +159,13 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
                 loadImages(m_functions, target, n, images);
             }
 
-            bool autoGenMipmaps = false;
-            int filter = (numMipmaps > 1) ? 3 : 2;
-
-            if (document.HasMember("AutoGenMipmaps"))
-                autoGenMipmaps = document["AutoGenMipmaps"].GetBool();
-
-            if (document.HasMember("Filter"))
-                filter = document["Filter"].GetInt();
-
             object = std::make_shared<Texture>(id, target);
             object->setFilter(filter);
 
             if (autoGenMipmaps)
+            {
                 object->generateMipmaps();
+            }
 
             if (document.HasMember("Wrap"))
             {
@@ -163,8 +174,6 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
                     return nullptr;
                 object->setWrap(wrap);
             }
-
-
         }
         else
         {

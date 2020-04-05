@@ -1,7 +1,8 @@
 #include <core/camera.h>
+#include <core/scene.h>
 
 #include "graphicscontrollerprivate.h"
-#include "cameraprivate.h"
+#include "sceneprivate.h"
 
 namespace trash
 {
@@ -21,14 +22,14 @@ void GraphicsControllerPrivate::resize(int32_t width, int32_t height)
 {
     currentViewport = glm::ivec4(0, 0, width, height);
 
-    for (auto& camera : cameras)
-        camera.second->setViewport(currentViewport);
+    if (scene)
+        scene->camera()->setViewport(currentViewport);
 }
 
 void GraphicsControllerPrivate::updateScene(uint64_t time, uint64_t dt)
 {
-    for (auto& camera : cameras)
-        camera.second->m().renderScene(time, dt);
+    if (scene)
+        scene->m().renderScene(time, dt);
 }
 
 } // namespace

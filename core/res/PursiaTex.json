@@ -3,5 +3,5 @@
         "Image" : "PursiaTex.png"
     },
     
-    "AutoGenMipmaps": false
+    "AutoGenMipmaps": true
 }

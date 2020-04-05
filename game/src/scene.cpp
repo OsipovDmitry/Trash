@@ -14,25 +14,24 @@ namespace game
 {
 
 Scene::Scene()
-    : m_camera(std::make_shared<core::Camera>())
+    : m_scene(std::make_shared<core::Scene>())
 {
     auto& graphicsController = core::Core::instance().graphicsController();
-    graphicsController.addCamera(0, m_camera);
+    graphicsController.setMainScene(m_scene);
 }
 
 Scene::~Scene()
 {
-    core::Core::instance().graphicsController().removeCamera(0);
 }
 
-std::shared_ptr<core::Camera> Scene::camera()
+std::shared_ptr<core::Scene> Scene::scene()
 {
-    return m_camera;
+    return m_scene;
 }
 
-std::shared_ptr<const core::Camera> Scene::camera() const
+std::shared_ptr<const core::Scene> Scene::scene() const
 {
-    return m_camera;
+    return m_scene;
 }
 
 void Scene::detachObject(std::shared_ptr<Object> object)
@@ -50,8 +49,8 @@ void Scene::attachObject(std::shared_ptr<Object> object, std::shared_ptr<core::N
         object->m_scene->detachObject(object);
 
     if (!parentNode)
-        parentNode = m_camera->scene()->rootNode();
-    assert(parentNode->relationDegree(m_camera->scene()->rootNode()) != -1);
+        parentNode = m_scene->rootNode();
+    assert(parentNode->relationDegree(m_scene->rootNode()) != -1);
 
     m_objects.insert(object);
     object->m_scene = this;
@@ -66,7 +65,7 @@ void Scene::update(uint64_t time , uint64_t dt)
 
 std::shared_ptr<Object> Scene::findObject(core::Node *node) const
 {
-    if (node->relationDegree(m_camera->scene()->rootNode()) == -1)
+    if (node->relationDegree(m_scene->rootNode()) == -1)
         return nullptr;
 
     std::shared_ptr<ObjectUserData> data = nullptr;

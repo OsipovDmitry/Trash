@@ -1,4 +1,5 @@
 #include <core/core.h>
+#include <core/scene.h>
 #include <core/camera.h>
 #include <core/graphicscontroller.h>
 
@@ -9,32 +10,22 @@ namespace trash
 namespace core
 {
 
-void GraphicsController::addCamera(uint32_t id, std::shared_ptr<Camera> camera)
+void GraphicsController::setMainScene(std::shared_ptr<Scene> scene)
 {
     auto& gcPrivate = m();
-    gcPrivate.cameras.insert({id, camera});
-    camera->setViewport(gcPrivate.currentViewport);
+    gcPrivate.scene = scene;
+    gcPrivate.scene->camera()->setViewport(gcPrivate.currentViewport);
 }
 
-void GraphicsController::removeCamera(uint32_t id)
+std::shared_ptr<Scene> GraphicsController::mainScene()
 {
-    m().cameras.erase(id);
+    return m().scene;
 }
 
-std::shared_ptr<const Camera> GraphicsController::camera(uint32_t id) const
+std::shared_ptr<const Scene> GraphicsController::mainScene() const
 {
-    auto& cameras = m().cameras;
-    auto it = cameras.find(id);
-    return (it == cameras.end()) ? nullptr : it->second;
+    return m().scene;
 }
-
-std::shared_ptr<Camera> GraphicsController::camera(uint32_t id)
-{
-    auto& cameras = m().cameras;
-    auto it = cameras.find(id);
-    return (it == cameras.end()) ? nullptr : it->second;
-}
-
 
 void GraphicsController::doWork(std::shared_ptr<AbstractController::Message> msg)
 {

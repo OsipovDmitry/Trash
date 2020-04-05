@@ -82,11 +82,8 @@ const utils::Transform &NodePrivate::getGlobalTransform()
 {
     if (isGlobalTransformDirty)
     {
-        globalTransform = transform;
-
         auto parent = thisNode.parent();
-        if (parent)
-            globalTransform = parent->globalTransform() * globalTransform;
+        globalTransform = parent ? parent->globalTransform() * transform : transform;
 
         isGlobalTransformDirty = false;
     }

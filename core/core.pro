@@ -30,7 +30,8 @@ HEADERS += \
     src/image.h \
     src/texture.inl \
     src/drawablenodeprivate.h \
-    src/textnodeprivate.h
+    src/textnodeprivate.h \
+    src/autotransformnodeprivate.h
 
 SOURCES += \
     src/hdrloader/hdrloader.cpp \
@@ -60,7 +61,9 @@ SOURCES += \
     src/drawablenode.cpp \
     src/drawablenodeprivate.cpp \
     src/textnode.cpp \
-    src/textnodeprivate.cpp
+    src/textnodeprivate.cpp \
+    src/autotransformnode.cpp \
+    src/autotransformnodeprivate.cpp
 
 LIBS += \
 #    -lassimp-vc140-mt

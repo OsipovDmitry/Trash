@@ -49,13 +49,14 @@ public:
     void updateShadowMaps();
     void updateShadowMap(std::shared_ptr<Light>);
 
-    void renderScene(uint64_t, uint64_t, trash::core::CameraPrivate &);
-    PickData pickScene(int32_t, int32_t, const trash::core::CameraPrivate &);
+    void renderScene(uint64_t, uint64_t);
+    PickData pickScene(int32_t, int32_t);
 
     std::pair<float, float> calculateZPlanes(const glm::mat4x4&, float) const;
 
     Scene& thisScene;
     std::shared_ptr<SceneRootNode> rootNode;
+    std::shared_ptr<Camera> camera;
     std::shared_ptr<LightsList> lights;
     std::shared_ptr<Buffer> lightsUbo;
     std::shared_ptr<Texture> lightsShadowMaps;

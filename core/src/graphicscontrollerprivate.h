@@ -20,7 +20,7 @@ class Renderer;
 class GraphicsControllerPrivate : public AbstractControllerPrivate
 {
 public:
-    std::unordered_map<uint32_t, std::shared_ptr<Camera>> cameras;
+    std::shared_ptr<Scene> scene;
     glm::ivec4 currentViewport;
 
     GraphicsControllerPrivate();

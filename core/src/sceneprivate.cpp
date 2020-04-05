@@ -43,6 +43,7 @@ Scene *SceneRootNode::scene() const
 ScenePrivate::ScenePrivate(Scene *scene)
     : thisScene(*scene)
     , rootNode(std::make_shared<SceneRootNode>(scene))
+    , camera(std::make_shared<Camera>())
     , lights(std::make_shared<LightsList>())
     , backgroundDrawable(std::make_shared<BackgroundDrawable>())
 {
@@ -215,8 +216,10 @@ void ScenePrivate::updateShadowMap(std::shared_ptr<Light> light)
     renderer.render(lightPrivate.shadowMapFramebuffer);
 }
 
-void ScenePrivate::renderScene(uint64_t time, uint64_t dt, CameraPrivate& cameraPrivate)
+void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
 {
+    auto& cameraPrivate = camera->m();
+
     cameraPrivate.setZPlanes(calculateZPlanes(cameraPrivate.calcProjectionMatrix({0.f, 1.f}) * cameraPrivate.getViewMatrix(), CameraMinZNear));
     utils::Frustum frustum(cameraPrivate.getProjectionMatrix() * cameraPrivate.getViewMatrix());
 
@@ -273,10 +276,11 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt, CameraPrivate& camera
 
 }
 
-PickData ScenePrivate::pickScene(int32_t xi, int32_t yi, const CameraPrivate& cameraPrivate)
+PickData ScenePrivate::pickScene(int32_t xi, int32_t yi)
 {
     static uint32_t backgroundId = 0xFFFFFFFF;
 
+    auto& cameraPrivate = camera->m();
     auto& renderer = Renderer::instance();
     renderer.setViewport(cameraPrivate.viewport);
     renderer.setViewMatrix(cameraPrivate.getProjectionMatrix());

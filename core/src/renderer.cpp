@@ -529,6 +529,7 @@ Renderer::Renderer(QOpenGLExtraFunctions& functions, GLuint defaultFbo)
     : m_functions(functions)
     , m_defaultFbo(defaultFbo)
     , m_resourceStorage(std::make_unique<ResourceStorage>())
+    , m_drawData()
     , m_projMatrix(1.0f)
     , m_viewMatrix(1.0f)
 {
@@ -794,12 +795,12 @@ void Renderer::bindUniformBuffer(std::shared_ptr<Buffer> buffer, GLuint unit)
 
 void Renderer::draw(std::shared_ptr<Drawable> drawable, const utils::Transform& transform)
 {
-    m_drawData.insert(std::make_pair(drawable, transform));
+    m_drawData[castFromLayerId(drawable->layerId())].push_back(std::make_pair(drawable, transform));
 }
 
 void Renderer::render(std::shared_ptr<Framebuffer> framebuffer)
 {
-    using RenderMethod = void(Renderer::*)(DrawDataContainer::iterator, DrawDataContainer::iterator);
+    using RenderMethod = void(Renderer::*)(DrawDataLayerContainer&);
     static const std::array<RenderMethod, numElementsLayerId()> renderMethods {
         &Renderer::renderSolidLayer, // render selection layer as solid
         &Renderer::renderShadowLayer, // render shadows layer as solid
@@ -817,15 +818,12 @@ void Renderer::render(std::shared_ptr<Framebuffer> framebuffer)
 
     m_functions.glViewport(m_viewport.x, m_viewport.y, m_viewport.z, m_viewport.w);
 
-    for (auto begin = m_drawData.begin(); begin != m_drawData.end(); )
+    for (uint32_t layerId = 0; layerId < numElementsLayerId(); ++layerId)
     {
-        auto layerId = begin->first->layerId();
-
-        auto end = m_drawData.upper_bound(*begin);
-        (this->*renderMethods[castFromLayerId(layerId)])(begin, end);
-        begin = end;
+        auto& dataLayer = m_drawData.at(layerId);
+        (this->*renderMethods[layerId])(dataLayer);
+        dataLayer.clear();
     }
-    m_drawData.clear();
 
     m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
 }
@@ -908,43 +906,47 @@ const glm::mat4x4 &Renderer::projectionMatrix() const
     return m_projMatrix;
 }
 
-void Renderer::renderShadowLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
+void Renderer::renderShadowLayer(DrawDataLayerContainer& data)
 {
     m_functions.glEnable(GL_DEPTH_TEST);
-    m_functions.glCullFace(GL_FRONT);
-    setupAndRender(begin, end);
+    setupAndRender(data, FaceRenderOrder::OnlyBack);
 }
 
-void Renderer::renderBackgroundLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
+void Renderer::renderBackgroundLayer(DrawDataLayerContainer& data)
 {
     m_functions.glDisable(GL_DEPTH_TEST);
-    m_functions.glCullFace(GL_BACK);
-    setupAndRender(begin, end);
+    setupAndRender(data, FaceRenderOrder::OnlyFront);
 }
 
-void Renderer::renderSolidLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
+void Renderer::renderSolidLayer(DrawDataLayerContainer& data)
 {
     m_functions.glEnable(GL_DEPTH_TEST);
-    m_functions.glCullFace(GL_BACK);
-    setupAndRender(begin, end);
+    setupAndRender(data, FaceRenderOrder::OnlyFront);
 }
 
-void Renderer::renderTransparentLayer(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
+void Renderer::renderTransparentLayer(DrawDataLayerContainer& data)
 {
+    std::sort(data.begin(), data.end(), [this](const DrawDataLayerContainer::value_type& first, const DrawDataLayerContainer::value_type& second) -> bool
+    {
+        const glm::vec3 v1 = first.second.translation - m_viewPosition;
+        const glm::vec3 v2 = second.second.translation - m_viewPosition;
+
+        return glm::dot(v1,v1) > glm::dot(v2,v2);
+    });
+
     m_functions.glEnable(GL_DEPTH_TEST);
-    m_functions.glCullFace(GL_BACK);
     m_functions.glEnable(GL_BLEND);
     m_functions.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    setupAndRender(begin, end);
+    setupAndRender(data, FaceRenderOrder::IndirectOrder);
     m_functions.glDisable(GL_BLEND);
 }
 
-void Renderer::setupAndRender(DrawDataContainer::iterator begin, DrawDataContainer::iterator end)
+void Renderer::setupAndRender(DrawDataLayerContainer& data, FaceRenderOrder faceRenderOrder)
 {
-    for (; begin != end; ++begin)
+    for (const auto& drawData : data)
     {
-        auto drawable = begin->first;
-        const auto& transform = begin->second;
+        auto drawable = drawData.first;
+        const auto& transform = drawData.second;
 
         auto renderProgram = drawable->renderProgram();
         m_functions.glUseProgram(renderProgram->id);
@@ -1018,8 +1020,28 @@ void Renderer::setupAndRender(DrawDataContainer::iterator begin, DrawDataContain
         if (mesh)
         {
             m_functions.glBindVertexArray(mesh->id);
-            for (auto ibo : mesh->indexBuffers)
-                m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
+            switch (faceRenderOrder) {
+            case FaceRenderOrder::OnlyBack:
+                m_functions.glCullFace(GL_FRONT);
+                for (auto ibo : mesh->indexBuffers)
+                    m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
+                break;
+            case FaceRenderOrder::OnlyFront:
+                m_functions.glCullFace(GL_BACK);
+                for (auto ibo : mesh->indexBuffers)
+                    m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
+                break;
+            case FaceRenderOrder::IndirectOrder:
+                m_functions.glCullFace(GL_FRONT);
+                for (auto ibo : mesh->indexBuffers)
+                    m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
+                m_functions.glCullFace(GL_BACK);
+                for (auto ibo : mesh->indexBuffers)
+                    m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
+                break;
+            default:
+                break;
+            }
             m_functions.glBindVertexArray(0);
         }
 
@@ -1074,16 +1096,6 @@ std::string Renderer::precompileShader(const QString &dir, QByteArray &text)
     }
 
     return "";
-}
-
-bool Renderer::DrawDataComparator::operator ()(const Renderer::DrawDataType& left, const Renderer::DrawDataType& right) const
-{
-    return left.first->layerId() < right.first->layerId();
-}
-
-bool Renderer::DrawDataComparator::operator ()(const Renderer::DrawDataType& left, LayerId id) const
-{
-    return left.first->layerId() < id;
 }
 
 } // namespace

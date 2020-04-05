@@ -11,4 +11,5 @@ done 6) develop shadow maps
 11) ScenePrivate::renderScene updates all dirty shadow maps. It should update shadow maps that are needed in this frame
 done 12) develop BackgroundDrawable
 done 13) develop TextNode, loading fonts (https://evanw.github.io/font-texture-generator/)
-14) why is base color black when there are no lighting ? 
+14) why is base color black when there are no lighting ?
+done 15) develop AutoTransformNode that is always orientaed to camera

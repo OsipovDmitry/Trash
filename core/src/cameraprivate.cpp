@@ -51,15 +51,5 @@ glm::mat4x4 CameraPrivate::calcProjectionMatrix(const std::pair<float, float>& z
                 glm::perspective(fov, aspect, zDistances.first, zDistances.second);
 }
 
-void CameraPrivate::renderScene(uint64_t time, uint64_t dt)
-{
-    scene->m().renderScene(time, dt, *this);
-}
-
-PickData CameraPrivate::pickScene(int32_t xi, int32_t yi)
-{
-    return scene->m().pickScene(xi, yi, *this);
-}
-
 } // namespace
 } // namespace

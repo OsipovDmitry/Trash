@@ -13,14 +13,10 @@ namespace trash
 namespace core
 {
 
-struct PickData;
-
 class CameraPrivate
 {
 public:
     mutable glm::mat4x4 viewMatrixCache = glm::mat4x4(1.0f), projMatrixCache = glm::mat4x4(1.0f);
-
-    std::shared_ptr<Scene> scene;
 
     glm::ivec4 viewport = glm::ivec4(0,0,512,512);
 
@@ -37,9 +33,6 @@ public:
     const glm::mat4x4& getViewMatrix() const;
     const glm::mat4x4& getProjectionMatrix() const;
     glm::mat4x4 calcProjectionMatrix(const std::pair<float, float>&) const;
-
-    void renderScene(uint64_t, uint64_t);
-    PickData pickScene(int32_t, int32_t);
 };
 
 } // namespace

@@ -84,7 +84,7 @@ void Game::doInitialize()
             l->setSpotAngles(glm::vec2(1.5f, 2.1f));
             l->setColor(colors[c++]);
 
-            m_->scene->camera()->scene()->attachLight(l);
+            m_->scene->scene()->attachLight(l);
         }
 
     auto l = std::make_shared<core::Light>(core::LightType::Direction);
@@ -94,12 +94,12 @@ void Game::doInitialize()
     l->setColor(glm::vec3(0.5f));
     l->setSpotAngles(glm::vec2(1.0f, 5000.0f));
 
-    m_->scene->camera()->scene()->attachLight(l);
+    m_->scene->scene()->attachLight(l);
 
     const float r = 400;
-    m_->scene->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.4f);
+    m_->scene->scene()->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.4f);
     //m_->scene->camera()->setProjectionMatrixAsOrtho(2000.0f);
-    m_->scene->camera()->setViewMatrix(glm::lookAt(glm::vec3(5 * r, 2.5f * r, -5 * r), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+    m_->scene->scene()->camera()->setViewMatrix(glm::lookAt(glm::vec3(5 * r, 2.5f * r, -5 * r), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 
 //    const float r = 6;
 //    m_->scene->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.25f, 1.0f, 5000.0f);
@@ -120,7 +120,7 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
 
     const float r = 300;
     const float t = time * 0.00005f + 10.0f;
-    m_->scene->camera()->setViewMatrix(glm::lookAt(glm::vec3(11 * r * cos(t), 3 * r, -11 * r * sin(t)), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+    m_->scene->scene()->camera()->setViewMatrix(glm::lookAt(glm::vec3(11 * r * cos(t), 3 * r, -11 * r * sin(t)), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
 
 //    for (auto l : m_->scene->camera()->scene()->lights())
 //    {
@@ -143,7 +143,7 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
 
 void Game::doMouseClick(int x, int y)
 {
-    auto pickData = m_->scene->camera()->pickNode(x, y);
+    auto pickData = m_->scene->scene()->pickScene(x, y);
     if (pickData.node)
     {
         auto object = m_->scene->findObject(pickData.node.get());

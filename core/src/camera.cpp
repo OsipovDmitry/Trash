@@ -11,21 +11,13 @@ namespace trash
 namespace core
 {
 
-Camera::Camera(std::shared_ptr<Scene> scene_)
+Camera::Camera()
     : m_(std::make_unique<CameraPrivate>())
 {
-    m_->scene = scene_;
-    if (!m_->scene)
-        m_->scene = std::make_shared<Scene>();
 }
 
 Camera::~Camera()
 {
-}
-
-PickData Camera::pickNode(int32_t xi, int32_t yi)
-{
-    return m_->pickScene(xi, yi);
 }
 
 void Camera::setViewport(const glm::ivec4& size)
@@ -49,16 +41,6 @@ void Camera::setClearDepth(bool state, float value)
 {
     m_->clearDepthBuffer = state;
     m_->clearDepth = value;
-}
-
-std::shared_ptr<Scene> Camera::scene()
-{
-    return m_->scene;
-}
-
-std::shared_ptr<const Scene> Camera::scene() const
-{
-    return m_->scene;
 }
 
 const glm::mat4x4& Camera::viewMatrix() const

@@ -2,6 +2,7 @@
 
 #include <utils/transform.h>
 #include <core/modelnode.h>
+#include <core/autotransformnode.h>
 #include <core/textnode.h>
 
 #include "person.h"
@@ -17,9 +18,12 @@ Person::Person(const std::string &modelFilename)
     m_modelNode = std::make_shared<core::ModelNode>(modelFilename);
     m_graphicsNode->attach(m_modelNode);
 
-//    auto textNode = std::make_shared<core::TextNode>(modelFilename.substr(0, modelFilename.find('.')), core::TextNodeAlignment::Center, core::TextNodeAlignment::Negative);
-//    textNode->setTransform(utils::Transform::fromTranslation(glm::vec3(0,350.f,0)) * utils::Transform::fromScale(210.0f));
-//    m_graphicsNode->attach(textNode);
+    auto autoTransform = std::make_shared<core::AutoTransformNode>();
+    autoTransform->setTransform(utils::Transform::fromTranslation(glm::vec3(0,350.f,0)) * utils::Transform::fromScale(210.0f));
+    m_graphicsNode->attach(autoTransform);
+
+    auto textNode = std::make_shared<core::TextNode>(modelFilename.substr(0, modelFilename.find('.')), core::TextNodeAlignment::Center, core::TextNodeAlignment::Negative);
+    autoTransform->attach(textNode);
 
     m_modelNode->playAnimation("idle");
     m_state = 0;

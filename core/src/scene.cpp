@@ -16,6 +16,11 @@ Scene::~Scene()
 {
 }
 
+PickData Scene::pickScene(int32_t x, int32_t y) const
+{
+    return m_->pickScene(x, y);
+}
+
 std::shared_ptr<Node> Scene::rootNode()
 {
     return m_->rootNode;
@@ -24,6 +29,16 @@ std::shared_ptr<Node> Scene::rootNode()
 std::shared_ptr<const Node> Scene::rootNode() const
 {
     return m_->rootNode;
+}
+
+std::shared_ptr<Camera> Scene::camera()
+{
+    return m_->camera;
+}
+
+std::shared_ptr<const Camera> Scene::camera() const
+{
+    return m_->camera;
 }
 
 void Scene::attachLight(std::shared_ptr<Light> light)
