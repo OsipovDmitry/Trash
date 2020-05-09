@@ -39,24 +39,10 @@ void NodePrivate::dirtyBoundingBox()
         thisNode.parent()->m().dirtyBoundingBox();
 }
 
-void NodePrivate::dirtyLightIndices()
-{
-    doDirtyLightIndices();
-    for (auto child : thisNode.children())
-        child->m().dirtyLightIndices();
-}
-
-void NodePrivate::dirtyShadowMaps()
-{
-    doDirtyShadowMaps();
-    for (auto child : thisNode.children())
-        child->m().dirtyShadowMaps();
-}
-
 void NodePrivate::doUpdate(uint64_t, uint64_t)
 {
-    auto& renderer = Renderer::instance();
-    renderer.draw(std::make_shared<BoxDrawable>(getBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
+    //auto& renderer = Renderer::instance();
+    //renderer.draw(std::make_shared<BoxDrawable>(getBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
 }
 
 Scene *NodePrivate::getScene() const
@@ -66,12 +52,11 @@ Scene *NodePrivate::getScene() const
     while (node->parent())
         node = node->parent();
 
+    Scene *scene = nullptr;
     if (auto sceneRootNode = dynamic_cast<SceneRootNode*>(node))
-    {
-        return sceneRootNode->scene();
-    }
+        scene = sceneRootNode->scene();
 
-    return nullptr;
+    return scene;
 }
 
 const utils::BoundingBox &NodePrivate::getBoundingBox()

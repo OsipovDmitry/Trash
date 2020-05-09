@@ -49,6 +49,9 @@ public:
     void updateShadowMaps();
     void updateShadowMap(std::shared_ptr<Light>);
 
+    static void dirtyNodeLightIndices(Node&);
+    static void dirtyNodeShadowMaps(Node&);
+
     void renderScene(uint64_t, uint64_t);
     PickData pickScene(int32_t, int32_t);
 

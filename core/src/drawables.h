@@ -167,7 +167,7 @@ public:
 class TextDrawable : public Drawable
 {
 public:
-    TextDrawable(std::shared_ptr<Font>, const std::string&, TextNodeAlignment, TextNodeAlignment, const glm::vec4&, float, utils::BoundingBox&);
+    TextDrawable(std::shared_ptr<Font>, const std::string&, TextNodeAlignment, TextNodeAlignment, const glm::vec4&, float);
 
     LayerId layerId() const override { return LayerId::TransparencyGeometry; }
     std::shared_ptr<RenderProgram> renderProgram() const override;

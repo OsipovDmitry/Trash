@@ -5,11 +5,13 @@ done 4) why aren't there setting up projMatrix to Renderer in CameraPrivate::pic
 done 5) Use current file path for pre-compile shaders
 done 6) develop shadow maps
 7) change Model::Animation representation
-8) remove scale from utils::Transform
+decline 8) remove scale from utils::Transform
 9) add supporting viewProjection and modelViewProjection matrices in shaders
 10) improve rendering pipline in Renderer class. Now we have a conflict when we are trying to render shadow maps and common scene
 11) ScenePrivate::renderScene updates all dirty shadow maps. It should update shadow maps that are needed in this frame
 done 12) develop BackgroundDrawable
 done 13) develop TextNode, loading fonts (https://evanw.github.io/font-texture-generator/)
 14) why is base color black when there are no lighting ?
-done 15) develop AutoTransformNode that is always orientaed to camera
+done 15) develop AutoTransformNode that is always oriented to camera
+done 16) replace bounding spheres to bounding boxes for scene graph
+17) sometimes shading jumps on static models

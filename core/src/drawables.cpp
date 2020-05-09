@@ -361,7 +361,7 @@ void BackgroundDrawable::prerender() const
     program->setUniform(program->uniformLocation("u_roughness"), 0.05f);
 }
 
-TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& color_, float lineSpacing, utils::BoundingBox &bb)
+TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& color_, float lineSpacing)
     : fontMap(font->texture),
       color(color_)
 {
@@ -431,8 +431,6 @@ TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, T
 
     for (auto& v : vertices)
         v += delta;
-
-    bb = utils::BoundingBox(vertices.data(), vertices.size());
 
     geometry = std::make_shared<Mesh>();
     geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 2, glm::value_ptr(*vertices.data()), GL_STATIC_DRAW));

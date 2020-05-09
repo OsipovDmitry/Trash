@@ -8,7 +8,6 @@ namespace trash
 namespace core
 {
 
-class Drawable;
 class DrawableNodePrivate;
 
 class CORESHARED_EXPORT DrawableNode : public Node
@@ -18,13 +17,14 @@ class CORESHARED_EXPORT DrawableNode : public Node
 public:
     DrawableNode();
 
-    bool isDrawableNode() const override;
-
-    void addDrawable(std::shared_ptr<Drawable>);
-    void removeDrawable(std::shared_ptr<Drawable>);
+    DrawableNode *asDrawableNode() override;
+    const DrawableNode *asDrawableNode() const override;
 
 protected:
     DrawableNode(NodePrivate*);
+
+    void doAttach() override;
+    void doDetach() override;
 
 };
 

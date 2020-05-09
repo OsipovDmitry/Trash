@@ -19,7 +19,26 @@ DrawableNodePrivate::DrawableNodePrivate(Node &node)
     , isLocalBoundingBoxDirty(true)
 
 {
+}
 
+void DrawableNodePrivate::addDrawable(std::shared_ptr<Drawable> drawable)
+{
+    drawables.insert(drawable);
+    isLocalBoundingBoxDirty = true;
+
+    dirtyBoundingBox();
+    doDirtyLightIndices();
+    doDirtyShadowMaps();
+}
+
+void DrawableNodePrivate::removeDrawable(std::shared_ptr<Drawable> drawable)
+{
+    drawables.erase(drawable);
+    isLocalBoundingBoxDirty = true;
+
+    dirtyBoundingBox();
+    doDirtyLightIndices();
+    doDirtyShadowMaps();
 }
 
 const utils::BoundingBox &DrawableNodePrivate::getLocalBoundingBox()
@@ -38,63 +57,11 @@ const utils::BoundingBox &DrawableNodePrivate::getLocalBoundingBox()
 
 std::shared_ptr<LightIndicesList> DrawableNodePrivate::getLightIndices()
 {
-    updateLightIndices();
+    doUpdateLightIndices();
     return lightIndices;
 }
 
-void DrawableNodePrivate::doUpdate(uint64_t dt, uint64_t time)
-{
-    NodePrivate::doUpdate(dt, time);
-
-    updateLightIndices();
-
-    auto& renderer = Renderer::instance();
-    for (auto& drawable : drawables)
-        renderer.draw(drawable, getGlobalTransform());
-
-    //renderer.draw(std::make_shared<BoxDrawable>(getLocalBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
-}
-
-void DrawableNodePrivate::doPick(uint32_t id)
-{
-    auto& renderer = Renderer::instance();
-
-    for (auto& drawable : drawables)
-        renderer.draw(drawable->selectionDrawable(id), getGlobalTransform());
-}
-
-void DrawableNodePrivate::doUpdateShadowMaps()
-{
-    auto& renderer = Renderer::instance();
-
-    for (auto& drawable : drawables)
-        renderer.draw(drawable->shadowDrawable(), getGlobalTransform());
-}
-
-void DrawableNodePrivate::doDirtyLightIndices()
-{
-    isLightIndicesDirty = true;
-}
-
-void DrawableNodePrivate::doDirtyShadowMaps()
-{
-    auto* scene = getScene();
-    if (!scene)
-        return;
-
-    auto& scenePrivate = scene->m();
-    auto lightsList = scene->lights();
-    auto lightIndicesList = getLightIndices();
-
-    for (auto index : *lightIndicesList)
-    { // add check for including bounding sphere of this node to light's frustum
-        if (index != -1)
-            scenePrivate.dirtyShadowMap(lightsList->at(static_cast<size_t>(index)).get());
-    }
-
-}
-
-void DrawableNodePrivate::updateLightIndices()
+void DrawableNodePrivate::doUpdateLightIndices()
 {
     if (isLightIndicesDirty)
     {
@@ -132,6 +99,72 @@ void DrawableNodePrivate::updateLightIndices()
     }
 }
 
+void DrawableNodePrivate::doUpdateShadowMaps()
+{
+    auto& renderer = Renderer::instance();
+
+    for (auto& drawable : drawables)
+        if (auto shadowDrawable = drawable->shadowDrawable())
+            renderer.draw(shadowDrawable, getGlobalTransform());
+}
+
+void DrawableNodePrivate::doDirtyLightIndices()
+{
+    isLightIndicesDirty = true;
+}
+
+void DrawableNodePrivate::doDirtyShadowMaps()
+{
+    auto* scene = getScene();
+    if (!scene)
+        return;
+
+    auto& scenePrivate = scene->m();
+    auto lightsList = scene->lights();
+    auto lightIndicesList = getLightIndices();
+
+    for (auto index : *lightIndicesList)
+    { // add check for including bounding box of this node to light's frustum
+        if (index != -1)
+            scenePrivate.dirtyShadowMap(lightsList->at(static_cast<size_t>(index)).get());
+    }
+}
+
+void DrawableNodePrivate::doUpdate(uint64_t dt, uint64_t time)
+{
+    NodePrivate::doUpdate(dt, time);
+    doUpdateLightIndices();
+
+    auto& renderer = Renderer::instance();
+    for (auto& drawable : drawables)
+        renderer.draw(drawable, getGlobalTransform());
+
+    //renderer.draw(std::make_shared<BoxDrawable>(getLocalBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
+}
+
+void DrawableNodePrivate::doPick(uint32_t id)
+{
+    NodePrivate::doPick(id);
+
+    auto& renderer = Renderer::instance();
+
+    for (auto& drawable : drawables)
+        if (auto selectionDrawable = drawable->selectionDrawable(id))
+            renderer.draw(selectionDrawable, getGlobalTransform());
+}
+
+void DrawableNodePrivate::doBeforeChangingTransformation()
+{
+    NodePrivate::doBeforeChangingTransformation();
+    ScenePrivate::dirtyNodeShadowMaps(thisNode);
+}
+
+void DrawableNodePrivate::doAfterChangingTransformation()
+{
+    NodePrivate::doAfterChangingTransformation();
+    ScenePrivate::dirtyNodeLightIndices(thisNode);
+    ScenePrivate::dirtyNodeShadowMaps(thisNode);
+}
 
 } // namespace
 } // namespace

@@ -22,20 +22,13 @@ Node::~Node()
 {
 }
 
-bool Node::isDrawableNode() const
-{
-    return false;
-}
-
 void Node::setTransform(const utils::Transform& value)
 {
-    m_->dirtyShadowMaps(); // before transformation
+    m_->doBeforeChangingTransformation();
     m_->transform = value;
     m_->dirtyGlobalTransform();
-    m_->dirtyLightIndices();
-    m_->dirtyShadowMaps(); // after transformation
-    if (parent())
-        parent()->m_->dirtyBoundingBox();
+    m_->dirtyBoundingBox();
+    m_->doAfterChangingTransformation();
 }
 
 const utils::Transform &Node::transform() const
@@ -66,16 +59,12 @@ void Node::setUserData(std::shared_ptr<NodeUserData> data)
 void Node::doAttach()
 {
     m_->dirtyGlobalTransform();
-    m_->dirtyLightIndices();
-    m_->dirtyShadowMaps();
     if (parent())
         parent()->m_->dirtyBoundingBox();
 }
 
 void Node::doDetach()
 {
-    m_->dirtyLightIndices();
-    m_->dirtyShadowMaps();
     m_->dirtyGlobalTransform();
     if (parent())
         parent()->m_->dirtyBoundingBox();

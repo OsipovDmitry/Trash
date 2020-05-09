@@ -19,16 +19,21 @@ class DrawableNodePrivate : public NodePrivate
 public:
     DrawableNodePrivate(Node&);
 
+    void addDrawable(std::shared_ptr<Drawable>);
+    void removeDrawable(std::shared_ptr<Drawable>);
+
     const utils::BoundingBox& getLocalBoundingBox() override;
     std::shared_ptr<LightIndicesList> getLightIndices();
 
+    virtual void doUpdateLightIndices();
+    virtual void doUpdateShadowMaps();
+    virtual void doDirtyLightIndices();
+    virtual void doDirtyShadowMaps();
+
     void doUpdate(uint64_t, uint64_t) override;
     void doPick(uint32_t) override;
-    void doUpdateShadowMaps() override;
-    void doDirtyLightIndices() override;
-    void doDirtyShadowMaps() override;
-
-    void updateLightIndices();
+    void doBeforeChangingTransformation() override;
+    void doAfterChangingTransformation() override;
 
     std::unordered_set<std::shared_ptr<Drawable>> drawables;
     std::shared_ptr<LightIndicesList> lightIndices;

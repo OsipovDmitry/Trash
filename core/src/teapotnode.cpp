@@ -18,10 +18,8 @@ TeapotNode::TeapotNode(const glm::vec3 &baseColor, float metallic, float roughne
 {
     auto& renderer = Renderer::instance();
 
-    if (children().at(0)->isDrawableNode())
+    if (auto drawableNode = children().at(0)->asDrawableNode())
     {
-        auto drawableNode = std::dynamic_pointer_cast<DrawableNode>(children().at(0));
-
         for (auto drawable : drawableNode->m().drawables)
         {
             auto texturedMeshDrawable = std::dynamic_pointer_cast<TexturedMeshDrawable>(drawable);

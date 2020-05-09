@@ -23,16 +23,13 @@ public:
 
     void dirtyGlobalTransform();
     void dirtyBoundingBox();
-    void dirtyLightIndices();
-    void dirtyShadowMaps();
 
     virtual const utils::BoundingBox& getLocalBoundingBox() { return emptyLocalBoundingBox; }
 
     virtual void doUpdate(uint64_t, uint64_t);
     virtual void doPick(uint32_t) {}
-    virtual void doUpdateShadowMaps() {}
-    virtual void doDirtyLightIndices() {}
-    virtual void doDirtyShadowMaps() {}
+    virtual void doBeforeChangingTransformation() {}
+    virtual void doAfterChangingTransformation() {}
 
     Scene *getScene() const;
     const utils::BoundingBox& getBoundingBox();

@@ -53,7 +53,7 @@ ModelNode::ModelNode(const std::string &filename)
             auto meshNode = std::make_shared<DrawableNode>();
             auto& meshNodePrivate = meshNode->m();
             meshNode->setTransform(transform);
-            meshNode->addDrawable(std::make_shared<TexturedMeshDrawable>(mesh->mesh,
+            meshNodePrivate.addDrawable(std::make_shared<TexturedMeshDrawable>(mesh->mesh,
                                                                          diffuseTexture,
                                                                          opacityTexture,
                                                                          normalTexture,

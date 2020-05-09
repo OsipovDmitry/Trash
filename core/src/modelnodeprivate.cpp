@@ -1,11 +1,9 @@
 #include <core/core.h>
 #include <core/node.h>
 
-#include "coreprivate.h"
 #include "modelnodeprivate.h"
-#include "renderwidget.h"
+#include "sceneprivate.h"
 #include "renderer.h"
-#include "drawables.h"
 
 namespace trash
 {
@@ -24,10 +22,11 @@ ModelNodePrivate::ModelNodePrivate(Node& node)
 void ModelNodePrivate::doUpdate(uint64_t time, uint64_t dt)
 {
     NodePrivate::doUpdate(time, dt);
-    dirtyShadowMaps();
 
     if (model->numBones())
     {
+        ScenePrivate::dirtyNodeShadowMaps(thisNode);
+
         if (startAnimation)
         {
             timeStart = time;

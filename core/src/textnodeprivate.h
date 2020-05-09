@@ -3,27 +3,29 @@
 
 #include <core/forwarddecl.h>
 
-#include "nodeprivate.h"
+#include "drawablenodeprivate.h"
 
 namespace trash
 {
 namespace core
 {
 
-class TextDrawable;
-
-class TextNodePrivate : public NodePrivate
+class TextNodePrivate : public DrawableNodePrivate
 {
 public:
     TextNodePrivate(Node&);
     void dirtyDrawable();
     void updateDrawable();
 
-    const utils::BoundingBox& getLocalBoundingBox() override;
     void doUpdate(uint64_t, uint64_t) override;
 
-    utils::BoundingBox localBoundingBox;
-    std::shared_ptr<TextDrawable> drawable;
+    // it's unnecessary to update lighting and shading for textnode
+    void doUpdateLightIndices() override {}
+    void doUpdateShadowMaps() override {}
+    void doDirtyLightIndices() override {}
+    void doDirtyShadowMaps() override {}
+
+    std::shared_ptr<Drawable> textDrawable;
     std::string text;
     glm::vec4 color;
     float lineSpacing;

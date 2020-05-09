@@ -22,7 +22,7 @@ namespace trash
 namespace core
 {
 
-const float ScenePrivate::CameraMinZNear = 1000.0f;
+const float ScenePrivate::CameraMinZNear = 500.0f;
 const float ScenePrivate::ShadowMapMinZNear = 20.0f;
 const int32_t ScenePrivate::ShadowMapSize = 512;
 
@@ -92,7 +92,7 @@ void ScenePrivate::attachLight(std::shared_ptr<Light> light)
         lightsShadowMaps->setCompareFunc(GL_LEQUAL);
     }
 
-    rootNode->m().dirtyLightIndices();
+    ScenePrivate::dirtyNodeLightIndices(*rootNode);
 }
 
 bool ScenePrivate::detachLight(std::shared_ptr<Light> light)
@@ -107,7 +107,7 @@ bool ScenePrivate::detachLight(std::shared_ptr<Light> light)
     *lightIter = nullptr;
     lightPrivate.scene = nullptr;
 
-    rootNode->m().dirtyLightIndices();
+    ScenePrivate::dirtyNodeLightIndices(*rootNode);
     return true;
 }
 
@@ -199,7 +199,8 @@ void ScenePrivate::updateShadowMap(std::shared_ptr<Light> light)
         if (!frustum.contain(node->globalTransform() * node->boundingBox()))
             continue;
 
-        node->m().doUpdateShadowMaps();
+        if (auto drawableNode = node->asDrawableNode())
+            drawableNode->m().doUpdateShadowMaps();
 
         for (auto child : node->children())
             nodes.push(child);
@@ -214,6 +215,40 @@ void ScenePrivate::updateShadowMap(std::shared_ptr<Light> light)
     renderer.setLightsBuffer(nullptr);
     renderer.setShadowMaps(nullptr);
     renderer.render(lightPrivate.shadowMapFramebuffer);
+}
+
+void ScenePrivate::dirtyNodeLightIndices(Node& dirtyNode)
+{
+    std::queue<Node*> nodes;
+    nodes.push(&dirtyNode);
+
+    while (!nodes.empty())
+    {
+        auto node = nodes.front();
+        nodes.pop();
+        if (auto drawableNode = node->asDrawableNode())
+            drawableNode->m().doDirtyLightIndices();
+
+        for (auto child : node->children())
+            nodes.push(child.get());
+    }
+}
+
+void ScenePrivate::dirtyNodeShadowMaps(Node& dirtyNode)
+{
+    std::queue<Node*> nodes;
+    nodes.push(&dirtyNode);
+
+    while (!nodes.empty())
+    {
+        auto node = nodes.front();
+        nodes.pop();
+        if (auto drawableNode = node->asDrawableNode())
+            drawableNode->m().doDirtyShadowMaps();
+
+        for (auto child : node->children())
+            nodes.push(child.get());
+    }
 }
 
 void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
@@ -363,7 +398,7 @@ std::pair<float, float> ScenePrivate::calculateZPlanes(const glm::mat4x4& viewPr
         if (!openFrustum.contain(node->globalTransform() * node->boundingBox()))
             continue;
 
-        if (node->isDrawableNode())
+        if (/*auto drawableNode = */node->asDrawableNode())
         {
             const utils::BoundingBox box = node->globalTransform() * node->m().getLocalBoundingBox();
             if (!box.empty())

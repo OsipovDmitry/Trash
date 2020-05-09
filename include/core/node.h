@@ -21,6 +21,7 @@ public:
     virtual ~NodeUserData() = default;
 };
 
+class DrawableNode;
 class NodePrivate;
 
 class CORESHARED_EXPORT Node : public utils::TreeNode<Node>
@@ -31,7 +32,8 @@ public:
     Node();
     ~Node() override;
 
-    virtual bool isDrawableNode() const;
+    virtual DrawableNode *asDrawableNode() { return nullptr; }
+    virtual const DrawableNode *asDrawableNode() const { return nullptr; }
 
     void setTransform(const utils::Transform&);
     const utils::Transform& transform() const;

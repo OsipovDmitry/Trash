@@ -128,7 +128,7 @@ void LightPrivate::dirtyScene()
     if (scene)
     {
         auto& scenePrivate = scene->m();
-        scenePrivate.rootNode->m().dirtyLightIndices();
+        ScenePrivate::dirtyNodeLightIndices(*scenePrivate.rootNode);
         scenePrivate.dirtyLightParams(thisLight);
         scenePrivate.dirtyShadowMap(thisLight);
     }

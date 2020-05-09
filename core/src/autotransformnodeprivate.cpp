@@ -21,12 +21,9 @@ void AutoTransformNodePrivate::doUpdate(uint64_t dt, uint64_t time)
     auto scene = getScene();
     if (scene)
     {
-        dirtyShadowMaps(); // before transformation
-        transform.rotation = glm::inverse(glm::quat(glm::mat3x3(scene->camera()->viewMatrix())) * thisNode.parent()->globalTransform().rotation);
-        dirtyGlobalTransform();
-        dirtyLightIndices();
-        dirtyShadowMaps(); // after transformation
-        dirtyBoundingBox();
+        auto thisTransform = thisNode.transform();
+        thisTransform.rotation = glm::inverse(glm::quat(glm::mat3x3(scene->camera()->viewMatrix())) * thisNode.parent()->globalTransform().rotation);
+        thisNode.setTransform(thisTransform);
     }
 
     NodePrivate::doUpdate(dt, time);

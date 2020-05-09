@@ -3,6 +3,7 @@
 #include <core/drawablenode.h>
 
 #include "drawablenodeprivate.h"
+#include "sceneprivate.h"
 #include "renderer.h"
 #include "drawables.h"
 
@@ -16,36 +17,33 @@ DrawableNode::DrawableNode()
 {
 }
 
-bool DrawableNode::isDrawableNode() const
+DrawableNode *DrawableNode::asDrawableNode()
 {
-    return true;
+    return this;
 }
 
-void DrawableNode::addDrawable(std::shared_ptr<Drawable> drawable)
+const DrawableNode *DrawableNode::asDrawableNode() const
 {
-    auto& dnPrivate = m();
-
-    dnPrivate.drawables.insert(drawable);
-
-    dnPrivate.dirtyBoundingBox();
-    dnPrivate.doDirtyLightIndices();
-    dnPrivate.doDirtyShadowMaps();
-}
-
-void DrawableNode::removeDrawable(std::shared_ptr<Drawable> drawable)
-{
-    auto& dnPrivate = m();
-
-    dnPrivate.drawables.erase(drawable);
-
-    dnPrivate.dirtyBoundingBox();
-    dnPrivate.doDirtyLightIndices();
-    dnPrivate.doDirtyShadowMaps();
+    return this;
 }
 
 DrawableNode::DrawableNode(NodePrivate *nodePrivate)
     : Node(nodePrivate)
 {
+}
+
+void DrawableNode::doAttach()
+{
+    Node::doAttach();
+    ScenePrivate::dirtyNodeLightIndices(*this);
+    ScenePrivate::dirtyNodeShadowMaps(*this);
+}
+
+void DrawableNode::doDetach()
+{
+    Node::doDetach();
+    ScenePrivate::dirtyNodeLightIndices(*this);
+    ScenePrivate::dirtyNodeShadowMaps(*this);
 }
 
 
