@@ -324,9 +324,9 @@ void Mesh::declareVertexAttribute(VertexAttribute attrib, std::shared_ptr<Vertex
         assert(vb->numComponents == 2 || vb->numComponents == 3);
         auto *p = vb->map(0, vb->numVertices * vb->numComponents * sizeof(float), GL_MAP_READ_BIT);
         if (vb->numComponents == 2)
-            boundingSphere = utils::BoundingSphere(static_cast<glm::vec2*>(p), vb->numVertices);
+            boundingBox = utils::BoundingBox(static_cast<glm::vec2*>(p), vb->numVertices);
         if (vb->numComponents == 3)
-            boundingSphere = utils::BoundingSphere(static_cast<glm::vec3*>(p), vb->numVertices);
+            boundingBox = utils::BoundingBox(static_cast<glm::vec3*>(p), vb->numVertices);
         vb->unmap();
     }
 }

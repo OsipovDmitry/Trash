@@ -24,7 +24,7 @@ ModelNode::ModelNode(const std::string &filename)
     if (mPrivate.model->numBones())
         mPrivate.bonesBuffer = std::make_shared<Buffer>(mPrivate.model->numBones()*sizeof(glm::mat3x4), nullptr, GL_DYNAMIC_DRAW);
 
-    utils::BoundingSphere minimalBoundingSphere;
+    utils::BoundingBox minimalBoundingBox;
     std::queue<std::pair<std::shared_ptr<Model::Node>, utils::Transform>> nodes;
     nodes.push(std::make_pair(mPrivate.model->rootNode, utils::Transform()));
 
@@ -64,7 +64,7 @@ ModelNode::ModelNode(const std::string &filename)
                                                                          meshNodePrivate.lightIndices));
             attach(meshNode);
 
-            minimalBoundingSphere += transform * mesh->mesh->boundingSphere;
+            minimalBoundingBox += transform * mesh->mesh->boundingBox;
         }
 
         for (auto child : node->children())
@@ -72,12 +72,7 @@ ModelNode::ModelNode(const std::string &filename)
     }
 
     for (auto meshNode : children())
-        meshNode->m().minimalBoundingSphere = meshNode->transform().inverse() * minimalBoundingSphere;
-}
-
-bool ModelNode::isModelNode() const
-{
-    return true;
+        meshNode->m().minimalBoundingBox = meshNode->transform().inverse() * minimalBoundingBox;
 }
 
 void ModelNode::showBones(bool state)

@@ -23,18 +23,20 @@ void TextNodePrivate::updateDrawable()
     if (drawableIsDyrty)
     {
         auto& renderer = Renderer::instance();
-        drawable = std::make_shared<TextDrawable>(renderer.loadFont(":/res/PurisaDesc.json"), text, alignX, alignY, color, lineSpacing, localBoundingSphere);
+        drawable = std::make_shared<TextDrawable>(renderer.loadFont(":/res/PurisaDesc.json"), text, alignX, alignY, color, lineSpacing, localBoundingBox);
         drawableIsDyrty = false;
     }
 }
 
-const utils::BoundingSphere &TextNodePrivate::getLocalBoundingSphere()
+const utils::BoundingBox &TextNodePrivate::getLocalBoundingBox()
 {
-    return localBoundingSphere;
+    return localBoundingBox;
 }
 
-void TextNodePrivate::doUpdate(uint64_t, uint64_t)
+void TextNodePrivate::doUpdate(uint64_t dt, uint64_t time)
 {
+    NodePrivate::doUpdate(dt, time);
+
     updateDrawable();
 
     auto& renderer = Renderer::instance();

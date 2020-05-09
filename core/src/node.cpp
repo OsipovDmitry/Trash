@@ -27,11 +27,6 @@ bool Node::isDrawableNode() const
     return false;
 }
 
-bool Node::isModelNode() const
-{
-    return false;
-}
-
 void Node::setTransform(const utils::Transform& value)
 {
     m_->dirtyShadowMaps(); // before transformation
@@ -40,7 +35,7 @@ void Node::setTransform(const utils::Transform& value)
     m_->dirtyLightIndices();
     m_->dirtyShadowMaps(); // after transformation
     if (parent())
-        parent()->m_->dirtyBoundingSphere();
+        parent()->m_->dirtyBoundingBox();
 }
 
 const utils::Transform &Node::transform() const
@@ -53,9 +48,9 @@ const utils::Transform &Node::globalTransform() const
     return m_->getGlobalTransform();
 }
 
-const utils::BoundingSphere &Node::boundingSphere() const
+const utils::BoundingBox &Node::boundingBox() const
 {
-    return m_->getBoundingSphere();
+    return m_->getBoundingBox();
 }
 
 std::shared_ptr<NodeUserData> Node::userData() const
@@ -74,7 +69,7 @@ void Node::doAttach()
     m_->dirtyLightIndices();
     m_->dirtyShadowMaps();
     if (parent())
-        parent()->m_->dirtyBoundingSphere();
+        parent()->m_->dirtyBoundingBox();
 }
 
 void Node::doDetach()
@@ -83,7 +78,7 @@ void Node::doDetach()
     m_->dirtyShadowMaps();
     m_->dirtyGlobalTransform();
     if (parent())
-        parent()->m_->dirtyBoundingSphere();
+        parent()->m_->dirtyBoundingBox();
 }
 
 } // namespace

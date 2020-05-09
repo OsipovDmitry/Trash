@@ -8,6 +8,7 @@ namespace utils
 
 struct Transform;
 struct BoundingSphere;
+struct BoundingBox;
 struct Frustum;
 struct Ray;
 struct Plane;

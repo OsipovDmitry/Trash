@@ -7,7 +7,7 @@
 #include <glm/vec4.hpp>
 
 #include <utils/transform.h>
-#include <utils/boundingsphere.h>
+#include <utils/boundingbox.h>
 #include <core/forwarddecl.h>
 
 namespace trash
@@ -22,32 +22,32 @@ public:
     virtual ~NodePrivate();
 
     void dirtyGlobalTransform();
-    void dirtyBoundingSphere();
+    void dirtyBoundingBox();
     void dirtyLightIndices();
     void dirtyShadowMaps();
 
-    virtual const utils::BoundingSphere& getLocalBoundingSphere() { return emptyLocalBoundingSphere; }
+    virtual const utils::BoundingBox& getLocalBoundingBox() { return emptyLocalBoundingBox; }
 
-    virtual void doUpdate(uint64_t, uint64_t) {}
+    virtual void doUpdate(uint64_t, uint64_t);
     virtual void doPick(uint32_t) {}
     virtual void doUpdateShadowMaps() {}
     virtual void doDirtyLightIndices() {}
     virtual void doDirtyShadowMaps() {}
 
     Scene *getScene() const;
-    const utils::BoundingSphere& getBoundingSphere();
+    const utils::BoundingBox& getBoundingBox();
     const utils::Transform& getGlobalTransform();
 
     Node& thisNode;
     utils::Transform transform, globalTransform;
-    utils::BoundingSphere minimalBoundingSphere, boundingSphere;
+    utils::BoundingBox minimalBoundingBox, boundingBox;
 
     std::shared_ptr<NodeUserData> userData;
 
     bool isGlobalTransformDirty;
-    bool isBoundingSphereDirty;
+    bool isBoundingBoxDirty;
 
-    static const utils::BoundingSphere emptyLocalBoundingSphere;
+    static const utils::BoundingBox emptyLocalBoundingBox;
 };
 
 } // namespace

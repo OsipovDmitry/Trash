@@ -14,7 +14,6 @@ namespace core
 DrawableNode::DrawableNode()
     : Node(new DrawableNodePrivate(*this))
 {
-
 }
 
 bool DrawableNode::isDrawableNode() const
@@ -28,7 +27,7 @@ void DrawableNode::addDrawable(std::shared_ptr<Drawable> drawable)
 
     dnPrivate.drawables.insert(drawable);
 
-    dnPrivate.dirtyBoundingSphere();
+    dnPrivate.dirtyBoundingBox();
     dnPrivate.doDirtyLightIndices();
     dnPrivate.doDirtyShadowMaps();
 }
@@ -39,9 +38,14 @@ void DrawableNode::removeDrawable(std::shared_ptr<Drawable> drawable)
 
     dnPrivate.drawables.erase(drawable);
 
-    dnPrivate.dirtyBoundingSphere();
+    dnPrivate.dirtyBoundingBox();
     dnPrivate.doDirtyLightIndices();
     dnPrivate.doDirtyShadowMaps();
+}
+
+DrawableNode::DrawableNode(NodePrivate *nodePrivate)
+    : Node(nodePrivate)
+{
 }
 
 

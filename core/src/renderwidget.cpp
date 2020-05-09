@@ -47,7 +47,8 @@ void RenderWidget::initializeGL()
     m_timer->setInterval(16);
     m_timer->start();
 
-    m_startTime = m_lastUpdateTime = m_lastFpsTime = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
+    m_startTime = m_lastFpsTime = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
+    m_lastUpdateTime = 0;
 
     m_core.sendMessage(std::make_shared<RenderWidgetWasInitializedMessage>());
 }
@@ -78,10 +79,10 @@ void RenderWidget::paintGL()
     int textSize = static_cast<int>(static_cast<float>(height()) / 720 * 28);
     int textXY = static_cast<int>(static_cast<float>(height()) / 720 * 10);
 
-    //QPainter painter(this);
-    //painter.setPen(Qt::black);
-    //painter.setFont(QFont("Arial", textSize));
-    //painter.drawStaticText(QPoint(textXY, textXY), QStaticText("FPS: " + QString::number(static_cast<double>(m_lastFps), 'f', 1)));
+    QPainter painter(this);
+    painter.setPen(Qt::black);
+    painter.setFont(QFont("Arial", textSize));
+    painter.drawStaticText(QPoint(textXY, textXY), QStaticText("FPS: " + QString::number(static_cast<double>(m_lastFps), 'f', 1)));
 }
 
 void RenderWidget::mousePressEvent(QMouseEvent *event)

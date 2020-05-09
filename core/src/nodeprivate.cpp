@@ -3,18 +3,21 @@
 #include "nodeprivate.h"
 #include "sceneprivate.h"
 
+#include "renderer.h"
+#include "drawables.h"
+
 namespace trash
 {
 namespace core
 {
 
-const utils::BoundingSphere NodePrivate::emptyLocalBoundingSphere = utils::BoundingSphere();
+const utils::BoundingBox NodePrivate::emptyLocalBoundingBox = utils::BoundingBox();
 
 NodePrivate::NodePrivate(Node &node)
     : thisNode(node)
-    , minimalBoundingSphere()
+    , minimalBoundingBox()
     , isGlobalTransformDirty(true)
-    , isBoundingSphereDirty(true)
+    , isBoundingBoxDirty(true)
 {
 }
 
@@ -29,11 +32,11 @@ void NodePrivate::dirtyGlobalTransform()
         child->m().dirtyGlobalTransform();
 }
 
-void NodePrivate::dirtyBoundingSphere()
+void NodePrivate::dirtyBoundingBox()
 {
-    isBoundingSphereDirty = true;
+    isBoundingBoxDirty = true;
     if (thisNode.parent())
-        thisNode.parent()->m().dirtyBoundingSphere();
+        thisNode.parent()->m().dirtyBoundingBox();
 }
 
 void NodePrivate::dirtyLightIndices()
@@ -48,6 +51,12 @@ void NodePrivate::dirtyShadowMaps()
     doDirtyShadowMaps();
     for (auto child : thisNode.children())
         child->m().dirtyShadowMaps();
+}
+
+void NodePrivate::doUpdate(uint64_t, uint64_t)
+{
+    auto& renderer = Renderer::instance();
+    renderer.draw(std::make_shared<BoxDrawable>(getBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
 }
 
 Scene *NodePrivate::getScene() const
@@ -65,17 +74,17 @@ Scene *NodePrivate::getScene() const
     return nullptr;
 }
 
-const utils::BoundingSphere &NodePrivate::getBoundingSphere()
+const utils::BoundingBox &NodePrivate::getBoundingBox()
 {
-    if (isBoundingSphereDirty)
+    if (isBoundingBoxDirty)
     {
-        boundingSphere = minimalBoundingSphere;
-        boundingSphere += getLocalBoundingSphere();
+        boundingBox = minimalBoundingBox;
+        boundingBox += getLocalBoundingBox();
         for (auto child : thisNode.children())
-            boundingSphere += child->transform() * child->boundingSphere();
-        isBoundingSphereDirty = false;
+            boundingBox += child->transform() * child->boundingBox();
+        isBoundingBoxDirty = false;
     }
-    return boundingSphere;
+    return boundingBox;
 }
 
 const utils::Transform &NodePrivate::getGlobalTransform()

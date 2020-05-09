@@ -8,6 +8,8 @@
 
 #include <iostream>
 
+#include <utils/boundingbox.h>
+
 int main(int argc, char *argv[])
 {
     static const int widgetHeight = 720;

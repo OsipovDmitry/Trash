@@ -267,6 +267,30 @@ SphereDrawable::SphereDrawable(uint32_t segs, const utils::BoundingSphere &bs, c
     geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
 }
 
+BoxDrawable::BoxDrawable(const utils::BoundingBox& box, const glm::vec4& c)
+    : ColoredMeshDrawable(nullptr, c, nullptr)
+{
+    std::vector<glm::vec3> vertices {
+                glm::vec3(box.minPoint.x, box.minPoint.y, box.minPoint.z),
+                glm::vec3(box.minPoint.x, box.maxPoint.y, box.minPoint.z),
+                glm::vec3(box.maxPoint.x, box.maxPoint.y, box.minPoint.z),
+                glm::vec3(box.maxPoint.x, box.minPoint.y, box.minPoint.z),
+                glm::vec3(box.minPoint.x, box.minPoint.y, box.maxPoint.z),
+                glm::vec3(box.minPoint.x, box.maxPoint.y, box.maxPoint.z),
+                glm::vec3(box.maxPoint.x, box.maxPoint.y, box.maxPoint.z),
+                glm::vec3(box.maxPoint.x, box.minPoint.y, box.maxPoint.z),
+    };
+    std::vector<uint32_t> indices {
+        0,1, 1,2, 2,3, 3,0,
+        4,5, 5,6, 6,7, 7,4,
+        0,4, 1,5, 2,6, 3,7
+    };
+
+    geometry = std::make_shared<Mesh>();
+    geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 3, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW));
+    geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
+}
+
 FrustumDrawable::FrustumDrawable(const utils::Frustum &frustum, const glm::vec4& c)
     : ColoredMeshDrawable(nullptr, c, nullptr)
 {
@@ -337,7 +361,7 @@ void BackgroundDrawable::prerender() const
     program->setUniform(program->uniformLocation("u_roughness"), 0.05f);
 }
 
-TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& color_, float lineSpacing, utils::BoundingSphere& bs)
+TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& color_, float lineSpacing, utils::BoundingBox &bb)
     : fontMap(font->texture),
       color(color_)
 {
@@ -408,7 +432,7 @@ TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, T
     for (auto& v : vertices)
         v += delta;
 
-    bs = utils::BoundingSphere(vertices.data(), vertices.size());
+    bb = utils::BoundingBox(vertices.data(), vertices.size());
 
     geometry = std::make_shared<Mesh>();
     geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 2, glm::value_ptr(*vertices.data()), GL_STATIC_DRAW));

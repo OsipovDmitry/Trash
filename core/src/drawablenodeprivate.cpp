@@ -16,24 +16,24 @@ DrawableNodePrivate::DrawableNodePrivate(Node &node)
     : NodePrivate(node)
     , lightIndices(std::make_shared<LightIndicesList>())
     , isLightIndicesDirty(true)
-    , isLocalBoundingSphereDirty(true)
+    , isLocalBoundingBoxDirty(true)
 
 {
 
 }
 
-const utils::BoundingSphere &DrawableNodePrivate::getLocalBoundingSphere()
+const utils::BoundingBox &DrawableNodePrivate::getLocalBoundingBox()
 {
-    if (isLocalBoundingSphereDirty)
+    if (isLocalBoundingBoxDirty)
     {
-        localBoundingSphere = utils::BoundingSphere();
+        localBoundingBox = utils::BoundingBox();
         for (auto drawable : drawables)
-            localBoundingSphere += drawable->mesh()->boundingSphere;
+            localBoundingBox += drawable->mesh()->boundingBox;
 
-        isLocalBoundingSphereDirty = false;
+        isLocalBoundingBoxDirty = false;
     }
 
-    return localBoundingSphere;
+    return localBoundingBox;
 }
 
 std::shared_ptr<LightIndicesList> DrawableNodePrivate::getLightIndices()
@@ -42,15 +42,17 @@ std::shared_ptr<LightIndicesList> DrawableNodePrivate::getLightIndices()
     return lightIndices;
 }
 
-void DrawableNodePrivate::doUpdate(uint64_t, uint64_t)
+void DrawableNodePrivate::doUpdate(uint64_t dt, uint64_t time)
 {
+    NodePrivate::doUpdate(dt, time);
+
     updateLightIndices();
 
     auto& renderer = Renderer::instance();
     for (auto& drawable : drawables)
         renderer.draw(drawable, getGlobalTransform());
 
-    //renderer.draw(std::make_shared<SphereDrawable>(8, getLocalBoundingSphere(), glm::vec4(0.8f, .0f, .0f, 1.0f)), getGlobalTransform());
+    //renderer.draw(std::make_shared<BoxDrawable>(getLocalBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
 }
 
 void DrawableNodePrivate::doPick(uint32_t id)

@@ -137,6 +137,12 @@ public:
     SphereDrawable(uint32_t, const utils::BoundingSphere&, const glm::vec4&);
 };
 
+class BoxDrawable : public ColoredMeshDrawable
+{
+public:
+    BoxDrawable(const utils::BoundingBox&, const glm::vec4&);
+};
+
 class FrustumDrawable : public ColoredMeshDrawable
 {
 public:
@@ -161,7 +167,7 @@ public:
 class TextDrawable : public Drawable
 {
 public:
-    TextDrawable(std::shared_ptr<Font>, const std::string&, TextNodeAlignment, TextNodeAlignment, const glm::vec4&, float, utils::BoundingSphere&);
+    TextDrawable(std::shared_ptr<Font>, const std::string&, TextNodeAlignment, TextNodeAlignment, const glm::vec4&, float, utils::BoundingBox&);
 
     LayerId layerId() const override { return LayerId::TransparencyGeometry; }
     std::shared_ptr<RenderProgram> renderProgram() const override;

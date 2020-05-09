@@ -23,6 +23,9 @@ public:
     void addDrawable(std::shared_ptr<Drawable>);
     void removeDrawable(std::shared_ptr<Drawable>);
 
+protected:
+    DrawableNode(NodePrivate*);
+
 };
 
 } // namespace

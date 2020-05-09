@@ -8,7 +8,7 @@ namespace core
 {
 
 TextNode::TextNode(const std::string& text_, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& color_, float lineSpacing_)
-    : Node(new TextNodePrivate(*this))
+    : DrawableNode(new TextNodePrivate(*this))
 {
     auto& tnPrivate = m();
     tnPrivate.text = text_;
@@ -17,7 +17,7 @@ TextNode::TextNode(const std::string& text_, TextNodeAlignment alignX, TextNodeA
     tnPrivate.color = color_;
     tnPrivate.lineSpacing = lineSpacing_;
     tnPrivate.dirtyDrawable();
-    tnPrivate.updateDrawable(); // for calculating bounding sphere
+    tnPrivate.updateDrawable(); // for calculating bounding box
 }
 
 const std::string &TextNode::text() const

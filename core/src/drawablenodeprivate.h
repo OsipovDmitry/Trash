@@ -19,7 +19,7 @@ class DrawableNodePrivate : public NodePrivate
 public:
     DrawableNodePrivate(Node&);
 
-    const utils::BoundingSphere& getLocalBoundingSphere() override;
+    const utils::BoundingBox& getLocalBoundingBox() override;
     std::shared_ptr<LightIndicesList> getLightIndices();
 
     void doUpdate(uint64_t, uint64_t) override;
@@ -32,10 +32,10 @@ public:
 
     std::unordered_set<std::shared_ptr<Drawable>> drawables;
     std::shared_ptr<LightIndicesList> lightIndices;
-    utils::BoundingSphere localBoundingSphere;
+    utils::BoundingBox localBoundingBox;
 
     bool isLightIndicesDirty;
-    bool isLocalBoundingSphereDirty = true;
+    bool isLocalBoundingBoxDirty;
 
 };
 

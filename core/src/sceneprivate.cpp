@@ -196,7 +196,7 @@ void ScenePrivate::updateShadowMap(std::shared_ptr<Light> light)
         auto node = nodes.front();
         nodes.pop();
 
-        if (!frustum.contain(node->globalTransform() * node->boundingSphere()))
+        if (!frustum.contain(node->globalTransform() * node->boundingBox()))
             continue;
 
         node->m().doUpdateShadowMaps();
@@ -236,7 +236,7 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
         auto node = nodes.front();
         nodes.pop();
 
-        if (!frustum.contain(node->globalTransform() * node->boundingSphere()))
+        if (!frustum.contain(node->globalTransform() * node->boundingBox()))
             continue;
 
         node->m().doUpdate(time, dt);
@@ -313,7 +313,7 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi)
         auto node = nodes.front();
         nodes.pop();
 
-        if (!ray.intersect(node->globalTransform() * node->boundingSphere()))
+        if (!ray.intersect(node->globalTransform() * node->boundingBox()))
             continue;
 
         node->m().doPick(static_cast<uint32_t>(nodeIds.size()));
@@ -360,16 +360,23 @@ std::pair<float, float> ScenePrivate::calculateZPlanes(const glm::mat4x4& viewPr
         auto node = nodes.front();
         nodes.pop();
 
-        if (!openFrustum.contain(node->globalTransform() * node->boundingSphere()))
+        if (!openFrustum.contain(node->globalTransform() * node->boundingBox()))
             continue;
 
         if (node->isDrawableNode())
         {
-            auto drawableNode = std::dynamic_pointer_cast<DrawableNode>(node);
-            const utils::BoundingSphere bSphere = drawableNode->globalTransform() * drawableNode->m().getLocalBoundingSphere();
-            const float distToSphere = openFrustum.planes.at(4).distanceTo(bSphere.center());
-            zNear = glm::min(zNear, distToSphere - bSphere.radius());
-            zFar = glm::max(zFar, distToSphere + bSphere.radius());
+            const utils::BoundingBox box = node->globalTransform() * node->m().getLocalBoundingBox();
+            if (!box.empty())
+            {
+                std::pair<float, float> distsToBox;
+                box.distanceToPlane(openFrustum.planes.at(4), distsToBox);
+                if (distsToBox.second > .0f)
+                {
+                    distsToBox.first = std::max(.0f, distsToBox.first);
+                    zNear = glm::min(zNear, distsToBox.first);
+                    zFar = glm::max(zFar, distsToBox.second);
+                }
+            }
         }
 
         for (auto child : node->children())

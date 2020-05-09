@@ -6,6 +6,7 @@
 #include <core/textnode.h>
 
 #include "person.h"
+#include "waypoint.h"
 
 namespace trash
 {
@@ -29,16 +30,24 @@ Person::Person(const std::string &modelFilename)
     m_state = 0;
 }
 
-void Person::moveTo(const glm::vec3 &t)
+void Person::moveTo(std::shared_ptr<WayPoint> value)
 {
     m_state = 1;
     m_modelNode->playAnimation("walk");
-    m_target = t;
+    m_currentWayPoint = value;
 }
 
 void Person::wave()
 {
     m_state = 2;
+    m_modelNode->playAnimation("wave");
+}
+
+void Person::idle()
+{
+    m_state = 0;
+    m_modelNode->playAnimation("idle");
+
 }
 
 void Person::doUpdate(uint64_t time, uint64_t dt)
@@ -48,35 +57,40 @@ void Person::doUpdate(uint64_t time, uint64_t dt)
     }
     else if (m_state == 1)
     {
-        auto curTransform = m_graphicsNode->transform();
-        auto to = m_target - curTransform.translation;
-        if (glm::length(to) < 10.0f)
+        if (!m_currentWayPoint)
         {
-            m_modelNode->playAnimation("idle");
-            m_state = 0;
+            idle();
         }
         else
         {
-            glm::vec3 z = glm::normalize(to);
-            glm::vec3 y(0.0f, 1.0f, 0.0f);
-            glm::vec3 x = glm::cross(y, z);
-            curTransform.translation += 330.0f * dt * 0.001f * z;
-            curTransform.rotation = glm::quat_cast(glm::mat3x3(x, y, z));
-            m_graphicsNode->setTransform(curTransform);
+            auto curTransform = m_graphicsNode->transform();
+            auto to = m_currentWayPoint->position() - curTransform.translation;
+            if (glm::length(to) < 10.0f)
+            {
+                m_currentWayPoint = m_currentWayPoint->nextWayPoint();
+            }
+            else
+            {
+                glm::vec3 z = glm::normalize(to);
+                glm::vec3 y(0.0f, 1.0f, 0.0f);
+                glm::vec3 x = glm::cross(y, z);
+                curTransform.translation += 330.0f * dt * 0.001f * z;
+                curTransform.rotation = glm::quat_cast(glm::mat3x3(x, y, z));
+                m_graphicsNode->setTransform(curTransform);
+            }
         }
     }
     else if (m_state == 2)
     {
         m_startWavingTime = time;
         m_state = 3;
-        m_modelNode->playAnimation("wave");
     }
     else if (m_state == 3)
     {
         if (m_modelNode->animationTime("wave") <= time - m_startWavingTime)
         {
-            m_modelNode->playAnimation("idle");
-            m_state = 0;
+            moveTo(m_currentWayPoint);
+            m_state = 1;
         }
     }
 }

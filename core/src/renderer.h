@@ -17,7 +17,7 @@
 #include <core/forwarddecl.h>
 #include <utils/tree.h>
 #include <utils/transform.h>
-#include <utils/boundingsphere.h>
+#include <utils/boundingbox.h>
 #include <utils/enumclass.h>
 #include <utils/noncopyble.h>
 
@@ -118,7 +118,7 @@ struct Mesh
     GLuint id;
     std::unordered_map<VertexAttribute, std::shared_ptr<VertexBuffer>> attributesDeclaration;
     std::unordered_set<std::shared_ptr<IndexBuffer>> indexBuffers;
-    utils::BoundingSphere boundingSphere;
+    utils::BoundingBox boundingBox;
 
     Mesh();
     ~Mesh();

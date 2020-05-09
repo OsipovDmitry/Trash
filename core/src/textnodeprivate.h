@@ -19,10 +19,10 @@ public:
     void dirtyDrawable();
     void updateDrawable();
 
-    const utils::BoundingSphere& getLocalBoundingSphere() override;
+    const utils::BoundingBox& getLocalBoundingBox() override;
     void doUpdate(uint64_t, uint64_t) override;
 
-    utils::BoundingSphere localBoundingSphere;
+    utils::BoundingBox localBoundingBox;
     std::shared_ptr<TextDrawable> drawable;
     std::string text;
     glm::vec4 color;

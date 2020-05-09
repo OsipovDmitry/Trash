@@ -16,7 +16,7 @@ AutoTransformNodePrivate::AutoTransformNodePrivate(Node& node)
 
 }
 
-void AutoTransformNodePrivate::doUpdate(uint64_t, uint64_t)
+void AutoTransformNodePrivate::doUpdate(uint64_t dt, uint64_t time)
 {
     auto scene = getScene();
     if (scene)
@@ -26,7 +26,10 @@ void AutoTransformNodePrivate::doUpdate(uint64_t, uint64_t)
         dirtyGlobalTransform();
         dirtyLightIndices();
         dirtyShadowMaps(); // after transformation
+        dirtyBoundingBox();
     }
+
+    NodePrivate::doUpdate(dt, time);
 }
 
 

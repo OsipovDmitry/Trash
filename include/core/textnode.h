@@ -4,7 +4,7 @@
 #include <glm/vec4.hpp>
 
 #include <utils/enumclass.h>
-#include <core/node.h>
+#include <core/drawablenode.h>
 
 namespace trash
 {
@@ -15,7 +15,7 @@ ENUMCLASS(TextNodeAlignment, uint8_t, Negative, Center, Positive)
 
 class TextNodePrivate;
 
-class CORESHARED_EXPORT TextNode : public Node
+class CORESHARED_EXPORT TextNode : public DrawableNode
 {
     PIMPL(TextNode)
 

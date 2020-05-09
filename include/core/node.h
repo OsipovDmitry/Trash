@@ -29,22 +29,22 @@ class CORESHARED_EXPORT Node : public utils::TreeNode<Node>
 
 public:
     Node();
-    Node(NodePrivate*);
     ~Node() override;
 
     virtual bool isDrawableNode() const;
-    virtual bool isModelNode() const;
 
     void setTransform(const utils::Transform&);
     const utils::Transform& transform() const;
     const utils::Transform& globalTransform() const;
 
-    const utils::BoundingSphere& boundingSphere() const;
+    const utils::BoundingBox& boundingBox() const;
 
     std::shared_ptr<NodeUserData> userData() const;
     void setUserData(std::shared_ptr<NodeUserData>);
 
 protected:
+    Node(NodePrivate*);
+
     void doAttach() override;
     void doDetach() override;
 

@@ -12,19 +12,23 @@ namespace trash
 namespace game
 {
 
+class WayPoint;
+
 class Person : public Object
 {
 public:
     Person(const std::string&);
 
-    void moveTo(const glm::vec3&);
+    void moveTo(std::shared_ptr<WayPoint>);
     void wave();
+    void idle();
 
 protected:
     void doUpdate(uint64_t, uint64_t) override;
 
 protected:
     std::shared_ptr<core::ModelNode> m_modelNode;
+    std::shared_ptr<WayPoint> m_currentWayPoint;
 
     int m_state; // 0 - idle, 1 - walk, 2 - start wave, 3 - wave
     glm::vec3 m_target;

@@ -17,6 +17,7 @@
 #include "person.h"
 #include "floor.h"
 #include "teapot.h"
+#include "waypoint.h"
 
 namespace trash
 {
@@ -55,6 +56,22 @@ void Game::doInitialize()
         m_->scene->attachObject(teapot);
     }
 
+    const float wpcoef = 700.0f;
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(1,0,2) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(1,0,1) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(2,0,1) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(2,0,-1) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(1,0,-1) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(1,0,-2) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(-1,0,-2) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(-1,0,-1) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(-2,0,-1) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(-2,0,1) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(-1,0,1) * wpcoef));
+    m_->waypoints.push_back(std::make_shared<WayPoint>(glm::vec3(-1,0,2) * wpcoef));
+    for (size_t i = 0; i < m_->waypoints.size(); ++i)
+        m_->waypoints[i]->setNextWayPoint(m_->waypoints[(i+1)%m_->waypoints.size()]);
+
     for (size_t i = 0; i < GamePrivate::numPersons; ++i)
     {
         m_->persons[i] = std::make_shared<Person>(GamePrivate::personsNames[i]);
@@ -65,6 +82,8 @@ void Game::doInitialize()
                                                          glm::vec3(1.f,1.f,1.f),
                                                          glm::quat_cast(glm::mat3x3(glm::vec3(-.7f,0.f,-.7f), glm::vec3(0.f,1.f,0.f), glm::vec3(.7f,0.f,-.7f))),
                                                          900.0f * glm::vec3(glm::cos(angle), 0.0f,glm::sin(angle))));
+
+        m_->persons[i]->moveTo(m_->waypoints[static_cast<size_t>(static_cast<float>(m_->waypoints.size()) / GamePrivate::numPersons * i)]);
     }
 
     m_->floor = std::make_shared<Floor>();
@@ -98,8 +117,7 @@ void Game::doInitialize()
 
     const float r = 400;
     m_->scene->scene()->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.4f);
-    //m_->scene->camera()->setProjectionMatrixAsOrtho(2000.0f);
-    m_->scene->scene()->camera()->setViewMatrix(glm::lookAt(glm::vec3(5 * r, 2.5f * r, -5 * r), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+    m_->scene->scene()->camera()->setViewMatrix(glm::lookAt(glm::vec3(.0f, 0.f, 0.f), glm::vec3(.0f, 0.f, -1.f), glm::vec3(0.0f, 1.0f, 0.0f)));
 
 //    const float r = 6;
 //    m_->scene->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.25f, 1.0f, 5000.0f);
@@ -150,7 +168,10 @@ void Game::doMouseClick(int x, int y)
         if (object == m_->floor)
         {
             if (!m_->acivePerson.expired())
-                m_->acivePerson.lock()->moveTo(pickData.localCoord);
+            {
+                auto waypoint = std::make_shared<WayPoint>(pickData.localCoord);
+                m_->acivePerson.lock()->moveTo(waypoint);
+            }
         }
         else
         {
