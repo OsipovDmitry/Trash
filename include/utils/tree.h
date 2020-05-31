@@ -30,6 +30,8 @@ public:
 
     void attach(std::shared_ptr<T> node)
     {
+        if (node->m_parent == this)
+            return;
         if (node->m_parent)
             node->m_parent->detach(node);
         node->m_parent = dynamic_cast<T*>(this);

@@ -89,10 +89,20 @@ struct Buffer
     Buffer(GLsizeiptr, const GLvoid*, GLenum);
     virtual ~Buffer();
 
+    int64_t size() const;
+
     void setSubData(GLintptr, GLsizeiptr, const void*);
 
     void *map(GLintptr, GLsizeiptr, GLbitfield);
     static void unmap();
+
+    const void *cpuData() const;
+    void clearCpuData();
+
+protected:
+    void *m_cpuData;
+    bool m_cpuDataIsDirty;
+
 };
 
 struct VertexBuffer : public Buffer

@@ -3,11 +3,13 @@
 
 #include <memory>
 #include <vector>
+#include <map>
 
 #include <glm/vec3.hpp>
 
 #include <utils/noncopyble.h>
 #include <utils/pimpl.h>
+#include <utils/forwarddecl.h>
 
 #include <core/node.h>
 #include <core/coreglobal.h>
@@ -24,6 +26,11 @@ struct PickData
     glm::vec3 localCoord;
 };
 
+struct IntersectionData
+{
+    std::multimap<float, std::shared_ptr<Node>> nodes;
+};
+
 class ScenePrivate;
 
 class CORESHARED_EXPORT Scene
@@ -36,6 +43,8 @@ public:
     virtual ~Scene();
 
     PickData pickScene(int32_t, int32_t) const;
+    IntersectionData intersectScene(const utils::Ray&) const;
+    IntersectionData intersectScene(const utils::Frustum&) const;
 
     std::shared_ptr<Node> rootNode();
     std::shared_ptr<const Node> rootNode() const;
@@ -45,7 +54,7 @@ public:
 
     void attachLight(std::shared_ptr<Light>);
     bool detachLight(std::shared_ptr<Light>);
-    std::shared_ptr<LightsList> lights() const;
+    std::shared_ptr<const LightsList> lights() const;
 
 private:
     std::unique_ptr<ScenePrivate> m_;

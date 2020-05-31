@@ -3,6 +3,7 @@
 
 #include <glm/gtx/intersect.hpp>
 
+#include "transform.h"
 #include "boundingsphere.h"
 #include "boundingbox.h"
 
@@ -26,7 +27,7 @@ public:
         return glm::intersectRaySphere(pos, dir, bs.center(), bs.radius(), p, n);
     }
 
-    bool intersect(const BoundingBox& bb) const {
+    bool intersect(const BoundingBox& bb, float *t0 = nullptr, float *t1 = nullptr) const {
         if (bb.empty())
             return false;
 
@@ -41,9 +42,16 @@ public:
             if (coordMax < tmax) tmax = coordMax;
         }
 
-        return true;
+        if (t0) *t0 = tmin;
+        if (t1) *t1 = tmax;
+        return tmax > 0.f;
     }
 };
+
+inline Ray operator *(const Transform& t, const Ray& r)
+{
+    return Ray(t * r.pos, glm::vec3(t.rotation * glm::vec4(glm::normalize(t.scale * r.dir), 1.f)));
+}
 
 } // namespace
 } // namespace

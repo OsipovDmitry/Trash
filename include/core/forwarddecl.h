@@ -27,8 +27,12 @@ class Camera;
 class Scene;
 class Light;
 
+struct PickData;
+struct IntersectionData;
+
 enum class LightType : uint32_t;
 enum class TextNodeAlignment : uint8_t;
+enum class IntersectionMode : uint8_t;
 
 using LightsList = std::vector<std::shared_ptr<Light>>;
 const int32_t MAX_LIGHTS_PER_NODE = 8;

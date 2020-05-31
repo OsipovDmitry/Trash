@@ -4,11 +4,10 @@
 #include <utils/frustum.h>
 #include <utils/ray.h>
 
+#include <core/scene.h>
 #include <core/light.h>
 #include <core/camera.h>
 #include <core/drawablenode.h>
-#include <core/textnode.h>
-#include <core/scene.h>
 
 #include "renderer.h"
 #include "drawables.h"
@@ -30,9 +29,6 @@ SceneRootNode::SceneRootNode(Scene *scene)
     : Node(new NodePrivate(*this))
     , m_scene(scene)
 {
-    auto text = std::make_shared<TextNode>("Hello,\nWorld!", TextNodeAlignment::Center, TextNodeAlignment::Negative, glm::vec4(.3f, .3f, 1.f, 1.f));
-    text->setTransform(utils::Transform::fromTranslation(glm::vec3(0.0f, 250.0f, 0.0f)) * utils::Transform::fromScale(450.0f));
-    attach(text);
 }
 
 Scene *SceneRootNode::scene() const
@@ -382,6 +378,135 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi)
     return PickData{node, localCoord};
 }
 
+IntersectionData ScenePrivate::intersectScene(const utils::Ray& ray)
+{
+    IntersectionData resultData;
+
+    std::queue<std::shared_ptr<Node>> nodes;
+    nodes.push(rootNode);
+
+    while (!nodes.empty())
+    {
+        auto node = nodes.front();
+        nodes.pop();
+
+        if (!ray.intersect(node->globalTransform() * node->boundingBox()))
+            continue;
+
+        if (auto drawableNode = node->asDrawableNode())
+        {
+            float boundBoxT0, boundBoxT1;
+
+            if (!ray.intersect(node->globalTransform() * node->m().getLocalBoundingBox(), &boundBoxT0, &boundBoxT1))
+                continue;
+
+            auto drawableIntersectionMode = drawableNode->intersectionMode();
+            if (drawableIntersectionMode == IntersectionMode::UseBoundingBox)
+            {
+                resultData.nodes.insert({glm::max(.0f, boundBoxT0), node});
+                resultData.nodes.insert({boundBoxT1, node});
+            }
+            else if (drawableIntersectionMode == IntersectionMode::UseGeometry)
+            {
+                for (auto drawable : drawableNode->m().drawables)
+                {
+                    auto mesh = drawable->mesh();
+                    float t0, t1;
+
+                    if (!ray.intersect(node->globalTransform() * mesh->boundingBox, &t0, &t1))
+                        continue;
+
+                    auto verteBuffer = mesh->vertexBuffer(VertexAttribute::Position);
+                    if (!verteBuffer)
+                        continue;
+
+                    assert(verteBuffer->numComponents == 2 || verteBuffer->numComponents == 3);
+
+                    const void *vertexData = verteBuffer->cpuData();
+                    const glm::vec3 *vertexDataAsVec3 = static_cast<const glm::vec3*>(vertexData);
+                    const glm::vec2 *vertexDataAsVec2 = static_cast<const glm::vec2*>(vertexData);
+
+                    for (auto indexBuffer : mesh->indexBuffers)
+                    {
+                        if (indexBuffer->primitiveType != GL_TRIANGLES)
+                            continue;
+
+                        const uint32_t *indexData = static_cast<const uint32_t*>(indexBuffer->cpuData());
+
+                        glm::vec2 barycentric;
+                        float t;
+
+                        for (uint32_t i = 0; i < indexBuffer->numIndices; i += 3)
+                        {
+                            if (verteBuffer->numComponents == 3)
+                            {
+                                if (glm::intersectRayTriangle(ray.pos, ray.dir,
+                                                              vertexDataAsVec3[indexData[i]],
+                                                              vertexDataAsVec3[indexData[i+1]],
+                                                              vertexDataAsVec3[indexData[i+2]],
+                                                              barycentric, t))
+                                    resultData.nodes.insert({t, node});
+                            }
+                            else if (verteBuffer->numComponents == 2)
+                            {
+                                if (glm::intersectRayTriangle(ray.pos, ray.dir,
+                                                              glm::vec3(vertexDataAsVec2[indexData[i]], .0f),
+                                                              glm::vec3(vertexDataAsVec2[indexData[i+1]], .0f),
+                                                              glm::vec3(vertexDataAsVec2[indexData[i+2]], .0f),
+                                                              barycentric, t))
+                                    resultData.nodes.insert({t, node});
+                            }
+                        }
+
+                    }
+                }
+            }
+        }
+
+        for (auto child : node->children())
+            nodes.push(child);
+    }
+
+    return resultData;
+}
+
+IntersectionData ScenePrivate::intersectScene(const utils::Frustum& frustum)
+{
+    IntersectionData resultData;
+
+    std::queue<std::shared_ptr<Node>> nodes;
+    nodes.push(rootNode);
+
+    while (!nodes.empty())
+    {
+        auto node = nodes.front();
+        nodes.pop();
+
+        if (!frustum.contain(node->globalTransform() * node->boundingBox()))
+            continue;
+
+        if (/*auto drawableNode = */node->asDrawableNode())
+        {
+            const auto box = node->globalTransform() * node->m().getLocalBoundingBox();
+            if (frustum.contain(box))
+            {
+                std::pair<float, float> distsToBox;
+                box.distanceToPlane(frustum.planes.at(4), distsToBox);
+                if (distsToBox.second > .0f)
+                {
+                    distsToBox.first = std::max(.0f, distsToBox.first);
+                    resultData.nodes.insert({distsToBox.first, node});
+                }
+            }
+        }
+
+        for (auto child : node->children())
+            nodes.push(child);
+    }
+
+    return resultData;
+}
+
 std::pair<float, float> ScenePrivate::calculateZPlanes(const glm::mat4x4& viewProjMatrix, float minZNear) const
 {
     utils::OpenFrustum openFrustum(viewProjMatrix);
@@ -400,8 +525,8 @@ std::pair<float, float> ScenePrivate::calculateZPlanes(const glm::mat4x4& viewPr
 
         if (/*auto drawableNode = */node->asDrawableNode())
         {
-            const utils::BoundingBox box = node->globalTransform() * node->m().getLocalBoundingBox();
-            if (!box.empty())
+            const auto box = node->globalTransform() * node->m().getLocalBoundingBox();
+            if (openFrustum.contain(box))
             {
                 std::pair<float, float> distsToBox;
                 box.distanceToPlane(openFrustum.planes.at(4), distsToBox);

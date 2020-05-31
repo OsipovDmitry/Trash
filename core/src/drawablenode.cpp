@@ -27,6 +27,16 @@ const DrawableNode *DrawableNode::asDrawableNode() const
     return this;
 }
 
+void DrawableNode::setIntersectionMode(IntersectionMode mode)
+{
+    m().intersectionMode = mode;
+}
+
+IntersectionMode DrawableNode::intersectionMode() const
+{
+    return m().intersectionMode;
+}
+
 DrawableNode::DrawableNode(NodePrivate *nodePrivate)
     : Node(nodePrivate)
 {

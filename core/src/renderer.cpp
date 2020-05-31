@@ -248,6 +248,8 @@ int32_t Texture::numMipmapLevels() const
 
 Buffer::Buffer(GLsizeiptr size, const GLvoid *data, GLenum usage)
     : id(0)
+    , m_cpuData(nullptr)
+    , m_cpuDataIsDirty(true)
 {
     auto& functions = Renderer::instance().functions();
     if (size)
@@ -261,6 +263,18 @@ Buffer::Buffer(GLsizeiptr size, const GLvoid *data, GLenum usage)
 Buffer::~Buffer()
 {
     Renderer::instance().functions().glDeleteBuffers(1, &id);
+    delete [] m_cpuData;
+}
+
+int64_t Buffer::size() const
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glBindBuffer(GL_ARRAY_BUFFER, id);
+
+    GLint64 result;
+    functions.glGetBufferParameteri64v(GL_ARRAY_BUFFER, GL_BUFFER_SIZE, &result);
+
+    return result;
 }
 
 void Buffer::setSubData(GLintptr offset, GLsizeiptr size, const void* data)
@@ -268,18 +282,46 @@ void Buffer::setSubData(GLintptr offset, GLsizeiptr size, const void* data)
     auto& functions = Renderer::instance().functions();
     functions.glBindBuffer(GL_ARRAY_BUFFER, id);
     functions.glBufferSubData(GL_ARRAY_BUFFER, offset, size, data);
+    m_cpuDataIsDirty = true;
 }
 
 void *Buffer::map(GLintptr offset, GLsizeiptr size, GLbitfield access)
 {
     auto& functions = Renderer::instance().functions();
     functions.glBindBuffer(GL_ARRAY_BUFFER, id);
+    m_cpuDataIsDirty = true;
     return functions.glMapBufferRange(GL_ARRAY_BUFFER, offset, size, access);
 }
 
 void Buffer::unmap()
 {
     Renderer::instance().functions().glUnmapBuffer(GL_ARRAY_BUFFER);
+}
+
+const void *Buffer::cpuData() const
+{
+    if (m_cpuDataIsDirty)
+    {
+        auto nonConstThis = const_cast<Buffer*>(this);
+        int64_t dataSize = size();
+
+        if (!m_cpuData)
+            nonConstThis->m_cpuData = new uint8_t [dataSize];
+
+
+        std::memcpy(m_cpuData, nonConstThis->map(0, dataSize, GL_MAP_READ_BIT), dataSize);
+        unmap();
+
+        nonConstThis->m_cpuDataIsDirty = false;
+    }
+    return m_cpuData;
+}
+
+void Buffer::clearCpuData()
+{
+    delete [] m_cpuData;
+    m_cpuData = nullptr;
+    m_cpuDataIsDirty = true;
 }
 
 VertexBuffer::VertexBuffer(uint32_t nv, uint32_t nc, const float *data, GLenum usage)
@@ -323,10 +365,10 @@ void Mesh::declareVertexAttribute(VertexAttribute attrib, std::shared_ptr<Vertex
     {
         assert(vb->numComponents == 2 || vb->numComponents == 3);
         auto *p = vb->map(0, vb->numVertices * vb->numComponents * sizeof(float), GL_MAP_READ_BIT);
-        if (vb->numComponents == 2)
-            boundingBox = utils::BoundingBox(static_cast<glm::vec2*>(p), vb->numVertices);
         if (vb->numComponents == 3)
             boundingBox = utils::BoundingBox(static_cast<glm::vec3*>(p), vb->numVertices);
+        else if (vb->numComponents == 2)
+            boundingBox = utils::BoundingBox(static_cast<glm::vec2*>(p), vb->numVertices);
         vb->unmap();
     }
 }

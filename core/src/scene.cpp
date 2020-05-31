@@ -21,6 +21,16 @@ PickData Scene::pickScene(int32_t x, int32_t y) const
     return m_->pickScene(x, y);
 }
 
+IntersectionData Scene::intersectScene(const utils::Ray &ray) const
+{
+    return m_->intersectScene(ray);
+}
+
+IntersectionData Scene::intersectScene(const utils::Frustum &frustum) const
+{
+    return m_->intersectScene(frustum);
+}
+
 std::shared_ptr<Node> Scene::rootNode()
 {
     return m_->rootNode;
@@ -51,7 +61,7 @@ bool Scene::detachLight(std::shared_ptr<Light> light)
     return m_->detachLight(light);
 }
 
-std::shared_ptr<LightsList> Scene::lights() const
+std::shared_ptr<const LightsList> Scene::lights() const
 {
     return m_->lights;
 }

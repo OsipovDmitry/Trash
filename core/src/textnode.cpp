@@ -28,9 +28,11 @@ const std::string &TextNode::text() const
 void TextNode::setText(const std::string& value)
 {
     auto& tnPrivate = m();
-    tnPrivate.text = value;
-    tnPrivate.dirtyDrawable();
-
+    if (tnPrivate.text != value)
+    {
+        tnPrivate.text = value;
+        tnPrivate.dirtyDrawable();
+    }
 }
 
 const glm::vec4 &TextNode::color() const

@@ -19,7 +19,6 @@ HEADERS += \
 
 SOURCES += \
     src/game.cpp \
-    src/object.cpp \
     src/scene.cpp \
     src/gameprivate.cpp \
     src/floor.cpp \

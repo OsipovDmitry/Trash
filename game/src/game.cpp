@@ -8,7 +8,9 @@
 #include <core/light.h>
 
 #include <utils/transform.h>
-#include <utils/boundingsphere.h>
+#include <utils/boundingbox.h>
+#include <utils/ray.h>
+#include <utils/frustum.h>
 
 #include <game/game.h>
 
@@ -86,6 +88,8 @@ void Game::doInitialize()
         m_->persons[i]->moveTo(m_->waypoints[static_cast<size_t>(static_cast<float>(m_->waypoints.size()) / GamePrivate::numPersons * i)]);
     }
 
+    m_->persons[0]->graphicsNode()->frustum = true;
+
     m_->floor = std::make_shared<Floor>();
     m_->scene->attachObject(m_->floor);
 
@@ -139,6 +143,45 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
     const float r = 300;
     const float t = time * 0.00005f + 10.0f;
     m_->scene->scene()->camera()->setViewMatrix(glm::lookAt(glm::vec3(11 * r * cos(t), 3 * r, -11 * r * sin(t)), glm::vec3(0.0f, 500.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+
+    for (auto person: m_->persons)
+    {
+        auto personNode = person->graphicsNode();
+        //utils::Ray ray = personNode->globalTransform() * utils::Ray(personNode->boundingBox().center(), glm::vec3(0.f, 0.f, 1.f));
+
+        auto transform = personNode->globalTransform().operator glm::mat4x4() *
+                glm::translate(glm::mat4x4(1.0f), personNode->boundingBox().center()) *
+                glm::rotate(glm::mat4x4(1.0f), glm::pi<float>(), glm::vec3(0.f, 1.f, 0.f));
+
+        utils::Frustum frustum(glm::perspective(glm::pi<float>()*0.25f, 1.0f, 100.0f, 3000.0f) * glm::inverse(transform));
+        auto intersectionData = m_->scene->scene()->intersectScene(/*ray*/frustum);
+
+        person->setText(person->name());
+
+        bool isFound = false;
+        for (const auto& intersection: intersectionData.nodes)
+        {
+            if (intersection.first < 0.f)
+                continue;
+
+            auto intersectedObject = m_->scene->findObject(intersection.second.get());
+            if (intersectedObject == person)
+                continue;
+
+            for (auto intersectedPerson : m_->persons)
+            {
+                if (intersectedPerson == intersectedObject)
+                {
+                    person->setText(person->name() + " is looking at " + intersectedPerson->name());
+                    isFound = true;
+                    break;
+                }
+            }
+
+            if (isFound)
+                break;
+        }
+    }
 
 //    for (auto l : m_->scene->camera()->scene()->lights())
 //    {

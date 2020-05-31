@@ -6,6 +6,8 @@
 #include "renderer.h"
 #include "drawables.h"
 
+#include <utils/frustum.h>
+
 namespace trash
 {
 namespace core
@@ -41,8 +43,18 @@ void NodePrivate::dirtyBoundingBox()
 
 void NodePrivate::doUpdate(uint64_t, uint64_t)
 {
-    //auto& renderer = Renderer::instance();
+    auto& renderer = Renderer::instance();
     //renderer.draw(std::make_shared<BoxDrawable>(getBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
+
+    if (!thisNode.frustum)
+        return;
+
+    auto tr = getGlobalTransform().operator glm::mat4x4() *
+            glm::translate(glm::mat4x4(1.0f), getBoundingBox().center()) *
+            glm::rotate(glm::mat4x4(1.0f), glm::pi<float>(), glm::vec3(0.f, 1.f, 0.f));
+
+    renderer.draw(std::make_shared<FrustumDrawable>(utils::Frustum(glm::perspective(glm::pi<float>()*0.25f, 1.0f, 100.0f, 3000.0f) * glm::inverse(tr)),
+                                                    glm::vec4(1.f, 0.f, 0.f, 1.f)), utils::Transform());
 }
 
 Scene *NodePrivate::getScene() const

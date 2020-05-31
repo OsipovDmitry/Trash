@@ -1,6 +1,7 @@
 #include <algorithm>
 
 #include <utils/transform.h>
+#include <utils/boundingbox.h>
 #include <core/modelnode.h>
 #include <core/autotransformnode.h>
 #include <core/textnode.h>
@@ -20,11 +21,12 @@ Person::Person(const std::string &modelFilename)
     m_graphicsNode->attach(m_modelNode);
 
     auto autoTransform = std::make_shared<core::AutoTransformNode>();
-    autoTransform->setTransform(utils::Transform::fromTranslation(glm::vec3(0,350.f,0)) * utils::Transform::fromScale(210.0f));
+    autoTransform->setTransform(utils::Transform::fromTranslation(glm::vec3(0,1.1f*m_graphicsNode->boundingBox().maxPoint.y,0)) * utils::Transform::fromScale(150.0f));
     m_graphicsNode->attach(autoTransform);
 
-    auto textNode = std::make_shared<core::TextNode>(modelFilename.substr(0, modelFilename.find('.')), core::TextNodeAlignment::Center, core::TextNodeAlignment::Negative);
-    autoTransform->attach(textNode);
+    m_name = modelFilename.substr(0, modelFilename.find('.'));
+    m_textNode = std::make_shared<core::TextNode>(m_name, core::TextNodeAlignment::Center, core::TextNodeAlignment::Negative);
+    autoTransform->attach(m_textNode);
 
     m_modelNode->playAnimation("idle");
     m_state = 0;
@@ -48,6 +50,16 @@ void Person::idle()
     m_state = 0;
     m_modelNode->playAnimation("idle");
 
+}
+
+const std::string &Person::name() const
+{
+    return m_name;
+}
+
+void Person::setText(const std::string& text)
+{
+    m_textNode->setText(text);
 }
 
 void Person::doUpdate(uint64_t time, uint64_t dt)

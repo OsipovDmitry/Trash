@@ -1,5 +1,6 @@
 #include <core/scene.h>
 #include <core/light.h>
+#include <core/drawablenode.h>
 
 #include "drawablenodeprivate.h"
 #include "sceneprivate.h"
@@ -15,6 +16,7 @@ namespace core
 DrawableNodePrivate::DrawableNodePrivate(Node &node)
     : NodePrivate(node)
     , lightIndices(std::make_shared<LightIndicesList>())
+    , intersectionMode(IntersectionMode::UseBoundingBox)
     , isLightIndicesDirty(true)
     , isLocalBoundingBoxDirty(true)
 

@@ -24,13 +24,11 @@ private:
     Scene *m_scene;
 };
 
-struct PickData;
 struct Buffer;
 struct Texture;
 struct Framebuffer;
 
 class Drawable;
-class CameraPrivate;
 
 class ScenePrivate
 {
@@ -54,6 +52,8 @@ public:
 
     void renderScene(uint64_t, uint64_t);
     PickData pickScene(int32_t, int32_t);
+    IntersectionData intersectScene(const utils::Ray&);
+    IntersectionData intersectScene(const utils::Frustum&);
 
     std::pair<float, float> calculateZPlanes(const glm::mat4x4&, float) const;
 

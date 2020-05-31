@@ -45,6 +45,9 @@ void Scene::detachObject(std::shared_ptr<Object> object)
 
 void Scene::attachObject(std::shared_ptr<Object> object, std::shared_ptr<core::Node> parentNode)
 {
+    if (object->m_scene == this)
+        return;
+
     if (object->m_scene)
         object->m_scene->detachObject(object);
 
@@ -74,6 +77,9 @@ std::shared_ptr<Object> Scene::findObject(core::Node *node) const
         data = std::dynamic_pointer_cast<ObjectUserData>(node->userData());
         node = node->parent();
     }
+
+    if (!data)
+        return nullptr;
 
     auto it = std::find_if(m_objects.begin(), m_objects.end(), [p = &data->thisObject](auto obj) {
         return p == obj.get();

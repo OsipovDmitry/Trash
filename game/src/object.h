@@ -16,7 +16,7 @@ class Scene;
 class ObjectUserData : public core::NodeUserData
 {
 public:
-    ObjectUserData(Object&);
+    ObjectUserData(Object& obj) : thisObject(obj) {}
 
     Object &thisObject;
 };
@@ -26,10 +26,14 @@ class Object
     NONCOPYBLE(Object)
 
 public:
-    Object(std::shared_ptr<ObjectUserData> = nullptr);
+    Object(std::shared_ptr<ObjectUserData> objectData = nullptr) : m_scene(nullptr) , m_graphicsNode(std::make_shared<core::Node>()) {
+        m_graphicsNode->setUserData(objectData);
+    }
     virtual ~Object() = default;
 
-    std::shared_ptr<core::Node> graphicsNode() const;
+    std::shared_ptr<core::Node> graphicsNode() const  {
+        return m_graphicsNode;
+    }
 
 protected:
     virtual void doUpdate(uint64_t, uint64_t) {}
@@ -38,7 +42,10 @@ protected:
     Scene *m_scene;
     std::shared_ptr<core::Node> m_graphicsNode;
 
-    void update(uint64_t, uint64_t);
+    void update(uint64_t time, uint64_t dt) {
+        //
+        doUpdate(time, dt);
+    }
 
     friend class Scene;
 };

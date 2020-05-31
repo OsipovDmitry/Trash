@@ -1,12 +1,16 @@
 #ifndef DRAWABLENODE_H
 #define DRAWABLENODE_H
 
+#include <utils/enumclass.h>
+
 #include <core/node.h>
 
 namespace trash
 {
 namespace core
 {
+
+ENUMCLASS(IntersectionMode, uint8_t, UseBoundingBox, UseGeometry)
 
 class DrawableNodePrivate;
 
@@ -19,6 +23,9 @@ public:
 
     DrawableNode *asDrawableNode() override;
     const DrawableNode *asDrawableNode() const override;
+
+    void setIntersectionMode(IntersectionMode);
+    IntersectionMode intersectionMode() const;
 
 protected:
     DrawableNode(NodePrivate*);

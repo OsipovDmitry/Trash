@@ -38,7 +38,7 @@ public:
     std::unordered_set<std::shared_ptr<Drawable>> drawables;
     std::shared_ptr<LightIndicesList> lightIndices;
     utils::BoundingBox localBoundingBox;
-
+    IntersectionMode intersectionMode;
     bool isLightIndicesDirty;
     bool isLocalBoundingBoxDirty;
 
