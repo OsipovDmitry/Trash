@@ -319,7 +319,8 @@ FrustumDrawable::FrustumDrawable(const utils::Frustum &frustum, const glm::vec4&
     geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
 }
 
-BackgroundDrawable::BackgroundDrawable()
+BackgroundDrawable::BackgroundDrawable(float r)
+    : roughness(r)
 {
     static const std::vector<float> vertices {
         -1.f, -1.f,
@@ -353,12 +354,7 @@ std::shared_ptr<Mesh> BackgroundDrawable::mesh() const
 void BackgroundDrawable::prerender() const
 {
     Drawable::prerender();
-
-    auto& renderer = Renderer::instance();
-    const auto& view = renderer.viewMatrix();
-    const auto& proj = renderer.projectionMatrix();
-    program->setUniform(program->uniformLocation("u_backgroundMatrix"), glm::mat4x4(glm::inverse(glm::mat3x3(view))) * glm::inverse(proj));
-    program->setUniform(program->uniformLocation("u_roughness"), 0.05f);
+    program->setUniform(program->uniformLocation("u_roughness"), roughness);
 }
 
 TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& color_, float lineSpacing)

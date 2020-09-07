@@ -24,6 +24,8 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
         {
             std::shared_ptr<Model> mdl;
             std::ifstream file(filename, std::ios_base::binary);
+            if (!file.is_open())
+                return nullptr;
             pull(file, mdl);
             file.close();
             m_resourceStorage->store(filename, mdl);

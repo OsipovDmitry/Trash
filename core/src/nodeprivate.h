@@ -26,10 +26,9 @@ public:
 
     virtual const utils::BoundingBox& getLocalBoundingBox() { return emptyLocalBoundingBox; }
 
-    virtual void doUpdate(uint64_t, uint64_t);
-    virtual void doPick(uint32_t) {}
-    virtual void doBeforeChangingTransformation() {}
-    virtual void doAfterChangingTransformation() {}
+    virtual void doUpdate(uint64_t, uint64_t, bool);
+    virtual void doBeforeChangingTransformation();
+    virtual void doAfterChangingTransformation();
 
     Scene *getScene() const;
     const utils::BoundingBox& getBoundingBox();

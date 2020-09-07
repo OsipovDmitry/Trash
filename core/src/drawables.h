@@ -152,7 +152,7 @@ public:
 class BackgroundDrawable : public Drawable
 {
 public:
-    BackgroundDrawable();
+    BackgroundDrawable(float = .0f);
 
     LayerId layerId() const override { return LayerId::Background; }
     std::shared_ptr<RenderProgram> renderProgram() const override;
@@ -162,6 +162,7 @@ public:
 
     std::shared_ptr<RenderProgram> program;
     std::shared_ptr<Mesh> geometry;
+    float roughness;
 };
 
 class TextDrawable : public Drawable
@@ -169,7 +170,7 @@ class TextDrawable : public Drawable
 public:
     TextDrawable(std::shared_ptr<Font>, const std::string&, TextNodeAlignment, TextNodeAlignment, const glm::vec4&, float);
 
-    LayerId layerId() const override { return LayerId::TransparencyGeometry; }
+    LayerId layerId() const override { return LayerId::TransparentGeometry; }
     std::shared_ptr<RenderProgram> renderProgram() const override;
     std::shared_ptr<Mesh> mesh() const override;
 

@@ -38,7 +38,7 @@ ENUMCLASS(LayerId, uint32_t,
           Shadows,
           Background,
           SolidGeometry,
-          TransparencyGeometry)
+          TransparentGeometry)
 
 struct RenderProgram : public ResourceStorage::Object
 {
@@ -152,26 +152,36 @@ struct Renderbuffer
 
 struct Framebuffer
 {
+    struct RenderTarget {
+        RenderTarget(std::shared_ptr<Texture> t) : texture(t) {}
+        RenderTarget(std::shared_ptr<Renderbuffer> rb) : renderbuffer(rb) {}
+
+        bool isTexture() const { return texture != nullptr; }
+        bool isRenderbuffer() const { return renderbuffer != nullptr; }
+
+        std::shared_ptr<Texture> texture = nullptr;
+        std::shared_ptr<Renderbuffer> renderbuffer = nullptr;
+    };
+
     NONCOPYBLE(Framebuffer)
 
     GLuint id;
-    std::shared_ptr<Texture> colorTexture, depthTexture;
-    std::shared_ptr<Renderbuffer> colorRenderbuffer, depthRenderbuffer;
+    std::array<std::shared_ptr<RenderTarget>, 8> colorAttachments;
+    std::shared_ptr<RenderTarget> depthAttachment;
 
     Framebuffer();
     ~Framebuffer();
 
-    void detachColor();
+    void detachColor(size_t);
     void detachDepth();
 
-    void attachColor(std::shared_ptr<Texture>, uint32_t = 0);
-    void attachColor(std::shared_ptr<Renderbuffer>);
+    void attachColor(size_t, std::shared_ptr<Texture>, uint32_t = 0);
+    void attachColor(size_t, std::shared_ptr<Renderbuffer>);
 
     void attachDepth(std::shared_ptr<Texture>, uint32_t = 0);
     void attachDepth(std::shared_ptr<Renderbuffer>);
 
-    void setDrawBuffer(GLenum);
-    void setReadBuffer(GLenum);
+    void drawBuffers(const std::vector<GLenum>&);
 };
 
 struct Model : public ResourceStorage::Object
@@ -295,10 +305,6 @@ public:
     void setShadowMaps(std::shared_ptr<Texture>);
     void setIBLMaps(std::shared_ptr<Texture>, std::shared_ptr<Texture>);
 
-    const glm::mat4x4& viewMatrix() const;
-    const glm::vec3& viewPosition() const;
-    const glm::mat4x4& projectionMatrix() const;
-
 private:
     using DrawDataType = std::pair<std::shared_ptr<Drawable>, utils::Transform>;
     using DrawDataLayerContainer = std::deque<DrawDataType>;
@@ -324,13 +330,14 @@ private:
     GLuint m_defaultFbo;
     std::unique_ptr<ResourceStorage> m_resourceStorage;
     DrawDataContainer m_drawData;
-    glm::mat4x4 m_projMatrix, m_viewMatrix, m_viewMatrixInverse, m_viewProjMatrix;
+    glm::mat4x4 m_projMatrix, m_viewMatrix, m_viewMatrixInverse, m_viewProjMatrix, m_viewProjMatrixInverse;
     glm::ivec4 m_viewport;
     glm::vec3 m_viewPosition;
     std::shared_ptr<Buffer> m_lightsBuffer = nullptr;
     std::shared_ptr<Texture> m_shadowMaps = nullptr;
     std::shared_ptr<Texture> m_IBLDiffuseMap = nullptr, m_IBLSpecularMap = nullptr, m_brdfLutMap;
     int32_t m_numIBLSpecularMapsMipmaps = 0;
+    float m_IBLContribution = 0.2f;
 
     bool m_clearColorBit = true, m_clearDepthBit = true;
     glm::vec4 m_clearColor = glm::vec4(0.f, 0.f, 0.f, 1.f);

@@ -41,7 +41,7 @@ void NodePrivate::dirtyBoundingBox()
         thisNode.parent()->m().dirtyBoundingBox();
 }
 
-void NodePrivate::doUpdate(uint64_t, uint64_t)
+void NodePrivate::doUpdate(uint64_t, uint64_t, bool)
 {
     auto& renderer = Renderer::instance();
     //renderer.draw(std::make_shared<BoxDrawable>(getBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
@@ -55,6 +55,18 @@ void NodePrivate::doUpdate(uint64_t, uint64_t)
 
     renderer.draw(std::make_shared<FrustumDrawable>(utils::Frustum(glm::perspective(glm::pi<float>()*0.25f, 1.0f, 100.0f, 3000.0f) * glm::inverse(tr)),
                                                     glm::vec4(1.f, 0.f, 0.f, 1.f)), utils::Transform());
+}
+
+void NodePrivate::doBeforeChangingTransformation()
+{
+    for (auto child : thisNode.children())
+        child->m().doBeforeChangingTransformation();
+}
+
+void NodePrivate::doAfterChangingTransformation()
+{
+    for (auto child : thisNode.children())
+        child->m().doAfterChangingTransformation();
 }
 
 Scene *NodePrivate::getScene() const

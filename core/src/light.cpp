@@ -41,17 +41,19 @@ void Light::setColor(const glm::vec3& value)
 {
     m_->color = value;
     //m_->dirtyScene();
+    //m_->dirtyMatrix();
 }
 
-const glm::vec3& Light::attenuation() const
+const glm::vec2& Light::radiuses() const
 {
-    return m_->att;
+    return m_->radiuses;
 }
 
-void Light::setAttenuation(const glm::vec3& value)
+void Light::setRadiuses(const glm::vec2& value)
 {
-    m_->att = value;
+    m_->radiuses = value;
     m_->dirtyScene();
+    m_->dirtyMatrix();
 }
 
 const glm::vec3& Light::position() const

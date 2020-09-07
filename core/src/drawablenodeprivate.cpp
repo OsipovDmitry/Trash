@@ -96,18 +96,8 @@ void DrawableNodePrivate::doUpdateLightIndices()
                 }
             }
         }
-
         isLightIndicesDirty = false;
     }
-}
-
-void DrawableNodePrivate::doUpdateShadowMaps()
-{
-    auto& renderer = Renderer::instance();
-
-    for (auto& drawable : drawables)
-        if (auto shadowDrawable = drawable->shadowDrawable())
-            renderer.draw(shadowDrawable, getGlobalTransform());
 }
 
 void DrawableNodePrivate::doDirtyLightIndices()
@@ -132,11 +122,26 @@ void DrawableNodePrivate::doDirtyShadowMaps()
     }
 }
 
-void DrawableNodePrivate::doUpdate(uint64_t dt, uint64_t time)
+void DrawableNodePrivate::doShadow()
 {
-    NodePrivate::doUpdate(dt, time);
-    doUpdateLightIndices();
+    auto& renderer = Renderer::instance();
 
+    for (auto& drawable : drawables)
+        if (auto shadowDrawable = drawable->shadowDrawable())
+            renderer.draw(shadowDrawable, getGlobalTransform());
+}
+
+void DrawableNodePrivate::doPick(uint32_t id)
+{
+    auto& renderer = Renderer::instance();
+
+    for (auto& drawable : drawables)
+        if (auto selectionDrawable = drawable->selectionDrawable(id))
+            renderer.draw(selectionDrawable, getGlobalTransform());
+}
+
+void DrawableNodePrivate::doRender()
+{
     auto& renderer = Renderer::instance();
     for (auto& drawable : drawables)
         renderer.draw(drawable, getGlobalTransform());
@@ -144,15 +149,14 @@ void DrawableNodePrivate::doUpdate(uint64_t dt, uint64_t time)
     //renderer.draw(std::make_shared<BoxDrawable>(getLocalBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
 }
 
-void DrawableNodePrivate::doPick(uint32_t id)
+void DrawableNodePrivate::doUpdate(uint64_t dt, uint64_t time, bool visible)
 {
-    NodePrivate::doPick(id);
+    NodePrivate::doUpdate(dt, time, visible);
 
-    auto& renderer = Renderer::instance();
-
-    for (auto& drawable : drawables)
-        if (auto selectionDrawable = drawable->selectionDrawable(id))
-            renderer.draw(selectionDrawable, getGlobalTransform());
+    if (visible)
+    {
+        doUpdateLightIndices();
+    }
 }
 
 void DrawableNodePrivate::doBeforeChangingTransformation()

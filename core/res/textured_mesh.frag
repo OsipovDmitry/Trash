@@ -13,6 +13,7 @@ uniform sampler2D u_brdfLUT;
 uniform sampler2DArrayShadow u_shadowMaps;
 
 uniform int u_numSpecularIBLMapLods;
+uniform float u_IBLContribution;
 
 #include<gammacorrection.glsl>
 #include<lights.glsl>
@@ -75,7 +76,7 @@ void main(void)
 
     vec3 color = vec3(0.0);
     color += Lo;
-    color += 0.2 * calcIblLighting(pbr, F0, fragNormal, toView);
+    color += u_IBLContribution * calcIblLighting(pbr, F0, fragNormal, toView);
 
     color = color / (color + vec3(1.0));
     fragColor = vec4(toSRGB(color), 1.0);

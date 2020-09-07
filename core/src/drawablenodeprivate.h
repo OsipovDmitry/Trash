@@ -26,12 +26,14 @@ public:
     std::shared_ptr<LightIndicesList> getLightIndices();
 
     virtual void doUpdateLightIndices();
-    virtual void doUpdateShadowMaps();
     virtual void doDirtyLightIndices();
     virtual void doDirtyShadowMaps();
 
-    void doUpdate(uint64_t, uint64_t) override;
-    void doPick(uint32_t) override;
+    virtual void doShadow();
+    virtual void doPick(uint32_t);
+    virtual void doRender();
+
+    void doUpdate(uint64_t, uint64_t, bool) override;
     void doBeforeChangingTransformation() override;
     void doAfterChangingTransformation() override;
 

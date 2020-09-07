@@ -196,7 +196,7 @@ void ScenePrivate::updateShadowMap(std::shared_ptr<Light> light)
             continue;
 
         if (auto drawableNode = node->asDrawableNode())
-            drawableNode->m().doUpdateShadowMaps();
+            drawableNode->m().doShadow();
 
         for (auto child : node->children())
             nodes.push(child);
@@ -254,27 +254,30 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
     cameraPrivate.setZPlanes(calculateZPlanes(cameraPrivate.calcProjectionMatrix({0.f, 1.f}) * cameraPrivate.getViewMatrix(), CameraMinZNear));
     utils::Frustum frustum(cameraPrivate.getProjectionMatrix() * cameraPrivate.getViewMatrix());
 
-    std::queue<std::shared_ptr<Node>> nodes;
-    nodes.push(rootNode);
-
     // TODO: update only lights that are used in this frame
     auto shadowMaps = getLightsShadowMaps();
 
-    auto& renderer = Renderer::instance();
-
+    std::queue<std::pair<std::shared_ptr<Node>, bool>> nodes;
+    nodes.push({rootNode, true});
     while (!nodes.empty())
     {
-        auto node = nodes.front();
+        auto nodePair = nodes.front();
         nodes.pop();
 
-        if (!frustum.contain(node->globalTransform() * node->boundingBox()))
-            continue;
+        const bool visible = nodePair.second && frustum.contain(nodePair.first->globalTransform() * nodePair.first->boundingBox());
+        nodePair.first->m().doUpdate(time, dt, visible);
 
-        node->m().doUpdate(time, dt);
+        if (visible)
+        {
+            if (auto drawableNode = nodePair.first->asDrawableNode())
+                drawableNode->m().doRender();
+        }
 
-        for (auto child : node->children())
-            nodes.push(child);
+        for (auto child : nodePair.first->children())
+            nodes.push({child, visible});
     }
+
+    auto& renderer = Renderer::instance();
 
     for (auto l : *lights)
     {
@@ -284,7 +287,7 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
 //                    std::make_shared<SphereDrawable>(2, utils::BoundingSphere(glm::vec3(), 10.0f), glm::vec4(l->color(),1)),
 //                    utils::Transform(glm::vec3(1,1,1), glm::quat(1,0,0,0), l->position()));
 
-            //renderer.draw(std::make_shared<FrustumDrawable>(utils::Frustum(l->m().getMatrix()), glm::vec4(l->color(),1)), utils::Transform());
+//            renderer.draw(std::make_shared<FrustumDrawable>(utils::Frustum(l->m().getMatrix()), glm::vec4(l->color(),1)), utils::Transform());
         }
     }
 
@@ -347,15 +350,18 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi)
         if (!ray.intersect(node->globalTransform() * node->boundingBox()))
             continue;
 
-        node->m().doPick(static_cast<uint32_t>(nodeIds.size()));
-        nodeIds.push_back(node);
+        if (auto drawableNode = node->asDrawableNode())
+        {
+            drawableNode->m().doPick(static_cast<uint32_t>(nodeIds.size()));
+            nodeIds.push_back(node);
+        }
 
         for (auto child : node->children())
             nodes.push(child);
     }
 
     auto pickBuffer = std::make_shared<Framebuffer>();
-    pickBuffer->attachColor(std::make_shared<Renderbuffer>(GL_RGBA8, cameraPrivate.viewport.z, cameraPrivate.viewport.w));
+    pickBuffer->attachColor(0, std::make_shared<Renderbuffer>(GL_RGBA8, cameraPrivate.viewport.z, cameraPrivate.viewport.w));
     pickBuffer->attachDepth(std::make_shared<Renderbuffer>(GL_DEPTH_COMPONENT32, cameraPrivate.viewport.z, cameraPrivate.viewport.w));
 
     renderer.render(pickBuffer);

@@ -7,7 +7,7 @@ struct LightStruct
 #define LIGHT_POSITION(light) (light.params[0].xyz)
 #define LIGHT_DIRECTION(light) (light.params[1].xyz)
 #define LIGHT_COLOR(light) (light.params[2].xyz)
-#define LIGHT_ATTENUATION(light) (light.params[3].xyz)
+#define LIGHT_RADIUSES(light) (light.params[3].xy)
 #define LIGHT_SPOT_COS_INNER(light) (light.params[0].w)
 #define LIGHT_SPOT_COS_OUTER(light) (light.params[1].w)
 #define LIGHT_TYPE(light) (int(light.params[2][3] + 0.5))
@@ -39,14 +39,15 @@ float lightAttenuation(in LightStruct light, vec3 toLight)
 
     if ((type == LIGHT_TYPE_POINT) || (type == LIGHT_TYPE_SPOT))
     {
-        float dist = length(toLight);
-        vec3 l = normalize(toLight);
-        vec3 attCoef = LIGHT_ATTENUATION(light);
+        vec2 radiuses = LIGHT_RADIUSES(light);
 
-        att *= 1.0 / (attCoef.x * dist * dist + attCoef.y * dist + attCoef.z);
+        float dist = length(toLight);
+        float arg = clamp((dist-radiuses.x)/radiuses.y, 0.0, 1.0);
+        att *= 1.0 - arg*arg;
 
         if (type == LIGHT_TYPE_SPOT)
         {
+            vec3 l = normalize(toLight);
             float cosAngle = dot(-l, LIGHT_DIRECTION(light));
             float spotAtt = (cosAngle - LIGHT_SPOT_COS_OUTER(light)) / (LIGHT_SPOT_COS_INNER(light) - LIGHT_SPOT_COS_OUTER(light));
             spotAtt = clamp(spotAtt, 0.0, 1.0);

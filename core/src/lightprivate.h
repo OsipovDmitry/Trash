@@ -19,8 +19,8 @@ struct Texture;
 class LightPrivate
 {
 public:
-    glm::vec3 pos, dir, color, att;
-    glm::vec2 angles, cosAngles;
+    glm::vec3 pos, dir, color;
+    glm::vec2 angles, cosAngles, radiuses;
     LightType type;
 
     Scene *scene;
@@ -43,7 +43,6 @@ public:
 
     void dirtyScene();
     void dirtyMatrix();
-
 };
 
 } // namespace

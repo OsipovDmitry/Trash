@@ -308,7 +308,6 @@ const void *Buffer::cpuData() const
         if (!m_cpuData)
             nonConstThis->m_cpuData = new uint8_t [dataSize];
 
-
         std::memcpy(m_cpuData, nonConstThis->map(0, dataSize, GL_MAP_READ_BIT), dataSize);
         unmap();
 
@@ -426,92 +425,96 @@ Framebuffer::Framebuffer()
 
 Framebuffer::~Framebuffer()
 {
-    detachColor();
+    for (size_t i = 0; i < colorAttachments.size(); ++i)
+        detachColor(i);
     detachDepth();
 
     auto& functions = Renderer::instance().functions();
     functions.glDeleteFramebuffers(1, &id);
 }
 
-void Framebuffer::detachColor()
+void Framebuffer::detachColor(size_t idx)
 {
+    if (!colorAttachments[idx])
+        return;
+
     auto& renderer = Renderer::instance();
     auto& functions = renderer.functions();
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
 
-    if (colorTexture)
+    if (colorAttachments[idx]->isTexture())
     {
-        if (colorTexture->target == GL_TEXTURE_2D || colorTexture->target == GL_TEXTURE_CUBE_MAP)
+        if (colorAttachments[idx]->texture->target == GL_TEXTURE_2D || colorAttachments[idx]->texture->target == GL_TEXTURE_CUBE_MAP)
             functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, 0, 0);
-        else if (colorTexture->target == GL_TEXTURE_2D_ARRAY)
+        else if (colorAttachments[idx]->texture->target == GL_TEXTURE_2D_ARRAY)
             functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, 0, 0, 0);
     }
-    else if (colorRenderbuffer)
+    else if (colorAttachments[idx]->isRenderbuffer())
     {
         functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, 0);
     }
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
 
-    colorTexture = nullptr;
-    colorRenderbuffer = nullptr;
+    colorAttachments[idx] = nullptr;
 }
 
 void Framebuffer::detachDepth()
 {
+    if (!depthAttachment)
+        return;
+
     auto& renderer = Renderer::instance();
     auto& functions = renderer.functions();
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
 
-    if (depthTexture)
+    if (depthAttachment->isTexture())
     {
-        if (depthTexture->target == GL_TEXTURE_2D || depthTexture->target == GL_TEXTURE_CUBE_MAP)
+        if (depthAttachment->texture->target == GL_TEXTURE_2D || depthAttachment->texture->target == GL_TEXTURE_CUBE_MAP)
             functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
-        else if (depthTexture->target == GL_TEXTURE_2D_ARRAY)
+        else if (depthAttachment->texture->target == GL_TEXTURE_2D_ARRAY)
             functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, 0, 0, 0);
     }
-    else if (depthRenderbuffer)
+    else if (depthAttachment->isRenderbuffer())
     {
         functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, 0);
     }
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
 
-    depthTexture = nullptr;
-    depthRenderbuffer = nullptr;
+    depthAttachment = nullptr;
 }
 
-void Framebuffer::attachColor(std::shared_ptr<Texture> texture, uint32_t layer)
+void Framebuffer::attachColor(size_t idx, std::shared_ptr<Texture> texture, uint32_t layer)
 {
-    detachColor();
+    detachColor(idx);
 
     auto& renderer = Renderer::instance();
     auto& functions = renderer.functions();
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
 
     if (texture->target == GL_TEXTURE_2D)
-        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, texture->id, 0);
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + idx, GL_TEXTURE_2D, texture->id, 0);
     else if (texture->target == GL_TEXTURE_CUBE_MAP)
-        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, 0);
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + idx, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, 0);
     else if (texture->target == GL_TEXTURE_2D_ARRAY)
-        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, texture->id, 0, static_cast<GLint>(layer));
+        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + idx, texture->id, 0, static_cast<GLint>(layer));
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
-    colorTexture = texture;
+    colorAttachments[idx] = std::make_shared<RenderTarget>(texture);
 }
 
-void Framebuffer::attachColor(std::shared_ptr<Renderbuffer> renderbuffer)
+void Framebuffer::attachColor(size_t idx, std::shared_ptr<Renderbuffer> renderbuffer)
 {
-    detachColor();
+    detachColor(idx);
 
     auto& renderer = Renderer::instance();
     auto& functions = renderer.functions();
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
-    functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_RENDERBUFFER, renderbuffer->id);
+    functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + idx, GL_RENDERBUFFER, renderbuffer->id);
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
-
-    colorRenderbuffer = renderbuffer;
+    colorAttachments[idx] = std::make_shared<RenderTarget>(renderbuffer);
 }
 
 void Framebuffer::attachDepth(std::shared_ptr<Texture> texture, uint32_t layer)
@@ -530,7 +533,7 @@ void Framebuffer::attachDepth(std::shared_ptr<Texture> texture, uint32_t layer)
         functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture->id, 0, static_cast<GLint>(layer));
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
-    depthTexture = texture;
+    depthAttachment = std::make_shared<RenderTarget>(texture);
 }
 
 void Framebuffer::attachDepth(std::shared_ptr<Renderbuffer> renderbuffer)
@@ -543,27 +546,16 @@ void Framebuffer::attachDepth(std::shared_ptr<Renderbuffer> renderbuffer)
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
     functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderbuffer->id);
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
-
-    depthRenderbuffer = renderbuffer;
+    depthAttachment = std::make_shared<RenderTarget>(renderbuffer);
 }
 
-void Framebuffer::setDrawBuffer(GLenum value)
+void Framebuffer::drawBuffers(const std::vector<GLenum>& buffers)
 {
     auto& renderer = Renderer::instance();
     auto& functions = renderer.functions();
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
-    functions.glDrawBuffers(1, &value);
-    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
-}
-
-void Framebuffer::setReadBuffer(GLenum value)
-{
-    auto& renderer = Renderer::instance();
-    auto& functions = renderer.functions();
-
-    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
-    functions.glReadBuffer(value);
+    functions.glDrawBuffers(buffers.size(), buffers.data());
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
 }
 
@@ -898,6 +890,7 @@ void Renderer::setViewMatrix(const glm::mat4x4& value)
 {
     m_viewMatrix = value;
     m_viewProjMatrix = m_projMatrix * m_viewMatrix;
+    m_viewProjMatrixInverse = glm::inverse(m_viewProjMatrix);
     m_viewMatrixInverse = glm::inverse(m_viewMatrix);
     m_viewPosition = glm::vec3(m_viewMatrixInverse * glm::vec4(0.f, 0.f, 0.f, 1.f));
 }
@@ -906,6 +899,7 @@ void Renderer::setProjectionMatrix(const glm::mat4x4& value)
 {
     m_projMatrix = value;
     m_viewProjMatrix = m_projMatrix * m_viewMatrix;
+    m_viewProjMatrixInverse = glm::inverse(m_viewProjMatrix);
 }
 
 void Renderer::setClearColor(bool state, const glm::vec4& value)
@@ -936,16 +930,6 @@ void Renderer::setIBLMaps(std::shared_ptr<Texture> dm, std::shared_ptr<Texture> 
     m_IBLSpecularMap = sm;
 
     m_numIBLSpecularMapsMipmaps = m_IBLSpecularMap ? m_IBLSpecularMap->numMipmapLevels() : 0;
-}
-
-const glm::mat4x4 &Renderer::viewMatrix() const
-{
-    return m_viewMatrix;
-}
-
-const glm::mat4x4 &Renderer::projectionMatrix() const
-{
-    return m_projMatrix;
 }
 
 void Renderer::renderShadowLayer(DrawDataLayerContainer& data)
@@ -1007,6 +991,9 @@ void Renderer::setupAndRender(DrawDataLayerContainer& data, FaceRenderOrder face
         auto viewProjMatrixLoc = renderProgram->uniformLocation("u_viewProjMatrix");
         if (viewProjMatrixLoc != -1) renderProgram->setUniform(viewProjMatrixLoc, m_viewProjMatrix);
 
+        auto viewProjMatrixInverseLoc = renderProgram->uniformLocation("u_viewProjMatrixInverse");
+        if (viewProjMatrixInverseLoc != -1) renderProgram->setUniform(viewProjMatrixInverseLoc, m_viewProjMatrixInverse);
+
         auto modelMatrixLoc = renderProgram->uniformLocation("u_modelMatrix");
         if (modelMatrixLoc != -1) renderProgram->setUniform(modelMatrixLoc, modelMatrix);
 
@@ -1042,6 +1029,9 @@ void Renderer::setupAndRender(DrawDataLayerContainer& data, FaceRenderOrder face
             renderProgram->setUniform(brdfLutMapLoc, castFromTextureUnit(TextureUnit::BrdfLUT));
             bindTexture(m_brdfLutMap, castFromTextureUnit(TextureUnit::BrdfLUT));
         }
+
+        auto iblContributionLoc = renderProgram->uniformLocation("u_IBLContribution");
+        if (iblContributionLoc != -1) renderProgram->setUniform(iblContributionLoc, m_IBLContribution);
 
         auto lightsBufferIndex = renderProgram->uniformBufferIndexByName("u_lightsBuffer");
         if ((lightsBufferIndex != static_cast<GLuint>(-1)) && m_lightsBuffer)

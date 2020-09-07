@@ -19,19 +19,19 @@ ModelNodePrivate::ModelNodePrivate(Node& node)
 {
 }
 
-void ModelNodePrivate::doUpdate(uint64_t time, uint64_t dt)
+void ModelNodePrivate::doUpdate(uint64_t time, uint64_t dt, bool visible)
 {
-    NodePrivate::doUpdate(time, dt);
+    NodePrivate::doUpdate(time, dt, visible);
 
-    if (model->numBones())
+    if (startAnimation)
+    {
+        timeStart = time;
+        startAnimation = false;
+    }
+
+    if (model->numBones() && visible)
     {
         ScenePrivate::dirtyNodeShadowMaps(thisNode);
-
-        if (startAnimation)
-        {
-            timeStart = time;
-            startAnimation = false;
-        }
 
         std::vector<glm::mat3x4> bones;
         model->calcBoneTransforms(animationName, (time - timeStart + timeOffset) * 0.001f, bones);

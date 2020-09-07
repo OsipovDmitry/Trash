@@ -37,8 +37,8 @@ public:
     const glm::vec3 &color() const;
     void setColor(const glm::vec3&);
 
-    const glm::vec3& attenuation() const;
-    void setAttenuation(const glm::vec3&); // vec3(quadratic, linear, constant)
+    const glm::vec2& radiuses() const;
+    void setRadiuses(const glm::vec2&); // vec2(inner, attDist)
 
     const glm::vec3& position() const;
     void setPosition(const glm::vec3&);

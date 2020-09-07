@@ -14,4 +14,4 @@ done 13) develop TextNode, loading fonts (https://evanw.github.io/font-texture-g
 14) why is base color black when there are no lighting ?
 done 15) develop AutoTransformNode that is always oriented to camera
 done 16) replace bounding spheres to bounding boxes for scene graph
-17) sometimes shading jumps on static models
+17) sometimes shading jumps on static models (it depends with autocalculating z-planes for frusum of light)

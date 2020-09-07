@@ -18,7 +18,7 @@ namespace core
 LightPrivate::LightPrivate(Light* l, LightType lightType)
     : dir(0.f, 0.f, 1.f)
     , color(1.f, 1.f, 1.f)
-    , att(0.f, 0.f, 1.f)
+    , radiuses(3.f, 50.f)
     , angles(glm::pi<float>()/6.0f, glm::pi<float>()/4.0f)
     , cosAngles(glm::cos(0.5f*angles))
     , type(lightType)
@@ -31,9 +31,7 @@ LightPrivate::LightPrivate(Light* l, LightType lightType)
 
 {
     shadowMapFramebuffer = std::make_shared<Framebuffer>();
-    shadowMapFramebuffer->attachColor(Renderer::instance().createTexture2D(GL_RGBA8, 1024,1024,GL_RGBA,GL_UNSIGNED_BYTE,nullptr));
-    //shadowMapFramebuffer->setDrawBuffer(GL_NONE);
-    //shadowMapFramebuffer->setReadBuffer(GL_NONE);
+    shadowMapFramebuffer->drawBuffers({GL_NONE});
 }
 
 float LightPrivate::intensity(const glm::vec3& v) const
@@ -43,18 +41,10 @@ float LightPrivate::intensity(const glm::vec3& v) const
 
     if ((type == LightType::Point) || (type == LightType::Spot))
     {
-        float dist = glm::length(toLight);
-        glm::vec3 l = glm::normalize(toLight);
+        const float dist = glm::length(toLight);
 
-        attenaution *= 1.0f / (att.x * dist * dist + att.y * dist + att.z);
-
-//        if (type == LightType::Spot)
-//        {
-//            float cosAngle = glm::dot(-l, dir);
-//            float spotAtt = (cosAngle - cosAngles.y) / (cosAngles.x - cosAngles.y);
-//            spotAtt = glm::clamp(spotAtt, 0.0f, 1.0f);
-//            attenaution *= spotAtt;
-//        }
+        const float arg = glm::clamp((dist - radiuses.x) / radiuses.y, 0.f, 1.f);
+        attenaution *= 1.f - arg*arg;
     }
 
     return attenaution;
@@ -78,7 +68,7 @@ glm::mat4x4 LightPrivate::packParams() const
                 glm::vec4(pos, cosAngles.x),
                 glm::vec4(dir, cosAngles.y),
                 glm::vec4(color, static_cast<float>(type)),
-                glm::vec4(att, shadowMapIsEnabled ? 1.0f : 0.0f)
+                glm::vec4(radiuses, 0.0f, shadowMapIsEnabled ? 1.0f : 0.0f)
                 );
 }
 

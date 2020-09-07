@@ -18,7 +18,7 @@ class ModelNodePrivate : public NodePrivate
 public:
     ModelNodePrivate(Node&);
 
-    void doUpdate(uint64_t, uint64_t) override;
+    void doUpdate(uint64_t, uint64_t, bool) override;
 
     std::shared_ptr<Model> model;
     std::shared_ptr<Buffer> bonesBuffer;

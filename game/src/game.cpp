@@ -93,8 +93,6 @@ void Game::doInitialize()
     m_->floor = std::make_shared<Floor>();
     m_->scene->attachObject(m_->floor);
 
-//    std::vector<glm::vec3> qwe {glm::vec3(-1000,800,-1000), /*glm::vec3(1000,800,1000), glm::vec3(1000,800,-1000), glm::vec3(-1000,800,1000)*/ };
-//    for (const auto& p: qwe)
     static std::array<glm::vec3, 5> colors {glm::vec3(1.0,0.3,0.2), glm::vec3(0,0.5,1), glm::vec3(0.5,1,0), glm::vec3(1,1,1), glm::vec3(1,0,0.5)};
     int c = 0;
     const int LN = 2;
@@ -106,7 +104,7 @@ void Game::doInitialize()
             l->setDirection(glm::vec3(0.0,-1.0,0.0));
             l->setSpotAngles(glm::vec2(1.5f, 2.1f));
             l->setColor(colors[c++]);
-
+            l->setRadiuses(glm::vec2(5300.0f, 3000.0f));
             m_->scene->scene()->attachLight(l);
         }
 
@@ -116,7 +114,6 @@ void Game::doInitialize()
     l->setDirection(-d);
     l->setColor(glm::vec3(0.5f));
     l->setSpotAngles(glm::vec2(1.0f, 5000.0f));
-
     m_->scene->scene()->attachLight(l);
 
     const float r = 400;

@@ -16,8 +16,10 @@ AutoTransformNodePrivate::AutoTransformNodePrivate(Node& node)
 
 }
 
-void AutoTransformNodePrivate::doUpdate(uint64_t dt, uint64_t time)
+void AutoTransformNodePrivate::doUpdate(uint64_t dt, uint64_t time, bool visible)
 {
+    NodePrivate::doUpdate(dt, time, visible);
+
     auto scene = getScene();
     if (scene)
     {
@@ -25,8 +27,6 @@ void AutoTransformNodePrivate::doUpdate(uint64_t dt, uint64_t time)
         thisTransform.rotation = glm::inverse(glm::quat(glm::mat3x3(scene->camera()->viewMatrix())) * thisNode.parent()->globalTransform().rotation);
         thisNode.setTransform(thisTransform);
     }
-
-    NodePrivate::doUpdate(dt, time);
 }
 
 
