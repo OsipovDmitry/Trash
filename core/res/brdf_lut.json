@@ -1,8 +1,0 @@
-{
-    "Mipmap0" : {
-        "Image" : "brdf_lut.png"
-    },
-    
-    "InternalFormat": "GL_RG8",
-    "Wrap": "GL_CLAMP_TO_EDGE"
-}

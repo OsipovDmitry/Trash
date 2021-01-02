@@ -1,26 +1,30 @@
 <RCC>
     <qresource prefix="/">
         <file>res/chess.png</file>
-        <file>res/textured_mesh.frag</file>
-        <file>res/textured_mesh.vert</file>
-        <file>res/textured_static_mesh.vert</file>
-        <file>res/colored_mesh.frag</file>
-        <file>res/colored_mesh.vert</file>
-        <file>res/colored_static_mesh.vert</file>
         <file>res/gammacorrection.glsl</file>
         <file>res/lights.glsl</file>
         <file>res/pbr.glsl</file>
         <file>res/ibl.glsl</file>
-        <file>res/brdf_lut.png</file>
-        <file>res/brdf_lut.json</file>
         <file>res/teapot.fbx</file>
-        <file>res/empty.frag</file>
         <file>res/background.frag</file>
         <file>res/background.vert</file>
         <file>res/PurisaDesc.json</file>
         <file>res/PursiaTex.json</file>
         <file>res/PursiaTex.png</file>
-        <file>res/text.frag</file>
-        <file>res/text.vert</file>
+        <file>res/standard.frag</file>
+        <file>res/standard.vert</file>
+        <file>res/shadow.frag</file>
+        <file>res/shadow.vert</file>
+        <file>res/id.frag</file>
+        <file>res/id.vert</file>
+        <file>res/deferred_geometry_pass.frag</file>
+        <file>res/deferred_geometry_pass.vert</file>
+        <file>res/deferred_light_pass.frag</file>
+        <file>res/deferred_light_pass.vert</file>
+        <file>res/deferred_stencil_pass.frag</file>
+        <file>res/deferred_stencil_pass.vert</file>
+        <file>res/posteffect.vert</file>
+        <file>res/posteffect_final.frag</file>
+        <file>res/settings_default.json</file>
     </qresource>
 </RCC>

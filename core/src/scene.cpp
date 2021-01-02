@@ -31,12 +31,12 @@ IntersectionData Scene::intersectScene(const utils::Frustum &frustum) const
     return m_->intersectScene(frustum);
 }
 
-std::shared_ptr<Node> Scene::rootNode()
+std::shared_ptr<SceneRootNode> Scene::rootNode()
 {
     return m_->rootNode;
 }
 
-std::shared_ptr<const Node> Scene::rootNode() const
+std::shared_ptr<const SceneRootNode> Scene::rootNode() const
 {
     return m_->rootNode;
 }
@@ -61,10 +61,10 @@ bool Scene::detachLight(std::shared_ptr<Light> light)
     return m_->detachLight(light);
 }
 
-std::shared_ptr<const LightsList> Scene::lights() const
-{
-    return m_->lights;
-}
+//std::shared_ptr<const LightsList> Scene::lights() const
+//{
+//    return m_->lights;
+//}
 
 } // namespace
 } // namespace

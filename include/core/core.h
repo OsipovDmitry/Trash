@@ -6,7 +6,6 @@
 #include <utils/controller.h>
 #include <utils/singletoon.h>
 #include <utils/pimpl.h>
-#include <utils/message.h>
 
 #include <core/coreglobal.h>
 #include <core/forwarddecl.h>
@@ -41,22 +40,6 @@ protected:
 private:
     Core();
     ~Core() override;
-};
-
-class ResizeMessage : public AbstractController::Message
-{
-    MESSAGE(ControllerMessageType::Resize)
-public:
-    int32_t width, height;
-    ResizeMessage(int32_t w, int32_t h) : AbstractController::Message(messageType()), width(w), height(h) {}
-};
-
-class UpdateMessage : public AbstractController::Message
-{
-    MESSAGE(ControllerMessageType::Update)
-public:
-    uint64_t time, dt;
-    UpdateMessage(uint64_t time_, uint64_t dt_) : AbstractController::Message(messageType()), time(time_), dt(dt_) {}
 };
 
 } // namespace

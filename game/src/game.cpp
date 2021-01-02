@@ -21,6 +21,11 @@
 #include "teapot.h"
 #include "waypoint.h"
 
+auto rnd = [](float from = 0.0f, float to = 1.0f)
+{
+    return static_cast<float>(rand()) / (RAND_MAX-1) * (to-from) + from;
+};
+
 namespace trash
 {
 namespace game
@@ -39,23 +44,12 @@ void Game::doInitialize()
 {
     m_->scene = std::make_shared<Scene>();
 
-//    const int N = 7;
-//    for (int x = 0; x < N; ++x)
-//        for (int y = 0; y < N; ++y)
-//        {
-//            auto teapot = std::make_shared<Teapot>(glm::vec3(1.0f, 1.0f, 1.0f), static_cast<float>(y) / (N-1), static_cast<float>(x) / (N-1));
-//            teapot->graphicsNode()->setTransform(utils::Transform(glm::vec3(1.f, 1.f, 1.f),
-//                                                                  glm::quat(1.f, 0.f, 0.f, 0.f),
-//                                                                  glm::vec3((x - (N-1)*.5f) * 4, (y - (N-1)*.5f) * 4, 0.f)));
-//            m_->scene->attachObject(teapot);
-//        }
-
-
     for (auto i = -4; i <= 4; ++i)
     {
         auto teapot = std::make_shared<Teapot>(glm::vec3(1.0f, 0.5f, 0.5f), 0.2f, 0.6f);
         teapot->graphicsNode()->setTransform(utils::Transform::fromTranslation(glm::vec3(i+(i%2), 0.0f, i-(i%2)) * 520.0f) * utils::Transform::fromScale(100.f));
         m_->scene->attachObject(teapot);
+
     }
 
     const float wpcoef = 700.0f;
@@ -88,31 +82,35 @@ void Game::doInitialize()
         m_->persons[i]->moveTo(m_->waypoints[static_cast<size_t>(static_cast<float>(m_->waypoints.size()) / GamePrivate::numPersons * i)]);
     }
 
-    m_->persons[0]->graphicsNode()->frustum = true;
-
     m_->floor = std::make_shared<Floor>();
     m_->scene->attachObject(m_->floor);
 
-    static std::array<glm::vec3, 5> colors {glm::vec3(1.0,0.3,0.2), glm::vec3(0,0.5,1), glm::vec3(0.5,1,0), glm::vec3(1,1,1), glm::vec3(1,0,0.5)};
-    int c = 0;
-    const int LN = 2;
-    const float LN_sz = 700.0f;
-    for (int z = -LN; z <= LN; ++z)
-        {
-            auto l = std::make_shared<core::Light>(core::LightType::Spot);
-            l->setPosition(glm::vec3(z * LN_sz, 800.0f, z * LN_sz));
-            l->setDirection(glm::vec3(0.0,-1.0,0.0));
-            l->setSpotAngles(glm::vec2(1.5f, 2.1f));
-            l->setColor(colors[c++]);
-            l->setRadiuses(glm::vec2(5300.0f, 3000.0f));
-            m_->scene->scene()->attachLight(l);
-        }
+    static const std::vector<glm::vec3> lightColors {
+        glm::vec3(1,0,0),
+                glm::vec3(0,1,0),
+                glm::vec3(0,0,1),
+                glm::vec3(1,1,0),
+                glm::vec3(1,0,1),
+                glm::vec3(0,1,1),
+    };
+
+    for (int z = 0; z < 50; ++z)
+    {
+        auto l = std::make_shared<core::Light>(core::LightType::Point);
+        l->setPosition(glm::vec3(rnd(-2500, 2500), 200.0f, rnd(-2500, 2500)));
+        l->setDirection(glm::vec3(0.0,-1.0,0.0));
+        l->setSpotAngles(glm::vec2(1.0f, 1.5f));
+        l->setColor(5.0f * lightColors.at(rand() % lightColors.size()));
+        l->setRadiuses(glm::vec2(250.0f, 250.0f));
+        l->enableShadowMap(false);
+        m_->scene->scene()->attachLight(l);
+    }
 
     auto l = std::make_shared<core::Light>(core::LightType::Direction);
     auto d = glm::vec3(2500.0f, 1000.0f, -2500.0f);
     l->setPosition(d);
     l->setDirection(-d);
-    l->setColor(glm::vec3(0.5f));
+    l->setColor(glm::vec3(0.5f, 0.5f, 0.5f));
     l->setSpotAngles(glm::vec2(1.0f, 5000.0f));
     m_->scene->scene()->attachLight(l);
 
@@ -146,7 +144,7 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
         auto personNode = person->graphicsNode();
         //utils::Ray ray = personNode->globalTransform() * utils::Ray(personNode->boundingBox().center(), glm::vec3(0.f, 0.f, 1.f));
 
-        auto transform = personNode->globalTransform().operator glm::mat4x4() *
+        auto transform = personNode->globalTransform() *
                 glm::translate(glm::mat4x4(1.0f), personNode->boundingBox().center()) *
                 glm::rotate(glm::mat4x4(1.0f), glm::pi<float>(), glm::vec3(0.f, 1.f, 0.f));
 
@@ -179,27 +177,9 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
                 break;
         }
     }
-
-//    for (auto l : m_->scene->camera()->scene()->lights())
-//    {
-//        l->setColor(glm::vec3(1,1,1));
-//    }
-
-//    if (!m_->acivePerson.expired())
-//    {
-//        auto& lights = m_->scene->camera()->scene()->lights();
-//        auto& activeLights = m_->acivePerson.lock()->graphicsNode()->getLights();
-//        for (auto idx : activeLights)
-//        {
-//            if (idx >= 0)
-//            {
-//                lights.at(idx)->setColor(glm::vec3(1,0,0));
-//            }
-//        }
-//    }
 }
 
-void Game::doMouseClick(int x, int y)
+void Game::doMouseClick(uint32_t, int x, int y)
 {
     auto pickData = m_->scene->scene()->pickScene(x, y);
     if (pickData.node)

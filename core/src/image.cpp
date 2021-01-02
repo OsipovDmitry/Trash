@@ -1,6 +1,6 @@
 #include <algorithm>
 
-#include <QImage>
+#include <QtGui/QImage>
 
 #include <utils/fileinfo.h>
 #include <utils/noncopyble.h>

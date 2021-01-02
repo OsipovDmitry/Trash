@@ -60,6 +60,16 @@ public:
     static Transform fromTranslation(const glm::vec3& value) { return Transform(glm::vec3(1.0f, 1.0f, 1.0f), glm::quat(1.0f, 0.0f, 0.0f, 0.0f), value); }
 };
 
+inline glm::mat4x4 operator *(const glm::mat4x4& left, const Transform& right)
+{
+    return left * right.operator glm::mat4x4();
+}
+
+inline glm::mat4x4 operator *(const Transform& left, const glm::mat4x4& right)
+{
+    return left.operator glm::mat4x4() * right;
+}
+
 } // namespace
 } // namespace
 

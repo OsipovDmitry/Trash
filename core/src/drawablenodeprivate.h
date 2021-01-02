@@ -4,6 +4,7 @@
 #include <unordered_set>
 
 #include "nodeprivate.h"
+#include "typesprivate.h"
 
 namespace trash
 {
@@ -12,7 +13,6 @@ namespace core
 
 class Drawable;
 struct Texture;
-using ShadowMapsList = std::array<std::shared_ptr<Texture>, MAX_LIGHTS_PER_NODE>;
 
 class DrawableNodePrivate : public NodePrivate
 {
@@ -29,11 +29,9 @@ public:
     virtual void doDirtyLightIndices();
     virtual void doDirtyShadowMaps();
 
-    virtual void doShadow();
-    virtual void doPick(uint32_t);
-    virtual void doRender();
+    virtual void doRender(uint32_t);
 
-    void doUpdate(uint64_t, uint64_t, bool) override;
+    void doUpdate(uint64_t, uint64_t) override;
     void doBeforeChangingTransformation() override;
     void doAfterChangingTransformation() override;
 

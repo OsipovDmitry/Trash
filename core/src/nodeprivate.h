@@ -26,7 +26,7 @@ public:
 
     virtual const utils::BoundingBox& getLocalBoundingBox() { return emptyLocalBoundingBox; }
 
-    virtual void doUpdate(uint64_t, uint64_t, bool);
+    virtual void doUpdate(uint64_t, uint64_t);
     virtual void doBeforeChangingTransformation();
     virtual void doAfterChangingTransformation();
 

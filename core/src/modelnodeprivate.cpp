@@ -19,9 +19,9 @@ ModelNodePrivate::ModelNodePrivate(Node& node)
 {
 }
 
-void ModelNodePrivate::doUpdate(uint64_t time, uint64_t dt, bool visible)
+void ModelNodePrivate::doUpdate(uint64_t time, uint64_t dt)
 {
-    NodePrivate::doUpdate(time, dt, visible);
+    NodePrivate::doUpdate(time, dt);
 
     if (startAnimation)
     {
@@ -29,7 +29,7 @@ void ModelNodePrivate::doUpdate(uint64_t time, uint64_t dt, bool visible)
         startAnimation = false;
     }
 
-    if (model->numBones() && visible)
+    if (model->numBones())
     {
         ScenePrivate::dirtyNodeShadowMaps(thisNode);
 

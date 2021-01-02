@@ -11,6 +11,8 @@
 #include <core/abstractcontroller.h>
 #include <core/types.h>
 
+#include "typesprivate.h"
+
 class QTimer;
 
 namespace trash
@@ -34,6 +36,7 @@ protected:
     void resizeGL(int, int) override;
     void paintGL() override;
     void mousePressEvent(QMouseEvent*) override;
+    void mouseMoveEvent(QMouseEvent*) override;
     void closeEvent(QCloseEvent*) override;
 
 private:
@@ -43,6 +46,8 @@ private:
     uint64_t m_startTime, m_lastUpdateTime, m_lastFpsTime;
     uint32_t m_fpsCounter;
     float m_lastFps;
+
+    static uint32_t mouseButtonMask(const Qt::MouseButtons&);
 };
 
 class RenderWidgetWasInitializedMessage : public AbstractController::Message
@@ -68,12 +73,22 @@ public:
     RenderWidgetWasResizedMessage(int32_t w, int32_t h) : AbstractController::Message(messageType()), width(w), height(h) {}
 };
 
-class RenderWidgetWasClickedMessage : public AbstractController::Message
+class RenderWidgetMouseClickMessage : public AbstractController::Message
 {
-    MESSAGE(ControllerMessageType::RenderWidgetWasClicked)
+    MESSAGE(ControllerMessageType::RenderWidgetMouseClick)
 public:
     int x, y;
-    RenderWidgetWasClickedMessage(int xPos, int yPos) : AbstractController::Message(messageType()), x(xPos), y(yPos) {}
+    uint32_t buttonMask;
+    RenderWidgetMouseClickMessage(uint32_t bmask, int xPos, int yPos) : AbstractController::Message(messageType()), buttonMask(bmask), x(xPos), y(yPos) {}
+};
+
+class RenderWidgetMouseMoveMessage : public AbstractController::Message
+{
+    MESSAGE(ControllerMessageType::RenderWidgetMouseMove)
+public:
+    int x, y;
+    uint32_t buttonMask;
+    RenderWidgetMouseMoveMessage(uint32_t bmask, int xPos, int yPos) : AbstractController::Message(messageType()), buttonMask(bmask), x(xPos), y(yPos) {}
 };
 
 class RenderWidgetWasClosedMessage : public AbstractController::Message

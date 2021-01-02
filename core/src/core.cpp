@@ -72,12 +72,21 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
         }
         break;
     }
-    case ControllerMessageType::RenderWidgetWasClicked:
+    case ControllerMessageType::RenderWidgetMouseClick:
     {
-        auto message = msg_cast<RenderWidgetWasClickedMessage>(msg);
+        auto message = msg_cast<RenderWidgetMouseClickMessage>(msg);
         if (!corePrivate.game.expired())
         {
-            corePrivate.game.lock()->doMouseClick(message->x, message->y);
+            corePrivate.game.lock()->doMouseClick(message->buttonMask, message->x, message->y);
+        }
+        break;
+    }
+    case ControllerMessageType::RenderWidgetMouseMove:
+    {
+        auto message = msg_cast<RenderWidgetMouseMoveMessage>(msg);
+        if (!corePrivate.game.expired())
+        {
+            corePrivate.game.lock()->doMouseMove(message->buttonMask, message->x, message->y);
         }
         break;
     }

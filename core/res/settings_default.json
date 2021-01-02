@@ -1,0 +1,21 @@
+{
+    "Renderer": {
+        "DeferredTechnique": true,
+        "Camera": {
+            "MinZNear": 1.0
+        },
+        "Shadow": {
+            "ShadowMapSize": 512,
+            "MinZNear": 1.0
+        },
+        "Background": {
+            "Roughness": 0.1
+        },
+        "IBL": {
+            "DiffuseMap": "textures/ibl/diffuse/diffuse.json",
+            "SpecularMap": "textures/ibl/specular/specular.json",
+            "BrdfLutMap": "textures/ibl/brdf/brdf_lut.json",
+            "Contribution": 0.2
+        }
+    }
+}

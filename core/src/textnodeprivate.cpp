@@ -30,10 +30,10 @@ void TextNodePrivate::updateDrawable()
     }
 }
 
-void TextNodePrivate::doUpdate(uint64_t dt, uint64_t time, bool visible)
+void TextNodePrivate::doUpdate(uint64_t dt, uint64_t time)
 {
     updateDrawable();
-    DrawableNodePrivate::doUpdate(dt, time, visible);
+    DrawableNodePrivate::doUpdate(dt, time);
 }
 
 

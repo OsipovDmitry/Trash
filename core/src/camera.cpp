@@ -20,27 +20,15 @@ Camera::~Camera()
 {
 }
 
-void Camera::setViewport(const glm::ivec4& size)
+void Camera::setViewportSize(const glm::uvec2& size)
 {
-    m_->viewport = size;
+    m_->viewportSize = size;
     m_->projMatrixIsDirty = true;
 }
 
-const glm::ivec4& Camera::viewport() const
+const glm::uvec2& Camera::viewportSize() const
 {
-    return m_->viewport;
-}
-
-void Camera::setClearColor(bool state, const glm::vec4& value)
-{
-    m_->clearColorBuffer = state;
-    m_->clearColor = value;
-}
-
-void Camera::setClearDepth(bool state, float value)
-{
-    m_->clearDepthBuffer = state;
-    m_->clearDepth = value;
+    return m_->viewportSize;
 }
 
 const glm::mat4x4& Camera::viewMatrix() const

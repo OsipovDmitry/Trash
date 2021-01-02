@@ -68,6 +68,7 @@ void DrawableNodePrivate::doUpdateLightIndices()
     if (isLightIndicesDirty)
     {
         auto lightsList = getScene()->m().lights;
+        auto boundingBox = getGlobalTransform() * getLocalBoundingBox();
 
         std::array<float, MAX_LIGHTS_PER_NODE> intesities;
         for (size_t i = 0; i < MAX_LIGHTS_PER_NODE; ++i)
@@ -81,7 +82,7 @@ void DrawableNodePrivate::doUpdateLightIndices()
             auto light = lightsList->at(lightIndex);
             if (light)
             {
-                float lightIntensity = light->m().intensity(getGlobalTransform().translation);
+                float lightIntensity = light->m().intensity(boundingBox);
                 for (int32_t i = 0; i < MAX_LIGHTS_PER_NODE; ++i)
                 {
                     if (intesities[static_cast<size_t>(i)] < lightIntensity)
@@ -112,7 +113,7 @@ void DrawableNodePrivate::doDirtyShadowMaps()
         return;
 
     auto& scenePrivate = scene->m();
-    auto lightsList = scene->lights();
+    auto lightsList = scenePrivate.lights;
     auto lightIndicesList = getLightIndices();
 
     for (auto index : *lightIndicesList)
@@ -122,41 +123,19 @@ void DrawableNodePrivate::doDirtyShadowMaps()
     }
 }
 
-void DrawableNodePrivate::doShadow()
-{
-    auto& renderer = Renderer::instance();
-
-    for (auto& drawable : drawables)
-        if (auto shadowDrawable = drawable->shadowDrawable())
-            renderer.draw(shadowDrawable, getGlobalTransform());
-}
-
-void DrawableNodePrivate::doPick(uint32_t id)
-{
-    auto& renderer = Renderer::instance();
-
-    for (auto& drawable : drawables)
-        if (auto selectionDrawable = drawable->selectionDrawable(id))
-            renderer.draw(selectionDrawable, getGlobalTransform());
-}
-
-void DrawableNodePrivate::doRender()
+void DrawableNodePrivate::doRender(uint32_t id)
 {
     auto& renderer = Renderer::instance();
     for (auto& drawable : drawables)
-        renderer.draw(drawable, getGlobalTransform());
+        renderer.draw(drawable, getGlobalTransform(), id);
 
     //renderer.draw(std::make_shared<BoxDrawable>(getLocalBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
 }
 
-void DrawableNodePrivate::doUpdate(uint64_t dt, uint64_t time, bool visible)
+void DrawableNodePrivate::doUpdate(uint64_t dt, uint64_t time)
 {
-    NodePrivate::doUpdate(dt, time, visible);
-
-    if (visible)
-    {
-        doUpdateLightIndices();
-    }
+    NodePrivate::doUpdate(dt, time);
+    doUpdateLightIndices();
 }
 
 void DrawableNodePrivate::doBeforeChangingTransformation()

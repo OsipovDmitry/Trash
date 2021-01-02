@@ -8,4 +8,5 @@ SOURCES += \
 
 LIBS += \
     -lcore \
-    -lgame
+    -lgame \
+    -lteeth

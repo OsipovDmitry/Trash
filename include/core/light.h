@@ -18,8 +18,6 @@ namespace trash
 namespace core
 {
 
-ENUMCLASS(LightType, uint32_t, None, Point, Direction, Spot)
-
 class LightPrivate;
 
 class CORESHARED_EXPORT Light
@@ -28,11 +26,10 @@ class CORESHARED_EXPORT Light
     PIMPL(Light)
 
 public:
-    Light(LightType = LightType::Point);
+    Light(LightType);
     virtual ~Light();
 
     LightType type() const;
-    void setType(LightType);
 
     const glm::vec3 &color() const;
     void setColor(const glm::vec3&);

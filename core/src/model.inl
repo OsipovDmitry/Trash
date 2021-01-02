@@ -7,6 +7,8 @@
 #include <assimp/Importer.hpp>
 #include <assimp/postprocess.h>
 
+#include <utils/fileinfo.h>
+
 #include "renderer.h"
 #include "importexport.h"
 
@@ -20,7 +22,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
     auto object = std::static_pointer_cast<Model>(m_resourceStorage->get(filename));
     if (!object)
     {
-        if (filename.find(".mdl") != std::string::npos)
+        if (utils::fileExt(filename) == "mdl")
         {
             std::shared_ptr<Model> mdl;
             std::ifstream file(filename, std::ios_base::binary);
@@ -63,25 +65,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                 if (material->GetTexture(aiTextureType_DIFFUSE, 0, &path) == AI_SUCCESS)
                 {
                     std::string filename = path.C_Str();
-                    materialTo->diffuseTexture = std::make_pair(filename, loadTexture(filename));
-
-//                    std::string bumpFilename = filename;
-//                    bumpFilename.replace(bumpFilename.find("Diffuse"), 7, "Normal");
-//                    materialTo->normalTexture = std::make_pair(bumpFilename, loadTexture(bumpFilename));
-
-//                    std::string opacityFilename = filename;
-//                    opacityFilename.replace(opacityFilename.find("Diffuse"), 7, "Opacity");
-//                    materialTo->opacityTexture = std::make_pair(opacityFilename, loadTexture(opacityFilename));
-
-//                    std::string specularFilename = filename;
-//                    specularFilename.replace(specularFilename.find("Diffuse"), 7, "Specular");
-//                    materialTo->metallicOrSpecularTexture = std::make_pair(specularFilename, loadTexture(specularFilename));
-
-//                    std::string glossFilename = filename;
-//                    glossFilename.replace(glossFilename.find("Diffuse"), 7, "Gloss");
-//                    materialTo->roughOrGlossTexture = std::make_pair(glossFilename, loadTexture(glossFilename));
-
-//                    materialTo->isMetallicRoughWorkflow = false;
+                    materialTo->baseColorMap = std::make_pair(filename, loadTexture(filename));
                 }
 
             }
@@ -91,7 +75,7 @@ std::shared_ptr<Model> Renderer::loadModel(const std::string& filename)
                 if (material->GetTexture(aiTextureType_NORMALS, 0, &path) == AI_SUCCESS)
                 {
                     std::string filename = path.C_Str();
-                    materialTo->normalTexture = std::make_pair(filename, loadTexture(filename));
+                    materialTo->normalMap = std::make_pair(filename, loadTexture(filename));
                 }
             }
 

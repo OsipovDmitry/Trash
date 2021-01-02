@@ -5,9 +5,11 @@
 
 #include <core/light.h>
 #include <core/scene.h>
+#include <core/scenerootnode.h>
 
 #include "lightprivate.h"
 #include "sceneprivate.h"
+#include "scenerootnodeprivate.h"
 #include "renderer.h"
 
 namespace trash
@@ -24,27 +26,24 @@ LightPrivate::LightPrivate(Light* l, LightType lightType)
     , type(lightType)
     , scene(nullptr)
     , thisLight(l)
-    , matrix(1.0f)
-    , zPlanes(ScenePrivate::ShadowMapMinZNear, ScenePrivate::ShadowMapMinZNear+1.0f)
-    , matrixIsDirty(true)
     , shadowMapIsEnabled(true)
-
 {
-    shadowMapFramebuffer = std::make_shared<Framebuffer>();
-    shadowMapFramebuffer->drawBuffers({GL_NONE});
 }
 
-float LightPrivate::intensity(const glm::vec3& v) const
+float LightPrivate::intensity(const utils::BoundingBox &box) const
 {
     float attenaution = 1.0f;
-    glm::vec3 toLight = direction(v);
 
     if ((type == LightType::Point) || (type == LightType::Spot))
     {
+        const glm::vec3 closestPoint = box.closestPoint(pos);
+        const glm::vec3 toLight = direction(closestPoint);
         const float dist = glm::length(toLight);
-
-        const float arg = glm::clamp((dist - radiuses.x) / radiuses.y, 0.f, 1.f);
-        attenaution *= 1.f - arg*arg;
+        attenaution = 1.f - glm::smoothstep(radiuses.x, radiuses.x + radiuses.y, dist);
+    }
+    else if (type == LightType::Direction)
+    {
+        attenaution = std::numeric_limits<float>::max();
     }
 
     return attenaution;
@@ -72,47 +71,6 @@ glm::mat4x4 LightPrivate::packParams() const
                 );
 }
 
-glm::mat4x4 LightPrivate::getMatrix()
-{
-    if (matrixIsDirty)
-    {
-        matrix = calcMatrix(zPlanes);
-        matrixIsDirty = false;
-    }
-
-    return matrix;
-}
-
-glm::mat4x4 LightPrivate::calcMatrix(const std::pair<float, float>& zDistances) const
-{
-    glm::vec3 upDir(0.0f, 1.0f, 0.0f);
-    if (glm::length(glm::cross(dir, upDir)) < 1e-5f)
-        upDir = glm::vec3(1.0f, 0.0f, 0.0f);
-
-    glm::mat4x4 result(1.f);
-
-    if ((type == LightType::Point) || (type == LightType::Spot))
-        result = glm::perspective(angles.y, 1.0f, zDistances.first, zDistances.second) * glm::lookAt(pos, pos+dir, upDir);
-    else if (type == LightType::Direction)
-    {
-        const float halfSize = 0.5f * angles.y;
-        result = glm::ortho(-halfSize, halfSize, -halfSize, halfSize, zDistances.first, zDistances.second) * glm::lookAt(pos, pos+dir, upDir);
-    }
-
-    return result;
-}
-
-void LightPrivate::attachShadowMap(std::shared_ptr<Texture> texture, uint32_t layer)
-{
-    shadowMapFramebuffer->attachDepth(texture, layer);
-}
-
-void LightPrivate::setZPlanes(const std::pair<float, float>& palnes)
-{
-    zPlanes = palnes;
-    matrixIsDirty = true;
-}
-
 void LightPrivate::dirtyScene()
 {
     if (scene)
@@ -121,12 +79,8 @@ void LightPrivate::dirtyScene()
         ScenePrivate::dirtyNodeLightIndices(*scenePrivate.rootNode);
         scenePrivate.dirtyLightParams(thisLight);
         scenePrivate.dirtyShadowMap(thisLight);
+        scenePrivate.rootNode->m().dirtyLocalBoundingBox();
     }
-}
-
-void LightPrivate::dirtyMatrix()
-{
-    matrixIsDirty = true;
 }
 
 } // namespace

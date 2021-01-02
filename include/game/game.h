@@ -26,7 +26,7 @@ public:
     void doInitialize() override;
     void doUnitialize() override;
     void doUpdate(uint64_t, uint64_t) override;
-    void doMouseClick(int, int) override;
+    void doMouseClick(uint32_t, int, int) override;
 
 private:
     std::unique_ptr<GamePrivate> m_;

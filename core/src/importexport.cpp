@@ -76,12 +76,11 @@ void push(std::ofstream& stream, std::shared_ptr<Mesh> f)
 }
 void push(std::ofstream& stream, std::shared_ptr<Model::Material> f)
 {
-    push(stream, f->diffuseTexture.first);
-    push(stream, f->opacityTexture.first);
-    push(stream, f->normalTexture.first);
-    push(stream, f->metallicOrSpecularTexture.first);
-    push(stream, f->roughOrGlossTexture.first);
-    push(stream, f->isMetallicRoughWorkflow);
+    push(stream, f->baseColorMap.first);
+    push(stream, f->opacityMap.first);
+    push(stream, f->normalMap.first);
+    push(stream, f->metallicMap.first);
+    push(stream, f->roughnessMap.first);
 }
 void push(std::ofstream& stream, std::shared_ptr<Model::Mesh> f)
 {
@@ -254,22 +253,20 @@ void pull(std::ifstream& stream, std::shared_ptr<Model::Material>& f)
 {
     f = std::make_shared<Model::Material>();
 
-    pull(stream, f->diffuseTexture.first);
-    f->diffuseTexture.second = Renderer::instance().loadTexture(f->diffuseTexture.first);
+    pull(stream, f->baseColorMap.first);
+    f->baseColorMap.second = Renderer::instance().loadTexture(f->baseColorMap.first);
 
-    pull(stream, f->opacityTexture.first);
-    f->opacityTexture.second = Renderer::instance().loadTexture(f->opacityTexture.first);
+    pull(stream, f->opacityMap.first);
+    f->opacityMap.second = Renderer::instance().loadTexture(f->opacityMap.first);
 
-    pull(stream, f->normalTexture.first);
-    f->normalTexture.second = Renderer::instance().loadTexture(f->normalTexture.first);
+    pull(stream, f->normalMap.first);
+    f->normalMap.second = Renderer::instance().loadTexture(f->normalMap.first);
 
-    pull(stream, f->metallicOrSpecularTexture.first);
-    f->metallicOrSpecularTexture.second = Renderer::instance().loadTexture(f->metallicOrSpecularTexture.first);
+    pull(stream, f->metallicMap.first);
+    f->metallicMap.second = Renderer::instance().loadTexture(f->metallicMap.first);
 
-    pull(stream, f->roughOrGlossTexture.first);
-    f->roughOrGlossTexture.second = Renderer::instance().loadTexture(f->roughOrGlossTexture.first);
-
-    pull(stream, f->isMetallicRoughWorkflow);
+    pull(stream, f->roughnessMap.first);
+    f->roughnessMap.second = Renderer::instance().loadTexture(f->roughnessMap.first);
 }
 void pull(std::ifstream& stream, std::shared_ptr<Model::Mesh>& f)
 {

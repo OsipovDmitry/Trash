@@ -4,10 +4,12 @@
 #include <memory>
 #include <array>
 
+#include <utils/message.h>
 #include <core/forwarddecl.h>
 #include <core/types.h>
 
 #include "abstractcontrollerprivate.h"
+#include "typesprivate.h"
 
 namespace trash
 {
@@ -26,6 +28,22 @@ public:
     std::array<AbstractController*, numElementsControllerType()> controllers;
     std::weak_ptr<AbstractGame> game;
 
+};
+
+class ResizeMessage : public AbstractController::Message
+{
+    MESSAGE(ControllerMessageType::Resize)
+public:
+    int32_t width, height;
+    ResizeMessage(int32_t w, int32_t h) : AbstractController::Message(messageType()), width(w), height(h) {}
+};
+
+class UpdateMessage : public AbstractController::Message
+{
+    MESSAGE(ControllerMessageType::Update)
+public:
+    uint64_t time, dt;
+    UpdateMessage(uint64_t time_, uint64_t dt_) : AbstractController::Message(messageType()), time(time_), dt(dt_) {}
 };
 
 } // namespace

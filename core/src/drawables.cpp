@@ -1,462 +1,418 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <utils/frustum.h>
-#include <core/textnode.h>
+#include <core/types.h>
 
 #include "renderer.h"
 #include "drawables.h"
 #include "resources.h"
+#include "utils.h"
 
 namespace trash
 {
 namespace core
 {
 
-SelectionDrawable::SelectionDrawable(uint32_t id_)
-    : id(id_)
+MeshDrawable::MeshDrawable(std::shared_ptr<Mesh> mesh, std::shared_ptr<Buffer> bonesBuffer)
+    : m_mesh(mesh)
+    , m_bonesBufferUniform(bonesBuffer ? std::make_shared<Uniform<std::shared_ptr<Buffer>>>(bonesBuffer) : nullptr)
 {
-}
-
-uint32_t SelectionDrawable::colorToId(uint8_t r, uint8_t g, uint8_t b, uint8_t a)
-{
-    return static_cast<uint32_t>(r | (g << 8) | (b << 16) | (a << 24));
-}
-
-glm::vec4 SelectionDrawable::idToColor(uint32_t id)
-{
-    return glm::vec4((id & 0xff) / 255.f, ((id >> 8) & 0xff) / 255.f, ((id >> 16) & 0xff) / 255.f, ((id >> 24) & 0xff) / 255.f);
-}
-
-MeshDrawable::MeshDrawable(std::shared_ptr<RenderProgram> p, std::shared_ptr<Mesh> m, std::shared_ptr<Buffer> bb)
-    : program(p)
-    , geometry(m)
-    , bonesBuffer(bb)
-{
-}
-
-std::shared_ptr<RenderProgram> MeshDrawable::renderProgram() const
-{
-    return program;
 }
 
 std::shared_ptr<Mesh> MeshDrawable::mesh() const
 {
-    return geometry;
+    return m_mesh;
 }
 
-std::shared_ptr<SelectionDrawable> MeshDrawable::selectionDrawable(uint32_t id) const
+std::shared_ptr<AbstractUniform> MeshDrawable::uniform(UniformId id) const
 {
-    return std::make_shared<SelectionMeshDrawable>(geometry, bonesBuffer, id);
-}
+    std::shared_ptr<AbstractUniform> result = Drawable::uniform(id);
 
-std::shared_ptr<ShadowDrawable> MeshDrawable::shadowDrawable() const
-{
-    return std::make_shared<ShadowMeshDrawable>(geometry, bonesBuffer);
-}
-
-void MeshDrawable::prerender() const
-{
-    Drawable::prerender();
-
-    auto& renderer = Renderer::instance();
-
-    GLuint bonesBufferIndex = program->uniformBufferIndexByName("u_bonesBuffer");
-    if (bonesBuffer && (bonesBufferIndex != (GLuint)-1))
+    switch (id)
     {
-        program->setUniformBufferBinding(bonesBufferIndex, 0);
-        renderer.bindUniformBuffer(bonesBuffer, 0);
+    case UniformId::BonesBuffer:
+    {
+        result = m_bonesBufferUniform;
+        break;
     }
-}
-
-SelectionMeshDrawable::SelectionMeshDrawable(std::shared_ptr<Mesh> m, std::shared_ptr<Buffer> bb, uint32_t id)
-    : SelectionDrawable(id)
-    , geometry(m)
-    , bonesBuffer(bb)
-
-{
-    auto& renderer = Renderer::instance();
-
-    if (bonesBuffer)
-        program = renderer.loadRenderProgram(coloreredMeshRenderProgramName.first, coloreredMeshRenderProgramName.second);
-    else
-        program = renderer.loadRenderProgram(coloreredStaticMeshRenderProgramName.first, coloreredStaticMeshRenderProgramName.second);
-}
-
-std::shared_ptr<RenderProgram> SelectionMeshDrawable::renderProgram() const
-{
-    return program;
-}
-
-std::shared_ptr<Mesh> SelectionMeshDrawable::mesh() const
-{
-    return geometry;
-}
-
-void SelectionMeshDrawable::prerender() const
-{
-    auto& renderer = Renderer::instance();
-
-    GLuint bonesBufferIndex = program->uniformBufferIndexByName("u_bonesBuffer");
-    if (bonesBuffer && (bonesBufferIndex != static_cast<GLuint>(-1)))
-    {
-        program->setUniformBufferBinding(bonesBufferIndex, 0);
-        renderer.bindUniformBuffer(bonesBuffer, 0);
     }
 
-    program->setUniform(program->uniformLocation("u_color"), idToColor(id));
+    return result;
 }
 
-ShadowMeshDrawable::ShadowMeshDrawable(std::shared_ptr<Mesh> m, std::shared_ptr<Buffer> bb)
-    : ShadowDrawable()
-    , geometry(m)
-    , bonesBuffer(bb)
+TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> mesh,
+                                           std::shared_ptr<Buffer> bonesBuffer,
+                                           const glm::vec4& color,
+                                           std::shared_ptr<Texture> baseColorTexture,
+                                           std::shared_ptr<Texture> opacityTexture,
+                                           std::shared_ptr<Texture> normalTexture,
+                                           std::shared_ptr<Texture> metallicTexture,
+                                           std::shared_ptr<Texture> roughnessTexture,
+                                           std::shared_ptr<LightIndicesList> lightIndicesList)
+    : MeshDrawable(mesh, bonesBuffer)
+    , m_colorUniform(std::make_shared<Uniform<glm::vec4>>(color))
+    , m_baseColorTextureUniform(baseColorTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(baseColorTexture) : nullptr)
+    , m_opacityTextureUniform(opacityTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(opacityTexture) : nullptr)
+    , m_normalTextureUniform(normalTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(normalTexture) : nullptr)
+    , m_metallicTextureUniform(metallicTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(metallicTexture) : nullptr)
+    , m_roughnessTextureUniform(roughnessTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(roughnessTexture) : nullptr)
+    , m_lightIndicesListUniform(lightIndicesList ? std::make_shared<Uniform<std::shared_ptr<LightIndicesList>>>(lightIndicesList) : nullptr)
 {
     auto& renderer = Renderer::instance();
 
-    if (bonesBuffer)
-        program = renderer.loadRenderProgram(shadowMeshRenderProgramName.first, shadowMeshRenderProgramName.second);
-    else
-        program = renderer.loadRenderProgram(shadowStaticMeshRenderProgramName.first, shadowStaticMeshRenderProgramName.second);
+    if (!m_baseColorTextureUniform)
+        m_baseColorTextureUniform = std::make_shared<Uniform<std::shared_ptr<Texture>>>(renderer.loadTexture(standardDiffuseTextureName));
+
+    if (!m_metallicTextureUniform)
+        m_metallicTextureUniform = std::make_shared<Uniform<std::shared_ptr<Texture>>>(renderer.createTexture2D(GL_R8, 1, 1, GL_RED, GL_UNSIGNED_BYTE, &standardMetallicTexture.second, false, standardMetallicTexture.first));
+
+    if (!m_roughnessTextureUniform)
+        m_roughnessTextureUniform = std::make_shared<Uniform<std::shared_ptr<Texture>>>(renderer.createTexture2D(GL_R8, 1, 1, GL_RED, GL_UNSIGNED_BYTE, &standardRoughnessTexture.second, false, standardRoughnessTexture.first));
 }
 
-std::shared_ptr<RenderProgram> ShadowMeshDrawable::renderProgram() const
-{
-    return program;
-}
-
-std::shared_ptr<Mesh> ShadowMeshDrawable::mesh() const
-{
-    return geometry;
-}
-
-void ShadowMeshDrawable::prerender() const
+std::shared_ptr<RenderProgram> TexturedMeshDrawable::renderProgram(DrawableRenderProgramId id) const
 {
     auto& renderer = Renderer::instance();
 
-    GLuint bonesBufferIndex = program->uniformBufferIndexByName("u_bonesBuffer");
-    if (bonesBuffer && (bonesBufferIndex != static_cast<GLuint>(-1)))
+    std::shared_ptr<RenderProgram> result;
+    switch (id)
     {
-        program->setUniformBufferBinding(bonesBufferIndex, 0);
-        renderer.bindUniformBuffer(bonesBuffer, 0);
-    }
-}
-
-ColoredMeshDrawable::ColoredMeshDrawable(std::shared_ptr<Mesh> m, const glm::vec4& c, std::shared_ptr<Buffer> bb)
-    : MeshDrawable(nullptr, m, bb)
-    , color(c)
-{
-    auto& renderer = Renderer::instance();
-
-    if (bonesBuffer)
-        program = renderer.loadRenderProgram(coloreredMeshRenderProgramName.first, coloreredMeshRenderProgramName.second);
-    else
-        program = renderer.loadRenderProgram(coloreredStaticMeshRenderProgramName.first, coloreredStaticMeshRenderProgramName.second);
-}
-
-void ColoredMeshDrawable::prerender() const
-{
-    MeshDrawable::prerender();
-
-    program->setUniform(program->uniformLocation("u_color"), color);
-}
-
-TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> m,
-                                           std::shared_ptr<Texture> bct,
-                                           std::shared_ptr<Texture> ot,
-                                           std::shared_ptr<Texture> nt,
-                                           std::shared_ptr<Texture> mt,
-                                           std::shared_ptr<Texture> rt,
-                                           bool mrw,
-                                           std::shared_ptr<Buffer> bb,
-                                           std::shared_ptr<LightIndicesList> ll)
-    : MeshDrawable(nullptr, m, bb)
-    , baseColorTexture(bct)
-    , opacityTexture(ot)
-    , normalTexture(nt)
-    , metallicOrSpecTexture(mt)
-    , roughOrGlossTexture(rt)
-    , lightIndicesList(ll)
-    , isMetallicRoughWorkflow(mrw)
-{
-    auto& renderer = Renderer::instance();
-
-    if (bonesBuffer)
-        program = renderer.loadRenderProgram(texturedMeshRenderProgramName.first, texturedMeshRenderProgramName.second);
-    else
-        program = renderer.loadRenderProgram(texturedStaticMeshRenderProgramName.first, texturedStaticMeshRenderProgramName.second);
-
-    if (!baseColorTexture)
-        baseColorTexture = renderer.loadTexture(standardDiffuseTextureName);
-
-    if (!opacityTexture)
-        opacityTexture = renderer.createTexture2D(GL_R16F, 1, 1, GL_RED, GL_FLOAT, &standardOpacityTexture.second, standardOpacityTexture.first);
-
-    if (!normalTexture)
-        normalTexture = renderer.createTexture2D(GL_RGB16F, 1, 1, GL_RGB, GL_FLOAT, glm::value_ptr(standardNormalTexture.second), standardNormalTexture.first);
-
-    if (!metallicOrSpecTexture)
-        metallicOrSpecTexture = renderer.createTexture2D(GL_R16F, 1, 1, GL_RED, GL_FLOAT, &standardMetallicTexture.second, standardMetallicTexture.first);
-
-    if (!roughOrGlossTexture)
-        roughOrGlossTexture = renderer.createTexture2D(GL_R16F, 1, 1, GL_RED, GL_FLOAT, &standardRoughnessTexture.second, standardRoughnessTexture.first);
-}
-
-void TexturedMeshDrawable::prerender() const
-{
-    MeshDrawable::prerender();
-
-    auto& renderer = Renderer::instance();
-
-    program->setUniform(program->uniformLocation("u_baseColorMap"), castFromTextureUnit(TextureUnit::BaseColor));
-    renderer.bindTexture(baseColorTexture, castFromTextureUnit(TextureUnit::BaseColor));
-
-    program->setUniform(program->uniformLocation("u_opacityMap"), castFromTextureUnit(TextureUnit::Opacity));
-    renderer.bindTexture(opacityTexture, castFromTextureUnit(TextureUnit::Opacity));
-
-    program->setUniform(program->uniformLocation("u_normalMap"), castFromTextureUnit(TextureUnit::Normal));
-    renderer.bindTexture(normalTexture, castFromTextureUnit(TextureUnit::Normal));
-
-    program->setUniform(program->uniformLocation("u_metallicMap"), castFromTextureUnit(TextureUnit::Metallic));
-    renderer.bindTexture(metallicOrSpecTexture, castFromTextureUnit(TextureUnit::Metallic));
-
-    program->setUniform(program->uniformLocation("u_roughnessMap"), castFromTextureUnit(TextureUnit::Roughness));
-    renderer.bindTexture(roughOrGlossTexture, castFromTextureUnit(TextureUnit::Roughness));
-
-    program->setUniform(program->uniformLocation("u_isMetallicRoughWorkflow"), isMetallicRoughWorkflow ? 1 : 0);
-
-    for (size_t i = 0; i < lightIndicesList->size(); ++i)
+    case DrawableRenderProgramId::ForwardRender:
     {
-        program->setUniform(program->uniformLocation("u_lightIndices["+std::to_string(i)+"]"), lightIndicesList->at(i));
+        if (!m_forwardRenderProgram)
+            m_forwardRenderProgram = renderer.loadRenderProgram(standardRenderProgramName.first, standardRenderProgramName.second, renderProgramDefines());
+
+        result = m_forwardRenderProgram;
+        break;
     }
+    case DrawableRenderProgramId::DeferredGeometryPass:
+    {
+        if (!m_deferredRenderProgram)
+            m_deferredRenderProgram = renderer.loadRenderProgram(deferredGeometryPassRenderProgramName.first, deferredGeometryPassRenderProgramName.second, renderProgramDefines());
+
+        result = m_deferredRenderProgram;
+        break;
+    }
+    case DrawableRenderProgramId::Shadow:
+    {
+        if (!m_shadowProgram)
+            m_shadowProgram = renderer.loadRenderProgram(shadowRenderProgramName.first, shadowRenderProgramName.second, renderProgramDefines());
+
+        result = m_shadowProgram;
+        break;
+    }
+    case DrawableRenderProgramId::Selection:
+    {
+        if (!m_selectionProgram)
+            m_selectionProgram = renderer.loadRenderProgram(idRenderProgramName.first, idRenderProgramName.second, renderProgramDefines());
+
+        result = m_selectionProgram;
+        break;
+    }
+    }
+
+    return result;
+}
+
+std::shared_ptr<AbstractUniform> TexturedMeshDrawable::uniform(UniformId id) const
+{
+    std::shared_ptr<AbstractUniform> result = MeshDrawable::uniform(id);
+
+    switch (id)
+    {
+    case UniformId::Color:
+    {
+        result = m_colorUniform;
+        break;
+    }
+    case UniformId::BaseColorMap:
+    {
+        result = m_baseColorTextureUniform;
+        break;
+    }
+    case UniformId::OpacityMap:
+    {
+        result = m_opacityTextureUniform;
+        break;
+    }
+    case UniformId::NormalMap:
+    {
+        result = m_normalTextureUniform;
+        break;
+    }
+    case UniformId::MetallicMap:
+    {
+        result = m_metallicTextureUniform;
+        break;
+    }
+    case UniformId::RoughnessMap:
+    {
+        result = m_roughnessTextureUniform;
+        break;
+    }
+    case UniformId::LightIndicesList:
+    {
+        result = m_lightIndicesListUniform;
+        break;
+    }
+    }
+
+    return result;
+}
+
+std::set<std::string> TexturedMeshDrawable::renderProgramDefines() const
+{
+    std::set<std::string> defines;
+    //defines.insert("DEBUG");
+
+    if (m_bonesBufferUniform && m_mesh->vertexBuffer(VertexAttribute::BonesIDs) && m_mesh->vertexBuffer(VertexAttribute::BonesWeights))
+        defines.insert("HAS_BONES");
+
+    if (m_mesh->vertexBuffer(VertexAttribute::Normal))
+    {
+        defines.insert("HAS_LIGHTING");
+        if (m_normalTextureUniform && m_mesh->vertexBuffer(VertexAttribute::Tangent))
+            defines.insert("HAS_NORMALMAPPING");
+    }
+
+    if (m_opacityTextureUniform)
+        defines.insert("HAS_OPACITYMAPPING");
+
+    return defines;
 }
 
 SphereDrawable::SphereDrawable(uint32_t segs, const utils::BoundingSphere &bs, const glm::vec4& c)
-    : ColoredMeshDrawable(nullptr, c, nullptr)
-{
-    std::vector<glm::vec3> vertices((segs+1) * (segs * segs));
-    std::vector<uint32_t> indices(4 * (segs * segs * segs));
-
-    for (uint32_t a = 0; a <= segs; ++a)
-    {
-        float angleA = glm::pi<float>() * (static_cast<float>(a) / segs - .5f);
-        float sinA = glm::sin(angleA);
-        float cosA = glm::cos(angleA);
-
-        for (uint32_t b = 0; b < segs*segs; ++b)
-        {
-            float angleB = 2.f * glm::pi<float>() * static_cast<float>(b) / (segs*segs - 1);
-            float sinB = glm::sin(angleB);
-            float cosB = glm::cos(angleB);
-
-            vertices[a * segs * segs + b] = glm::vec3(bs.w * cosA * sinB + bs.x,
-                                                      bs.w * sinA + bs.y,
-                                                      bs.w * cosA * cosB + bs.z);
-
-            if ((a < segs) && (b < (segs*segs - 1)))
-            {
-                indices[4 * (a*(segs*segs) + b) + 0] = a*(segs*segs) + b;
-                indices[4 * (a*(segs*segs) + b) + 1] = a*(segs*segs) + b + 1;
-                indices[4 * (a*(segs*segs) + b) + 2] = a*(segs*segs) + b;
-                indices[4 * (a*(segs*segs) + b) + 3] = (a+1)*(segs*segs) + b;
-            }
-        }
-    }
-
-    geometry = std::make_shared<Mesh>();
-    geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 3, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW));
-    geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
+    : TexturedMeshDrawable(buildSphereMesh(segs, bs, true), nullptr, c, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
+{   
 }
 
 BoxDrawable::BoxDrawable(const utils::BoundingBox& box, const glm::vec4& c)
-    : ColoredMeshDrawable(nullptr, c, nullptr)
+    : TexturedMeshDrawable(buildBoxMesh(box, true), nullptr, c, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
 {
-    std::vector<glm::vec3> vertices {
-                glm::vec3(box.minPoint.x, box.minPoint.y, box.minPoint.z),
-                glm::vec3(box.minPoint.x, box.maxPoint.y, box.minPoint.z),
-                glm::vec3(box.maxPoint.x, box.maxPoint.y, box.minPoint.z),
-                glm::vec3(box.maxPoint.x, box.minPoint.y, box.minPoint.z),
-                glm::vec3(box.minPoint.x, box.minPoint.y, box.maxPoint.z),
-                glm::vec3(box.minPoint.x, box.maxPoint.y, box.maxPoint.z),
-                glm::vec3(box.maxPoint.x, box.maxPoint.y, box.maxPoint.z),
-                glm::vec3(box.maxPoint.x, box.minPoint.y, box.maxPoint.z),
-    };
-    std::vector<uint32_t> indices {
-        0,1, 1,2, 2,3, 3,0,
-        4,5, 5,6, 6,7, 7,4,
-        0,4, 1,5, 2,6, 3,7
-    };
 
-    geometry = std::make_shared<Mesh>();
-    geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 3, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW));
-    geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
 }
 
 FrustumDrawable::FrustumDrawable(const utils::Frustum &frustum, const glm::vec4& c)
-    : ColoredMeshDrawable(nullptr, c, nullptr)
+    : TexturedMeshDrawable(buildFrustumMesh(frustum), nullptr, c, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
 {
-    static auto intersectPlanes = [](const utils::Plane& p0, const utils::Plane& p1, const utils::Plane& p2) -> glm::vec3 {
-        glm::vec3 bxc = glm::cross(p1.normal(), p2.normal());
-        glm::vec3 cxa = glm::cross(p2.normal(), p0.normal());
-        glm::vec3 axb = glm::cross(p0.normal(), p1.normal());
-        glm::vec3 r = -p0.dist() * bxc - p1.dist() * cxa - p2.dist() * axb;
-        return -r * (1.0f / glm::dot(p0.normal(), bxc));
-    };
+}
 
-    std::vector<glm::vec3> vertices({
-        intersectPlanes(frustum.planes[4], frustum.planes[0], frustum.planes[2]),
-        intersectPlanes(frustum.planes[4], frustum.planes[1], frustum.planes[2]),
-        intersectPlanes(frustum.planes[4], frustum.planes[1], frustum.planes[3]),
-        intersectPlanes(frustum.planes[4], frustum.planes[0], frustum.planes[3]),
-        intersectPlanes(frustum.planes[5], frustum.planes[0], frustum.planes[2]),
-        intersectPlanes(frustum.planes[5], frustum.planes[1], frustum.planes[2]),
-        intersectPlanes(frustum.planes[5], frustum.planes[1], frustum.planes[3]),
-        intersectPlanes(frustum.planes[5], frustum.planes[0], frustum.planes[3]) });
-
-    std::vector<uint32_t> indices({ 0,1, 1,2, 2,3, 3,0, 4,5, 5,6, 6,7, 7,4, 0,4, 1,5, 2,6, 3,7 });
-
-    geometry = std::make_shared<Mesh>();
-    geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 3, reinterpret_cast<float*>(vertices.data()), GL_STATIC_DRAW));
-    geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_LINES, indices.size(), indices.data(), GL_STATIC_DRAW));
+ConeDrawable::ConeDrawable(uint32_t segs, float r, float l, const glm::vec4& c)
+    : TexturedMeshDrawable(buildConeMesh(segs, r, l, true), nullptr, c, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
+{
 }
 
 BackgroundDrawable::BackgroundDrawable(float r)
-    : roughness(r)
+    : Drawable()
+    , m_roughnessUniform(std::make_shared<Uniform<float>>(r))
 {
-    static const std::vector<float> vertices {
-        -1.f, -1.f,
-        +1.f, -1.f,
-        -1.f, +1.f,
-        +1.f, +1.f,
-
-    };
-    static const std::vector<uint32_t> indices {
-        0, 1, 2, 3
-    };
-
-    geometry = std::make_shared<Mesh>();
-    geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(4, 2, vertices.data(), GL_STATIC_DRAW));
-    geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_TRIANGLE_STRIP, 4, indices.data(), GL_STATIC_DRAW));
-
-    auto& renderer = Renderer::instance();
-    program = renderer.loadRenderProgram(backgroundRenderProgramName.first, backgroundRenderProgramName.second);
 }
 
-std::shared_ptr<RenderProgram> BackgroundDrawable::renderProgram() const
+std::shared_ptr<RenderProgram> BackgroundDrawable::renderProgram(DrawableRenderProgramId id) const
 {
-    return program;
+    if (id != DrawableRenderProgramId::ForwardRender)
+        return nullptr;
+
+    if (m_renderProgram)
+        return m_renderProgram;
+
+    auto& renderer = Renderer::instance();
+    m_renderProgram = renderer.loadRenderProgram(backgroundRenderProgramName.first, backgroundRenderProgramName.second, {});
+
+    return m_renderProgram;
 }
 
 std::shared_ptr<Mesh> BackgroundDrawable::mesh() const
 {
-    return geometry;
+    if (!m_mesh)
+        m_mesh = buildPlaneMesh();
+
+    return m_mesh;
 }
 
-void BackgroundDrawable::prerender() const
+std::shared_ptr<AbstractUniform> BackgroundDrawable::uniform(UniformId id) const
 {
-    Drawable::prerender();
-    program->setUniform(program->uniformLocation("u_roughness"), roughness);
-}
+    std::shared_ptr<AbstractUniform> result = Drawable::uniform(id);
 
-TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& color_, float lineSpacing)
-    : fontMap(font->texture),
-      color(color_)
-{
-    std::vector<glm::vec2> vertices(4*str.length());
-    std::vector<glm::vec2> texCoords(4*str.length());
-    std::vector<uint32_t> indices(6*str.length());
-
-    glm::vec2 pos(.0f, -1.f);
-    const glm::vec2 texInvSize = glm::vec2(1.f, 1.f) / glm::vec2(font->width, font->height);
-    const float symbolTexInvHeight = static_cast<float>(font->height) / static_cast<float>(font->size);
-
-    glm::vec2 leftTop(.0f, .0f), bottomRight(.0f, .0f);
-
-    for (size_t i = 0; i < str.length(); ++i)
+    switch (id)
     {
-        const char ch = str.at(i);
-
-        if (ch == '\n')
-        {
-            pos.x = .0f;
-            pos.y -= lineSpacing;
-            continue;
-        }
-
-        auto chIt = font->characters.find(ch);
-
-        if (chIt == font->characters.end())
-            chIt = font->characters.find('?');
-
-        const auto& chInfo = chIt->second;
-
-        const glm::vec2 tmpPos = pos + glm::vec2(chInfo->originX, chInfo->originY) * texInvSize * symbolTexInvHeight;
-
-        vertices.at(4 * i + 0) = tmpPos;
-        vertices.at(4 * i + 1) = tmpPos + glm::vec2(0.f, -chInfo->height) * texInvSize * symbolTexInvHeight;
-        vertices.at(4 * i + 2) = tmpPos + glm::vec2(chInfo->width, -chInfo->height) * texInvSize * symbolTexInvHeight;
-        vertices.at(4 * i + 3) = tmpPos + glm::vec2(chInfo->width, 0.f) * texInvSize * symbolTexInvHeight;
-
-        texCoords.at(4 * i + 0) = glm::vec2(chInfo->x, chInfo->y) * texInvSize;
-        texCoords.at(4 * i + 1) = glm::vec2(chInfo->x, chInfo->y + chInfo->height) * texInvSize;
-        texCoords.at(4 * i + 2) = glm::vec2(chInfo->x + chInfo->width, chInfo->y + chInfo->height) * texInvSize;
-        texCoords.at(4 * i + 3) = glm::vec2(chInfo->x + chInfo->width, chInfo->y) * texInvSize;
-
-        indices.at(6 * i + 0) = i * 4 + 0;
-        indices.at(6 * i + 1) = i * 4 + 1;
-        indices.at(6 * i + 2) = i * 4 + 2;
-        indices.at(6 * i + 3) = i * 4 + 0;
-        indices.at(6 * i + 4) = i * 4 + 2;
-        indices.at(6 * i + 5) = i * 4 + 3;
-
-        if (vertices.at(4 * i + 0).x < leftTop.x) leftTop.x = vertices.at(4 * i + 0).x;
-        if (vertices.at(4 * i + 0).y > leftTop.y) leftTop.y = vertices.at(4 * i + 0).y;
-        if (vertices.at(4 * i + 2).x > bottomRight.x) bottomRight.x = vertices.at(4 * i + 2).x;
-        if (vertices.at(4 * i + 2).y < bottomRight.y) bottomRight.y = vertices.at(4 * i + 2).y;
-
-        pos += glm::vec2(chInfo->advance, .0f) * texInvSize * symbolTexInvHeight;
+    case UniformId::Roughness:
+    {
+        result = m_roughnessUniform;
+        break;
+    }
     }
 
-    const glm::vec2 size(bottomRight.x - leftTop.x, leftTop.y - bottomRight.y);
-
-    glm::vec2 delta;
-    if (alignX == TextNodeAlignment::Center) delta.x = -0.5f * size.x;
-    else if (alignX == TextNodeAlignment::Positive) delta.x = -size.x;
-
-    if (alignY == TextNodeAlignment::Center) delta.y = 0.5f * size.y;
-    else if (alignY == TextNodeAlignment::Negative) delta.y = size.y;
-
-    for (auto& v : vertices)
-        v += delta;
-
-    geometry = std::make_shared<Mesh>();
-    geometry->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 2, glm::value_ptr(*vertices.data()), GL_STATIC_DRAW));
-    geometry->declareVertexAttribute(VertexAttribute::TexCoord, std::make_shared<VertexBuffer>(texCoords.size(), 2, glm::value_ptr(*texCoords.data()), GL_STATIC_DRAW));
-    geometry->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_TRIANGLES, indices.size(), indices.data(), GL_STATIC_DRAW));
-
-    auto& renderer = Renderer::instance();
-    program = renderer.loadRenderProgram(textRenderProgramName.first, textRenderProgramName.second);
+    return result;
 }
 
-std::shared_ptr<RenderProgram> TextDrawable::renderProgram() const
+TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& c, float lineSpacing)
+    : TexturedMeshDrawable(buildTextMesh(font, str, alignX, alignY, lineSpacing), nullptr, c, nullptr, font->texture, nullptr, nullptr, nullptr, nullptr)
 {
-    return program;
 }
 
-std::shared_ptr<Mesh> TextDrawable::mesh() const
+LightDrawable::LightDrawable(LightType type)
+    : Drawable()
+    , m_lightType(type)
 {
-    return geometry;
 }
 
-void TextDrawable::prerender() const
+std::shared_ptr<RenderProgram> LightDrawable::renderProgram(DrawableRenderProgramId id) const
 {
-    Drawable::prerender();
+    std::shared_ptr<RenderProgram> result;
 
     auto& renderer = Renderer::instance();
 
-    program->setUniform(program->uniformLocation("u_fontMap"), castFromTextureUnit(TextureUnit::BaseColor));
-    renderer.bindTexture(fontMap, castFromTextureUnit(TextureUnit::BaseColor));
+    switch (id)
+    {
+    case DrawableRenderProgramId::DeferredStencilPass:
+    {
+        if (!m_stencilRenderProgram)
+            m_stencilRenderProgram = renderer.loadRenderProgram(deferredStencilPassRenderProgramName.first, deferredStencilPassRenderProgramName.second, renderProgramDefines());
 
-    program->setUniform(program->uniformLocation("u_color"), color);
+        result = m_stencilRenderProgram;
+        break;
+    }
+    case DrawableRenderProgramId::DeferredLightPass:
+    {
+        if (!m_lightRenderProgram)
+            m_lightRenderProgram = renderer.loadRenderProgram(deferredLightPassRenderProgramName.first, deferredLightPassRenderProgramName.second, renderProgramDefines());
+
+        result = m_lightRenderProgram;
+        break;
+    }
+    }
+
+    return result;
+}
+
+std::shared_ptr<Mesh> LightDrawable::mesh() const
+{
+    if (!m_mesh)
+    {
+        switch (m_lightType) {
+        case LightType::Point:
+        {
+            m_mesh = buildSphereMesh(8, utils::BoundingSphere(glm::vec3(0.f, 0.f, 0.f), 1.f), false);
+            break;
+        }
+        case LightType::Direction:
+        {
+            m_mesh = buildBoxMesh(utils::BoundingBox(glm::vec3(-1.f, -1.f, -1.f), glm::vec3(1.f, 1.f, 1.f)), false);
+            break;
+        }
+        case LightType::Spot:
+        {
+            m_mesh = buildConeMesh(8, 1.f, 1.f, false);
+            break;
+        }
+        }
+    }
+
+    return m_mesh;
+}
+
+std::set<std::string> LightDrawable::renderProgramDefines() const
+{
+    std::set<std::string> defines;
+    defines.insert("LIGHT");
+
+    return defines;
+}
+
+IBLDrawable::IBLDrawable()
+    : Drawable()
+{
+}
+
+std::shared_ptr<RenderProgram> IBLDrawable::renderProgram(DrawableRenderProgramId id) const
+{
+    std::shared_ptr<RenderProgram> result;
+
+    auto& renderer = Renderer::instance();
+
+    switch (id)
+    {
+    case DrawableRenderProgramId::DeferredStencilPass:
+    {
+        if (!m_stencilRenderProgram)
+            m_stencilRenderProgram = renderer.loadRenderProgram(deferredStencilPassRenderProgramName.first, deferredStencilPassRenderProgramName.second, renderProgramDefines());
+
+        result = m_stencilRenderProgram;
+        break;
+    }
+    case DrawableRenderProgramId::DeferredLightPass:
+    {
+        if (!m_lightRenderProgram)
+            m_lightRenderProgram = renderer.loadRenderProgram(deferredLightPassRenderProgramName.first, deferredLightPassRenderProgramName.second, renderProgramDefines());
+
+        result = m_lightRenderProgram;
+        break;
+    }
+    }
+
+    return result;
+}
+
+std::shared_ptr<Mesh> IBLDrawable::mesh() const
+{
+    if (!m_mesh)
+    {
+        m_mesh = buildBoxMesh(utils::BoundingBox(glm::vec3(-1.f, -1.f, -1.f), glm::vec3(1.f, 1.f, 1.f)), false);
+    }
+
+    return m_mesh;
+}
+
+std::set<std::string> IBLDrawable::renderProgramDefines() const
+{
+    std::set<std::string> defines;
+    defines.insert("IBL");
+
+    return defines;
+}
+
+PostEffectDrawable::PostEffectDrawable()
+{
+}
+
+std::shared_ptr<RenderProgram> PostEffectDrawable::renderProgram(DrawableRenderProgramId id) const
+{
+    std::shared_ptr<RenderProgram> result;
+
+    auto& renderer = Renderer::instance();
+
+    switch (id)
+    {
+    case DrawableRenderProgramId::PostEffect:
+    {
+        if (!m_renderProgram)
+            m_renderProgram = renderer.loadRenderProgram(postEffectRenderProgramName.first, postEffectRenderProgramName.second, {});
+
+        result = m_renderProgram;
+        break;
+    }
+    }
+
+    return result;
+}
+
+std::shared_ptr<Mesh> PostEffectDrawable::mesh() const
+{
+    static std::weak_ptr<Mesh> s_weakMesh;
+
+    if (!m_mesh)
+    {
+        if (!s_weakMesh.expired())
+            m_mesh = s_weakMesh.lock();
+        else
+        {
+            m_mesh = buildPlaneMesh();
+            s_weakMesh = m_mesh;
+        }
+    }
+
+    return m_mesh;
 }
 
 } // namespace

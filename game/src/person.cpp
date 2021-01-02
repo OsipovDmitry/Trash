@@ -26,6 +26,7 @@ Person::Person(const std::string &modelFilename)
 
     m_name = modelFilename.substr(0, modelFilename.find('.'));
     m_textNode = std::make_shared<core::TextNode>(m_name, core::TextNodeAlignment::Center, core::TextNodeAlignment::Negative);
+    m_textNode->setColor(glm::vec4(0.2f, 0.2f, 1.0f, 0.6f));
     autoTransform->attach(m_textNode);
 
     m_modelNode->playAnimation("idle");

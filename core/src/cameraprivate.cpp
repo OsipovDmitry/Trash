@@ -44,7 +44,7 @@ const glm::mat4x4 &CameraPrivate::getProjectionMatrix() const
 
 glm::mat4x4 CameraPrivate::calcProjectionMatrix(const std::pair<float, float>& zDistances) const
 {
-    const float aspect = static_cast<float>(viewport.z) / static_cast<float>(viewport.w);
+    const float aspect = static_cast<float>(viewportSize.x) / static_cast<float>(viewportSize.y);
 
     return projMatrixAsOrtho ?
                 glm::ortho(-aspect * halfHeight, +aspect * halfHeight, -halfHeight, +halfHeight, zDistances.first, zDistances.second) :

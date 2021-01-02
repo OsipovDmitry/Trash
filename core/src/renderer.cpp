@@ -18,6 +18,7 @@
 #include "drawables.h"
 #include "resources.h"
 #include "importexport.h"
+#include "utils.h"
 #include "model.inl"
 #include "texture.inl"
 
@@ -27,6 +28,51 @@ namespace trash
 {
 namespace core
 {
+
+AbstractUniform::~AbstractUniform()
+{
+}
+
+RenderProgram::RenderProgram(GLuint id_)
+    : id(id_)
+{
+    auto& functions = Renderer::instance().functions();
+
+    GLint numActiveUniforms, uniformMaxLength;
+    functions.glGetProgramiv(id, GL_ACTIVE_UNIFORMS, &numActiveUniforms);
+    functions.glGetProgramiv(id, GL_ACTIVE_UNIFORM_MAX_LENGTH, &uniformMaxLength);
+
+    GLint numActiveUniformBlocks, uniformBlockMaxLength;
+    functions.glGetProgramiv(id, GL_ACTIVE_UNIFORM_BLOCKS, &numActiveUniformBlocks);
+    functions.glGetProgramiv(id, GL_ACTIVE_UNIFORM_BLOCK_MAX_NAME_LENGTH, &uniformBlockMaxLength);
+
+    char *name = static_cast<char*>(malloc(sizeof(char) * static_cast<unsigned int>(glm::max(uniformMaxLength, uniformBlockMaxLength) + 1)));
+    GLint size;
+    GLenum type;
+
+    for (size_t i = 0; i < numActiveUniforms; ++i)
+    {
+        functions.glGetActiveUniform(id, i, uniformMaxLength, nullptr, &size, &type, name);
+        auto uniformId = uniformIdByName(name);
+        if (uniformId == UniformId::Undefined)
+            continue;
+        GLint loc = functions.glGetUniformLocation(id, name);
+        if (loc == -1)
+            continue;
+        uniforms.insert({uniformId, loc});
+    }
+
+    for (size_t i = 0; i < numActiveUniformBlocks; ++i)
+    {
+        functions.glGetActiveUniformBlockName(id, i, uniformBlockMaxLength, nullptr, name);
+        auto uniformId = uniformIdByName(name);
+        if (uniformId == UniformId::Undefined)
+            continue;
+        uniforms.insert({uniformId, static_cast<GLint>(i)});
+    }
+
+    free(name);
+}
 
 RenderProgram::~RenderProgram()
 {
@@ -68,14 +114,44 @@ void RenderProgram::setupTransformFeedback(const std::vector<std::string>& varyi
     }
 }
 
-GLuint RenderProgram::uniformBufferIndexByName(const std::string& name)
+UniformId RenderProgram::uniformIdByName(const std::string& name)
 {
-    return Renderer::instance().functions().glGetUniformBlockIndex(id, name.c_str());
-}
+    static const std::map<std::string, UniformId> s_names {
+        { "u_id", UniformId::NodeId },
+        { "u_modelMatrix", UniformId::ModelMatrix },
+        { "u_normalMatrix", UniformId::NormalMatrix },
+        { "u_viewMatrix", UniformId::ViewMatrix },
+        { "u_projMatrix", UniformId::ProjMatrix },
+        { "u_viewProjMatrix", UniformId::ViewProjMatrix },
+        { "u_viewProjMatrixInverse", UniformId::ViewProjMatrixInverse },
+        { "u_modelViewMatrix", UniformId::ModelViewMatrix },
+        { "u_modelViewProjMatrix", UniformId::ModelViewProjMatrix },
+        { "u_viewPosition", UniformId::ViewPosition },
+        { "u_viewportSize", UniformId::ViewportSize },
+        { "u_diffuseIBLMap", UniformId::IBLDiffuseMap },
+        { "u_specularIBLMap", UniformId::IBLSpecularMap },
+        { "u_maxSpecularIBLMapMipmapLevel", UniformId::IBLSpecularMapMaxMipmapLevel },
+        { "u_brdfLUT", UniformId::BrdfLutMap },
+        { "u_IBLContribution", UniformId::IBLContribution },
+        { "u_shadowMaps", UniformId::ShadowMaps },
+        { "u_bonesBuffer", UniformId::BonesBuffer },
+        { "u_lightsBuffer", UniformId::LightsBuffer },
+        { "u_color", UniformId::Color },
+        { "u_roughness", UniformId::Roughness },
+        { "u_baseColorMap", UniformId::BaseColorMap },
+        { "u_opacityMap", UniformId::OpacityMap },
+        { "u_normalMap", UniformId::NormalMap },
+        { "u_metallicMap", UniformId::MetallicMap },
+        { "u_roughnessMap", UniformId::RoughnessMap },
+        { "u_lightIndices[0]", UniformId::LightIndicesList },
+        { "u_gBufferMap0", UniformId::GBufferMap0 },
+        { "u_gBufferMap1", UniformId::GBufferMap1 },
+        { "u_gBufferMap2", UniformId::GBufferMap2 },
+        { "u_hdrMap", UniformId::HDRMap },
+    };
 
-void RenderProgram::setUniformBufferBinding(GLuint index, GLuint unit)
-{
-    Renderer::instance().functions().glUniformBlockBinding(id, index, unit);
+    auto it = s_names.find(name);
+    return (it == s_names.end()) ? UniformId::Undefined : it->second;
 }
 
 GLint RenderProgram::uniformBufferDataSize(GLuint blockIndex)
@@ -119,66 +195,9 @@ std::unordered_map<std::string, GLint> RenderProgram::uniformBufferOffsets(GLuin
     return result;
 }
 
-GLint RenderProgram::uniformLocation(const std::string& name)
-{
-    return Renderer::instance().functions().glGetUniformLocation(id, name.c_str());
-}
-
-void RenderProgram::setUniform(GLint loc, GLint value)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glUseProgram(id);
-    functions.glUniform1i(loc, value);
-}
-
-void RenderProgram::setUniform(GLint loc, float value)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glUseProgram(id);
-    functions.glUniform1f(loc, value);
-}
-
-void RenderProgram::setUniform(GLint loc, const glm::vec3& value)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glUseProgram(id);
-    functions.glUniform3fv(loc, 1, glm::value_ptr(value));
-}
-
-void RenderProgram::setUniform(GLint loc, const glm::vec4& value)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glUseProgram(id);
-    functions.glUniform4fv(loc, 1, glm::value_ptr(value));
-}
-
-void RenderProgram::setUniform(GLint loc, const glm::mat3x3& value)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glUseProgram(id);
-    functions.glUniformMatrix3fv(loc, 1, false, glm::value_ptr(value));
-}
-
-void RenderProgram::setUniform(GLint loc, const glm::mat4x4& value)
-{
-    auto& functions = Renderer::instance().functions();
-    functions.glUseProgram(id);
-    functions.glUniformMatrix4fv(loc, 1, false, glm::value_ptr(value));
-}
-
 Texture::~Texture()
 {
     Renderer::instance().functions().glDeleteTextures(1, &id);
-}
-
-void Texture::generateMipmaps()
-{
-    auto& functions = Renderer::instance().functions();
-
-    functions.glBindTexture(target, id);
-    functions.glGenerateMipmap(target);
-    functions.glTexParameteri(target, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
-    functions.glTexParameteri(target, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
 }
 
 void Texture::setFilter(int32_t value)
@@ -234,7 +253,7 @@ void Texture::setBorderColor(const glm::vec4& value)
     functions.glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, glm::value_ptr(value));
 }
 
-int32_t Texture::numMipmapLevels() const
+int32_t Texture::maxMipmapLevel() const
 {
     auto& functions = Renderer::instance().functions();
 
@@ -359,7 +378,6 @@ void Mesh::declareVertexAttribute(VertexAttribute attrib, std::shared_ptr<Vertex
 
     attributesDeclaration[attrib] = vb;
 
-
     if (attrib == VertexAttribute::Position)
     {
         assert(vb->numComponents == 2 || vb->numComponents == 3);
@@ -428,6 +446,7 @@ Framebuffer::~Framebuffer()
     for (size_t i = 0; i < colorAttachments.size(); ++i)
         detachColor(i);
     detachDepth();
+    detachDepthStencil();
 
     auto& functions = Renderer::instance().functions();
     functions.glDeleteFramebuffers(1, &id);
@@ -485,6 +504,32 @@ void Framebuffer::detachDepth()
     depthAttachment = nullptr;
 }
 
+void Framebuffer::detachDepthStencil()
+{
+    if (!depthStencilAttachment)
+        return;
+
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+
+    if (depthStencilAttachment->isTexture())
+    {
+        if (depthStencilAttachment->texture->target == GL_TEXTURE_2D || depthStencilAttachment->texture->target == GL_TEXTURE_CUBE_MAP)
+            functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, 0, 0);
+        else if (depthStencilAttachment->texture->target == GL_TEXTURE_2D_ARRAY)
+            functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, 0, 0, 0);
+    }
+    else if (depthStencilAttachment->isRenderbuffer())
+    {
+        functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, 0);
+    }
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
+
+    depthStencilAttachment = nullptr;
+}
+
 void Framebuffer::attachColor(size_t idx, std::shared_ptr<Texture> texture, uint32_t layer)
 {
     detachColor(idx);
@@ -520,6 +565,7 @@ void Framebuffer::attachColor(size_t idx, std::shared_ptr<Renderbuffer> renderbu
 void Framebuffer::attachDepth(std::shared_ptr<Texture> texture, uint32_t layer)
 {
     detachDepth();
+    detachDepthStencil();
 
     auto& renderer = Renderer::instance();
     auto& functions = renderer.functions();
@@ -539,6 +585,7 @@ void Framebuffer::attachDepth(std::shared_ptr<Texture> texture, uint32_t layer)
 void Framebuffer::attachDepth(std::shared_ptr<Renderbuffer> renderbuffer)
 {
     detachDepth();
+    detachDepthStencil();
 
     auto& renderer = Renderer::instance();
     auto& functions = renderer.functions();
@@ -547,6 +594,40 @@ void Framebuffer::attachDepth(std::shared_ptr<Renderbuffer> renderbuffer)
     functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_RENDERBUFFER, renderbuffer->id);
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
     depthAttachment = std::make_shared<RenderTarget>(renderbuffer);
+}
+
+void Framebuffer::attachDepthStencil(std::shared_ptr<Texture> texture, uint32_t layer)
+{
+    detachDepth();
+    detachDepthStencil();
+
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+
+    if (texture->target == GL_TEXTURE_2D)
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texture->id, 0);
+    else if (texture->target == GL_TEXTURE_CUBE_MAP)
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, 0);
+    else if (texture->target == GL_TEXTURE_2D_ARRAY)
+        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, texture->id, 0, static_cast<GLint>(layer));
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
+    depthStencilAttachment = std::make_shared<RenderTarget>(texture);
+}
+
+void Framebuffer::attachDepthStencil(std::shared_ptr<Renderbuffer> renderbuffer)
+{
+    detachDepth();
+    detachDepthStencil();
+
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+    functions.glFramebufferRenderbuffer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_RENDERBUFFER, renderbuffer->id);
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
+    depthStencilAttachment = std::make_shared<RenderTarget>(renderbuffer);
 }
 
 void Framebuffer::drawBuffers(const std::vector<GLenum>& buffers)
@@ -559,27 +640,39 @@ void Framebuffer::drawBuffers(const std::vector<GLenum>& buffers)
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
 }
 
+bool Framebuffer::isComplete() const
+{
+    auto& renderer = Renderer::instance();
+    auto& functions = renderer.functions();
+
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
+    auto res = functions.glCheckFramebufferStatus(GL_FRAMEBUFFER);
+    functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
+
+    return res = GL_FRAMEBUFFER_COMPLETE;
+}
+
 Renderer::Renderer(QOpenGLExtraFunctions& functions, GLuint defaultFbo)
     : m_functions(functions)
     , m_defaultFbo(defaultFbo)
     , m_resourceStorage(std::make_unique<ResourceStorage>())
     , m_drawData()
-    , m_projMatrix(1.0f)
-    , m_viewMatrix(1.0f)
 {
 }
 
 void Renderer::initializeResources()
 {
     m_functions.glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
-    m_functions.glEnable(GL_CULL_FACE);
 
-    m_brdfLutMap = loadTexture(brdfLutTextureName);
+    m_hdrFramebuffer = std::make_shared<Framebuffer>();
+    m_hdrFramebufferSize = glm::uvec2(0u, 0u);
+
+    m_gFramebuffer = std::make_shared<Framebuffer>();
+    m_gFramebufferSize = glm::uvec2(0u, 0u);
 
 //    const float L = 2500;
 //    const float wrap = 14;
 //    std::vector<glm::vec3> pos {glm::vec3(-L, 0.0f, -L), glm::vec3(-L, 0.0f, +L), glm::vec3(+L, 0.0f, -L), glm::vec3(+L, 0.0f, +L)};
-//    std::vector<glm::vec3> t {glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f), glm::vec3(1.0f, 0.0f, 0.0f)};
 //    std::vector<glm::vec3> n {glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f)};
 //    std::vector<glm::vec2> tc {glm::vec2(0.f, 0.f), glm::vec2(0.f, wrap), glm::vec2(wrap, 0.f), glm::vec2(wrap, wrap)};
 //    std::vector<uint32_t> indices {0, 1, 2, 3};
@@ -587,7 +680,6 @@ void Renderer::initializeResources()
 //    auto mesh = std::make_shared<Mesh>();
 //    mesh->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(4, 3, &pos[0].x, GL_STATIC_DRAW));
 //    mesh->declareVertexAttribute(VertexAttribute::Normal, std::make_shared<VertexBuffer>(4, 3, &n[0].x, GL_STATIC_DRAW));
-//    mesh->declareVertexAttribute(VertexAttribute::Tangent, std::make_shared<VertexBuffer>(4, 3, &t[0].x, GL_STATIC_DRAW));
 //    mesh->declareVertexAttribute(VertexAttribute::TexCoord, std::make_shared<VertexBuffer>(4, 2, &tc[0].x, GL_STATIC_DRAW));
 //    mesh->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_TRIANGLE_STRIP, 4, indices.data(), GL_STATIC_DRAW));
 
@@ -598,19 +690,47 @@ void Renderer::initializeResources()
 //    mdl->rootNode = std::make_shared<Model::Node>();
 //    mdl->rootNode->meshes.push_back(std::make_shared<Model::Mesh>(mesh, mat));
 
-//    std::ofstream f("floor.mdl", std::ios_base::binary);
+//    std::ofstream f("floor2.mdl", std::ios_base::binary);
 //    push(f, mdl);
 //    f.close();
 
-//    std::vector<std::string> names {"liam", "stefani", "shae", "malcolm", "regina"};
+//    std::vector<std::string> names {"liam2", "stefani2", "shae2", "malcolm2", "regina2"};
 //    for (auto& n : names)
 //    {
-//        auto mdl = loadModel(n+".dae");
+//        auto mdl = loadModel(n+".mdl");
 //        mdl->animations.clear();
-//        std::ofstream file(n+".mdl", std::ios_base::binary);
+//        std::ofstream file(n+"2.mdl", std::ios_base::binary);
 //        push(file, mdl);
 //        file.close();
 //    }
+
+
+
+//    auto model = loadModel("teeth.dae");
+//    model->rootNode->children().at(1)->meshes.at(0)->material->baseColorMap.first = "textures/teeth_basecolor.png";
+//    model->rootNode->children().at(1)->meshes.at(0)->material->normalMap.first = "textures/teeth_normal.png";
+//    model->rootNode->children().at(1)->meshes.at(0)->material->metallicMap.first = "textures/teeth_metallic.png";
+//    model->rootNode->children().at(1)->meshes.at(0)->material->roughnessMap.first = "textures/teeth_roughness.png";
+
+//    model->rootNode->children().at(2)->meshes.at(0)->material->baseColorMap.first = "textures/teeth_basecolor.png";
+//    model->rootNode->children().at(2)->meshes.at(0)->material->normalMap.first = "textures/teeth_normal.png";
+//    model->rootNode->children().at(2)->meshes.at(0)->material->metallicMap.first = "textures/teeth_metallic.png";
+//    model->rootNode->children().at(2)->meshes.at(0)->material->roughnessMap.first = "textures/teeth_roughness.png";
+
+//    std::ofstream f("teeth.mdl", std::ios_base::binary);
+//    push(f, model);
+//    f.close();
+
+//    QImage diffuse("Mrm_Albedo_LP_merged.1001.png");
+//    QImage specular("Mrm_Specular_LP_merged.1001.png");
+//    QImage glossiness("Mrm_Gloss_LP_merged.1001.png");
+//    QImage baseColor, metallic, roughness;
+
+//    diffuseSpecularGlossinessToBaseColorMetallicRoughness(diffuse, specular, glossiness, QImage(), baseColor, metallic, roughness);
+
+//    baseColor.save("teeth_basecolor.png");
+//    metallic.save("teeth_metallic.png");
+//    roughness.save("teeth_roughness.png");
 
 }
 
@@ -629,9 +749,12 @@ GLuint Renderer::defaultFbo() const
     return m_defaultFbo;
 }
 
-std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &vertexFile, const std::string &fragmentFile)
+std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &vertexFile, const std::string &fragmentFile, const std::set<std::string>& defines)
 {
-    const std::string key = vertexFile+fragmentFile;
+    std::string key = vertexFile+fragmentFile;
+    for (const auto& define : defines)
+        key += define;
+
     auto object = std::dynamic_pointer_cast<RenderProgram>(m_resourceStorage->get(key));
     if (!object)
     {
@@ -656,7 +779,7 @@ std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &ve
             }
 
             auto byteArray = file.readAll();
-            auto errorString = precompileShader(QString::fromStdString(dir), byteArray);
+            auto errorString = precompileShader(QString::fromStdString(dir), byteArray, defines);
             if (!errorString.empty())
             {
                 std::cout << shader.second << ": " << errorString << std::endl;
@@ -827,276 +950,552 @@ void Renderer::bindUniformBuffer(std::shared_ptr<Buffer> buffer, GLuint unit)
     m_functions.glBindBufferBase(GL_UNIFORM_BUFFER, unit, id);
 }
 
-void Renderer::draw(std::shared_ptr<Drawable> drawable, const utils::Transform& transform)
+void Renderer::draw(std::shared_ptr<Drawable> drawable, const utils::Transform& transform, uint32_t id)
 {
-    m_drawData[castFromLayerId(drawable->layerId())].push_back(std::make_pair(drawable, transform));
+    m_drawData[castFromLayerId(drawable->layerId())].push_back(std::tuple<std::shared_ptr<Drawable>, utils::Transform, uint32_t>(drawable, transform, id));
 }
 
-void Renderer::render(std::shared_ptr<Framebuffer> framebuffer)
+void Renderer::clear()
 {
-    using RenderMethod = void(Renderer::*)(DrawDataLayerContainer&);
-    static const std::array<RenderMethod, numElementsLayerId()> renderMethods {
-        &Renderer::renderSolidLayer, // render selection layer as solid
-        &Renderer::renderShadowLayer, // render shadows layer as solid
-        &Renderer::renderBackgroundLayer,
-        &Renderer::renderSolidLayer,
-        &Renderer::renderTransparentLayer
-    };
+    for (auto& layer: m_drawData)
+        layer.clear();
+}
 
-    GLuint framebufferId = framebuffer ? framebuffer->id : m_defaultFbo;
-    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
-
-    m_functions.glClearColor(m_clearColor.r, m_clearColor.g, m_clearColor.b, m_clearColor.a);
-    m_functions.glClearDepthf(m_clearDepth);
-    m_functions.glClear(calcClearMask());
-
-    m_functions.glViewport(m_viewport.x, m_viewport.y, m_viewport.z, m_viewport.w);
-
-    for (uint32_t layerId = 0; layerId < numElementsLayerId(); ++layerId)
+void Renderer::renderDeffered(const RenderInfo& renderInfo)
+{
+    if (renderInfo.viewportSize() != m_gFramebufferSize)
     {
-        auto& dataLayer = m_drawData.at(layerId);
-        (this->*renderMethods[layerId])(dataLayer);
-        dataLayer.clear();
+        m_gFramebufferSize = renderInfo.viewportSize();
+        resizeGFramebuffer(m_gFramebufferSize);
     }
 
-    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
-}
-
-void Renderer::readPixel(std::shared_ptr<Framebuffer> framebuffer, int xi, int yi, uint8_t &r, uint8_t &g, uint8_t &b, uint8_t &a, float& depth) const
-{
-    GLuint framebufferId = framebuffer ? framebuffer->id : m_defaultFbo;
-    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
-
-    uint8_t color[4];
-    m_functions.glReadBuffer(GL_COLOR_ATTACHMENT0);
-    m_functions.glReadPixels(xi, m_viewport.w - yi - 1, 1, 1, GL_RGBA, GL_UNSIGNED_BYTE, color);
-    r = color[0];
-    g = color[1];
-    b = color[2];
-    a = color[3];
-
-    m_functions.glReadBuffer(GL_DEPTH_ATTACHMENT);
-    m_functions.glReadPixels(xi, m_viewport.w - yi - 1, 1, 1, GL_DEPTH_COMPONENT, GL_FLOAT, &depth);
-
-    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
-}
-
-void Renderer::setViewport(const glm::ivec4& value)
-{
-    m_viewport = value;
-}
-
-void Renderer::setViewMatrix(const glm::mat4x4& value)
-{
-    m_viewMatrix = value;
-    m_viewProjMatrix = m_projMatrix * m_viewMatrix;
-    m_viewProjMatrixInverse = glm::inverse(m_viewProjMatrix);
-    m_viewMatrixInverse = glm::inverse(m_viewMatrix);
-    m_viewPosition = glm::vec3(m_viewMatrixInverse * glm::vec4(0.f, 0.f, 0.f, 1.f));
-}
-
-void Renderer::setProjectionMatrix(const glm::mat4x4& value)
-{
-    m_projMatrix = value;
-    m_viewProjMatrix = m_projMatrix * m_viewMatrix;
-    m_viewProjMatrixInverse = glm::inverse(m_viewProjMatrix);
-}
-
-void Renderer::setClearColor(bool state, const glm::vec4& value)
-{
-    m_clearColorBit = state;
-    m_clearColor = value;
-}
-
-void Renderer::setClearDepth(bool state, float value)
-{
-    m_clearDepthBit = state;
-    m_clearDepth = value;
-}
-
-void Renderer::setLightsBuffer(std::shared_ptr<Buffer> lb)
-{
-    m_lightsBuffer = lb;
-}
-
-void Renderer::setShadowMaps(std::shared_ptr<Texture> sm)
-{
-    m_shadowMaps = sm;
-}
-
-void Renderer::setIBLMaps(std::shared_ptr<Texture> dm, std::shared_ptr<Texture> sm)
-{
-    m_IBLDiffuseMap = dm;
-    m_IBLSpecularMap = sm;
-
-    m_numIBLSpecularMapsMipmaps = m_IBLSpecularMap ? m_IBLSpecularMap->numMipmapLevels() : 0;
-}
-
-void Renderer::renderShadowLayer(DrawDataLayerContainer& data)
-{
-    m_functions.glEnable(GL_DEPTH_TEST);
-    setupAndRender(data, FaceRenderOrder::OnlyBack);
-}
-
-void Renderer::renderBackgroundLayer(DrawDataLayerContainer& data)
-{
-    m_functions.glDisable(GL_DEPTH_TEST);
-    setupAndRender(data, FaceRenderOrder::OnlyFront);
-}
-
-void Renderer::renderSolidLayer(DrawDataLayerContainer& data)
-{
-    m_functions.glEnable(GL_DEPTH_TEST);
-    setupAndRender(data, FaceRenderOrder::OnlyFront);
-}
-
-void Renderer::renderTransparentLayer(DrawDataLayerContainer& data)
-{
-    std::sort(data.begin(), data.end(), [this](const DrawDataLayerContainer::value_type& first, const DrawDataLayerContainer::value_type& second) -> bool
+    if (renderInfo.viewportSize() != m_hdrFramebufferSize)
     {
-        const glm::vec3 v1 = first.second.translation - m_viewPosition;
-        const glm::vec3 v2 = second.second.translation - m_viewPosition;
+        m_hdrFramebufferSize = renderInfo.viewportSize();
+        resizeHDRFramebuffer(m_hdrFramebufferSize);
+    }
 
+    m_functions.glViewport(0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y);
+
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_gFramebuffer->id);
+
+    static const GLfloat gcolor[4] = {0.5f, 0.5f, 0.5f, 0.0f};
+    static const GLfloat gdepth[1] = {1.0f};
+    static const GLint gstencil[1] = {0};
+    m_functions.glClearBufferfv(GL_COLOR, 0, gcolor);
+    m_functions.glClearBufferfv(GL_COLOR, 1, gcolor);
+    m_functions.glClearBufferfv(GL_DEPTH, 0, gdepth);
+    m_functions.glClearBufferiv(GL_STENCIL, 0, gstencil);
+
+    m_functions.glDisable(GL_BLEND);
+    m_functions.glEnable(GL_STENCIL_TEST);
+    m_functions.glStencilOp(GL_KEEP, GL_KEEP, GL_REPLACE);
+    m_functions.glStencilFunc(GL_ALWAYS, 1, 0xFF);
+    m_functions.glStencilMask(0xFF);
+    m_functions.glEnable(GL_DEPTH_TEST);
+    m_functions.glDepthMask(GL_TRUE);
+    m_functions.glEnable(GL_CULL_FACE);
+    m_functions.glCullFace(GL_BACK);
+
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::OpaqueGeometry)])
+    {
+        setupUniforms(drawData, DrawableRenderProgramId::DeferredGeometryPass, renderInfo);
+        renderMesh(std::get<0>(drawData)->mesh());
+    }
+
+    m_functions.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_hdrFramebuffer->id);
+    m_functions.glBindFramebuffer(GL_READ_FRAMEBUFFER, m_gFramebuffer->id);
+    m_functions.glBlitFramebuffer(0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y,
+                                  0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y,
+                                  GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
+    m_functions.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
+    m_functions.glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_hdrFramebuffer->id);
+
+    static const GLfloat color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    m_functions.glClearBufferfv(GL_COLOR, 0, color);
+
+    m_functions.glDisable(GL_BLEND);
+    m_functions.glEnable(GL_STENCIL_TEST);
+    m_functions.glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    m_functions.glStencilMask(0x00);
+    m_functions.glDisable(GL_DEPTH_TEST);
+    m_functions.glDepthMask(GL_TRUE);
+    m_functions.glEnable(GL_CULL_FACE);
+    m_functions.glCullFace(GL_BACK);
+
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::Background)])
+    {
+        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+        renderMesh(std::get<0>(drawData)->mesh());
+    }
+
+    m_functions.glEnable(GL_STENCIL_TEST);
+    m_functions.glStencilOpSeparate(GL_BACK, GL_KEEP, GL_INCR_WRAP, GL_KEEP);
+    m_functions.glStencilOpSeparate(GL_FRONT, GL_KEEP, GL_DECR_WRAP, GL_KEEP);
+    m_functions.glStencilMask(0xFF);
+    m_functions.glDepthMask(GL_FALSE);
+    m_functions.glBlendFunc(GL_ONE, GL_ONE);
+    m_functions.glCullFace(GL_FRONT);
+
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::Lights)])
+    {
+        auto mesh = std::get<0>(drawData)->mesh();
+
+        m_functions.glDisable(GL_BLEND);
+        m_functions.glEnable(GL_DEPTH_TEST);
+        m_functions.glDisable(GL_CULL_FACE);
+        m_functions.glStencilFunc(GL_ALWAYS, 0, 0xFF);
+
+        m_functions.glClear(GL_STENCIL_BUFFER_BIT);
+
+        static GLenum none[] = {GL_NONE};
+        m_functions.glDrawBuffers(1, none);
+
+        setupUniforms(drawData, DrawableRenderProgramId::DeferredStencilPass, renderInfo);
+        renderMesh(mesh);
+
+        m_functions.glEnable(GL_BLEND);
+        m_functions.glDisable(GL_DEPTH_TEST);
+        m_functions.glEnable(GL_CULL_FACE);
+        m_functions.glStencilFunc(GL_NOTEQUAL, 0, 0xFF);
+
+        static GLenum colorAttachment[] = {GL_COLOR_ATTACHMENT0};
+        m_functions.glDrawBuffers(1, colorAttachment);
+
+        setupUniforms(drawData, DrawableRenderProgramId::DeferredLightPass, renderInfo);
+        renderMesh(mesh);
+    }
+
+    DrawDataLayerContainer& transparentLayer = m_drawData[castFromLayerId(LayerId::TransparentGeometry)];
+    std::sort(transparentLayer.begin(), transparentLayer.end(), [&renderInfo](const DrawDataLayerContainer::value_type& first, const DrawDataLayerContainer::value_type& second) -> bool
+    {
+        const glm::vec3 v1 = std::get<1>(first).translation - renderInfo.viewPosition();
+        const glm::vec3 v2 = std::get<1>(second).translation - renderInfo.viewPosition();
         return glm::dot(v1,v1) > glm::dot(v2,v2);
     });
 
+    m_functions.glDisable(GL_STENCIL_TEST);
     m_functions.glEnable(GL_DEPTH_TEST);
+    m_functions.glDepthMask(GL_TRUE);
     m_functions.glEnable(GL_BLEND);
-    m_functions.glBlendFunc(GL_SRC_ALPHA,GL_ONE_MINUS_SRC_ALPHA);
-    setupAndRender(data, FaceRenderOrder::IndirectOrder);
+    m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::TransparentGeometry)])
+    {
+        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+        m_functions.glCullFace(GL_FRONT);
+        renderMesh(std::get<0>(drawData)->mesh());
+        m_functions.glCullFace(GL_BACK);
+        renderMesh(std::get<0>(drawData)->mesh());
+    }
+
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
+
+    m_functions.glDisable(GL_STENCIL_TEST);
+    m_functions.glDisable(GL_DEPTH_TEST);
     m_functions.glDisable(GL_BLEND);
+    m_functions.glEnable(GL_CULL_FACE);
+    m_functions.glCullFace(GL_BACK);
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::PostEffect)])
+    {
+        setupUniforms(drawData, DrawableRenderProgramId::PostEffect, renderInfo);
+        renderMesh(std::get<0>(drawData)->mesh());
+    }
+
+    m_functions.glBindVertexArray(0);
 }
 
-void Renderer::setupAndRender(DrawDataLayerContainer& data, FaceRenderOrder faceRenderOrder)
+void Renderer::renderForward(const RenderInfo& renderInfo)
 {
-    for (const auto& drawData : data)
+    if (renderInfo.viewportSize() != m_hdrFramebufferSize)
     {
-        auto drawable = drawData.first;
-        const auto& transform = drawData.second;
+        m_hdrFramebufferSize = renderInfo.viewportSize();
+        resizeHDRFramebuffer(m_hdrFramebufferSize);
+    }
 
-        auto renderProgram = drawable->renderProgram();
-        m_functions.glUseProgram(renderProgram->id);
+    m_functions.glViewport(0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y);
 
-        glm::mat4x4 modelMatrix = transform.operator glm::mat4x4();
-        glm::mat3x3 normalMatrix = glm::inverseTranspose(modelMatrix);
-        glm::mat4x4 modelViewMatrix = m_viewMatrix * modelMatrix;
-        glm::mat4x4 modelViewProjMatrix = m_viewProjMatrix * modelMatrix;
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_hdrFramebuffer->id);
 
-        auto projMatrixLoc = renderProgram->uniformLocation("u_projMatrix");
-        if (projMatrixLoc != -1) renderProgram->setUniform(projMatrixLoc, m_projMatrix);
+    static const GLfloat color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
+    static const GLfloat depth[1] = {1.0f};
 
-        auto viewMatrixLoc = renderProgram->uniformLocation("u_viewMatrix");
-        if (viewMatrixLoc != -1) renderProgram->setUniform(viewMatrixLoc, m_viewMatrix);
+    m_functions.glClearBufferfv(GL_COLOR, 0, color);
+    m_functions.glClearBufferfv(GL_DEPTH, 0, depth);
 
-        auto viewProjMatrixLoc = renderProgram->uniformLocation("u_viewProjMatrix");
-        if (viewProjMatrixLoc != -1) renderProgram->setUniform(viewProjMatrixLoc, m_viewProjMatrix);
+    m_functions.glDisable(GL_BLEND);
+    m_functions.glDisable(GL_STENCIL_TEST);
+    m_functions.glDisable(GL_DEPTH_TEST);
+    m_functions.glDepthMask(GL_TRUE);
+    m_functions.glEnable(GL_CULL_FACE);
+    m_functions.glCullFace(GL_BACK);
 
-        auto viewProjMatrixInverseLoc = renderProgram->uniformLocation("u_viewProjMatrixInverse");
-        if (viewProjMatrixInverseLoc != -1) renderProgram->setUniform(viewProjMatrixInverseLoc, m_viewProjMatrixInverse);
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::Background)])
+    {
+        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+        renderMesh(std::get<0>(drawData)->mesh());
+    }
 
-        auto modelMatrixLoc = renderProgram->uniformLocation("u_modelMatrix");
-        if (modelMatrixLoc != -1) renderProgram->setUniform(modelMatrixLoc, modelMatrix);
+    m_functions.glEnable(GL_DEPTH_TEST);
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::OpaqueGeometry)])
+    {
+        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+        renderMesh(std::get<0>(drawData)->mesh());
+    }
 
-        auto normalMatrixLoc = renderProgram->uniformLocation("u_normalMatrix");
-        if (normalMatrixLoc != -1) renderProgram->setUniform(normalMatrixLoc, normalMatrix);
+    DrawDataLayerContainer& transparentLayer = m_drawData[castFromLayerId(LayerId::TransparentGeometry)];
+    std::sort(transparentLayer.begin(), transparentLayer.end(), [&renderInfo](const DrawDataLayerContainer::value_type& first, const DrawDataLayerContainer::value_type& second) -> bool
+    {
+        const glm::vec3 v1 = std::get<1>(first).translation - renderInfo.viewPosition();
+        const glm::vec3 v2 = std::get<1>(second).translation - renderInfo.viewPosition();
+        return glm::dot(v1,v1) > glm::dot(v2,v2);
+    });
 
-        auto modelViewMatrixLoc = renderProgram->uniformLocation("u_modelViewMatrix");
-        if (modelViewMatrixLoc != -1) renderProgram->setUniform(modelViewMatrixLoc, modelViewMatrix);
+    m_functions.glEnable(GL_BLEND);
+    m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::TransparentGeometry)])
+    {
+        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+        m_functions.glCullFace(GL_FRONT);
+        renderMesh(std::get<0>(drawData)->mesh());
+        m_functions.glCullFace(GL_BACK);
+        renderMesh(std::get<0>(drawData)->mesh());
+    }
 
-        auto modelViewProjMatrixLoc = renderProgram->uniformLocation("u_modelViewProjMatrix");
-        if (modelViewProjMatrixLoc != -1) renderProgram->setUniform(modelViewProjMatrixLoc, modelViewProjMatrix);
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
 
-        auto viewPositionLoc = renderProgram->uniformLocation("u_viewPosition");
-        if (viewPositionLoc != -1) renderProgram->setUniform(viewPositionLoc, m_viewPosition);
+    m_functions.glDisable(GL_DEPTH_TEST);
+    m_functions.glDisable(GL_BLEND);
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::PostEffect)])
+    {
+        setupUniforms(drawData, DrawableRenderProgramId::PostEffect, renderInfo);
+        renderMesh(std::get<0>(drawData)->mesh());
+    }
 
-        auto iblDiffuseMapLoc = renderProgram->uniformLocation("u_diffuseIBLMap");
-        if ((iblDiffuseMapLoc != -1) && m_IBLDiffuseMap) {
-            renderProgram->setUniform(iblDiffuseMapLoc, castFromTextureUnit(TextureUnit::DiffuseIBL));
-            bindTexture(m_IBLDiffuseMap, castFromTextureUnit(TextureUnit::DiffuseIBL));
-        }
+    m_functions.glBindVertexArray(0);
+}
 
-        auto iblSpecularMapLoc = renderProgram->uniformLocation("u_specularIBLMap");
-        if ((iblSpecularMapLoc != -1) && m_IBLSpecularMap) {
-            renderProgram->setUniform(iblSpecularMapLoc, castFromTextureUnit(TextureUnit::SpecularIBL));
-            bindTexture(m_IBLSpecularMap, castFromTextureUnit(TextureUnit::SpecularIBL));
-        }
+void Renderer::renderShadows(const RenderInfo& renderInfo, std::shared_ptr<Framebuffer> framebuffer)
+{
+    GLuint framebufferId = framebuffer ? framebuffer->id : m_defaultFbo;
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
 
-        auto numIBLSpecularMapsMipmapsLoc = renderProgram->uniformLocation("u_numSpecularIBLMapLods");
-        if (numIBLSpecularMapsMipmapsLoc != -1) renderProgram->setUniform(numIBLSpecularMapsMipmapsLoc, m_numIBLSpecularMapsMipmaps);
+    m_functions.glViewport(0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y);
 
-        auto brdfLutMapLoc = renderProgram->uniformLocation("u_brdfLUT");
-        if ((brdfLutMapLoc != -1) && m_brdfLutMap) {
-            renderProgram->setUniform(brdfLutMapLoc, castFromTextureUnit(TextureUnit::BrdfLUT));
-            bindTexture(m_brdfLutMap, castFromTextureUnit(TextureUnit::BrdfLUT));
-        }
+    static const GLfloat depth[1] = {1.0f};
+    m_functions.glClearBufferfv(GL_DEPTH, 0, depth);
 
-        auto iblContributionLoc = renderProgram->uniformLocation("u_IBLContribution");
-        if (iblContributionLoc != -1) renderProgram->setUniform(iblContributionLoc, m_IBLContribution);
+    m_functions.glDisable(GL_BLEND);
+    m_functions.glDisable(GL_STENCIL_TEST);
+    m_functions.glEnable(GL_DEPTH_TEST);
+    m_functions.glDepthMask(GL_TRUE);
+    m_functions.glEnable(GL_CULL_FACE);
+    m_functions.glCullFace(GL_FRONT);
 
-        auto lightsBufferIndex = renderProgram->uniformBufferIndexByName("u_lightsBuffer");
-        if ((lightsBufferIndex != static_cast<GLuint>(-1)) && m_lightsBuffer)
+    for (auto layer : {LayerId::OpaqueGeometry, LayerId::TransparentGeometry})
+        for (const auto& drawData : m_drawData.at(castFromLayerId(layer)))
         {
-            renderProgram->setUniformBufferBinding(lightsBufferIndex, 1);
-            bindUniformBuffer(m_lightsBuffer, 1);
+            setupUniforms(drawData, DrawableRenderProgramId::Shadow, renderInfo);
+            renderMesh(std::get<0>(drawData)->mesh());
         }
 
-        auto shadowMapsLoc = renderProgram->uniformLocation("u_shadowMaps");
-        if ((shadowMapsLoc != -1) && m_shadowMaps) {
-            renderProgram->setUniform(shadowMapsLoc, castFromTextureUnit(TextureUnit::ShadowMaps));
-            bindTexture(m_shadowMaps, castFromTextureUnit(TextureUnit::ShadowMaps));
-        }
+    m_functions.glBindVertexArray(0);
+}
 
-        drawable->prerender();
+void Renderer::renderIds(const RenderInfo& renderInfo, std::shared_ptr<Framebuffer> framebuffer)
+{
+    GLuint framebufferId = framebuffer ? framebuffer->id : m_defaultFbo;
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
 
-        auto mesh = drawable->mesh();
-        if (mesh)
+    m_functions.glViewport(0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y);
+
+    static const GLuint color[4] = {0u, 0u, 0u, 0u};
+    static const GLfloat depth[1] = {1.0f};
+
+    m_functions.glClearBufferuiv(GL_COLOR, 0, color);
+    m_functions.glClearBufferfv(GL_DEPTH, 0, depth);
+
+    m_functions.glDisable(GL_BLEND);
+    m_functions.glDisable(GL_STENCIL_TEST);
+    m_functions.glEnable(GL_DEPTH_TEST);
+    m_functions.glDepthMask(GL_TRUE);
+    m_functions.glEnable(GL_CULL_FACE);
+    m_functions.glCullFace(GL_BACK);
+
+    for (auto layer : {LayerId::OpaqueGeometry, LayerId::TransparentGeometry})
+    {
+        for (const auto& drawData : m_drawData.at(castFromLayerId(layer)))
         {
-            m_functions.glBindVertexArray(mesh->id);
-            switch (faceRenderOrder) {
-            case FaceRenderOrder::OnlyBack:
-                m_functions.glCullFace(GL_FRONT);
-                for (auto ibo : mesh->indexBuffers)
-                    m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
-                break;
-            case FaceRenderOrder::OnlyFront:
-                m_functions.glCullFace(GL_BACK);
-                for (auto ibo : mesh->indexBuffers)
-                    m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
-                break;
-            case FaceRenderOrder::IndirectOrder:
-                m_functions.glCullFace(GL_FRONT);
-                for (auto ibo : mesh->indexBuffers)
-                    m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
-                m_functions.glCullFace(GL_BACK);
-                for (auto ibo : mesh->indexBuffers)
-                    m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
-                break;
-            default:
-                break;
+            setupUniforms(drawData, DrawableRenderProgramId::Selection, renderInfo);
+            renderMesh(std::get<0>(drawData)->mesh());
+        }
+    }
+
+    m_functions.glBindVertexArray(0);
+}
+
+void Renderer::readPixel(const RenderInfo& renderInfo, std::shared_ptr<Framebuffer> framebuffer, GLenum attachment, int xi, int yi, GLenum format, GLenum type, GLvoid *data) const
+{
+    GLuint framebufferId = framebuffer ? framebuffer->id : m_defaultFbo;
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
+
+    m_functions.glReadBuffer(attachment);
+    m_functions.glReadPixels(xi, renderInfo.viewportSize().y - yi - 1, 1, 1, format, type, data);
+}
+
+void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId programId, const RenderInfo& renderInfo)
+{
+    std::shared_ptr<Drawable> drawable = std::get<0>(data);
+    glm::mat4x4 modelMatrix = std::get<1>(data).operator glm::mat4x4();
+    uint32_t id = std::get<2>(data);
+
+    auto renderProgram = drawable->renderProgram(programId);
+    m_functions.glUseProgram(renderProgram->id);
+
+    for (const auto& uniform : renderProgram->uniforms)
+    {
+        switch (uniform.first)
+        {
+        case UniformId::NodeId:
+        {
+            m_functions.glUniform1ui(uniform.second, id);
+            break;
+        }
+        case UniformId::ModelMatrix:
+        {
+            m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(modelMatrix));
+            break;
+        }
+        case UniformId::NormalMatrix:
+        {
+            m_functions.glUniformMatrix3fv(uniform.second, 1, GL_FALSE, glm::value_ptr(glm::mat3x3(glm::inverseTranspose(modelMatrix))));
+            break;
+        }
+        case UniformId::ViewMatrix:
+        {
+            m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.viewMatrix()));
+            break;
+        }
+        case UniformId::ProjMatrix:
+        {
+            m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.projMatrix()));
+            break;
+        }
+        case UniformId::ViewProjMatrix:
+        {
+            m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.viewProjMatrix()));
+            break;
+        }
+        case UniformId::ViewProjMatrixInverse:
+        {
+            m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.viewProjMatrixInverse()));
+            break;
+        }
+        case UniformId::ModelViewMatrix:
+        {
+            m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.viewMatrix() * modelMatrix));
+            break;
+        }
+        case UniformId::ModelViewProjMatrix:
+        {
+            m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.viewProjMatrix() * modelMatrix));
+            break;
+        }
+        case UniformId::ViewPosition:
+        {
+            m_functions.glUniform3fv(uniform.second, 1, glm::value_ptr(renderInfo.viewPosition()));
+            break;
+        }
+        case UniformId::ViewportSize:
+        {
+            m_functions.glUniform2uiv(uniform.second, 1, glm::value_ptr(renderInfo.viewportSize()));
+            break;
+        }
+        case UniformId::IBLDiffuseMap:
+        {
+            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::DiffuseIBL));
+            bindTexture(renderInfo.IBLDiffuseMap(), castFromTextureUnit(TextureUnit::DiffuseIBL));
+            break;
+        }
+        case UniformId::IBLSpecularMap:
+        {
+            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::SpecularIBL));
+            bindTexture(renderInfo.IBLSpecularMap(), castFromTextureUnit(TextureUnit::SpecularIBL));
+            break;
+        }
+        case UniformId::IBLSpecularMapMaxMipmapLevel:
+        {
+            m_functions.glUniform1i(uniform.second, renderInfo.maxIBLSpecularMapMipmapLevel());
+            break;
+        }
+        case UniformId::BrdfLutMap:
+        {
+            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::BrdfLUT));
+            bindTexture(renderInfo.brdfLutMap(), castFromTextureUnit(TextureUnit::BrdfLUT));
+            break;
+        }
+        case UniformId::IBLContribution:
+        {
+            m_functions.glUniform1f(uniform.second, renderInfo.IBLContribution());
+            break;
+        }
+        case UniformId::ShadowMaps:
+        {
+            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::ShadowMaps));
+            bindTexture(renderInfo.shadowMaps(), castFromTextureUnit(TextureUnit::ShadowMaps));
+            break;
+        }
+        case UniformId::BonesBuffer:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Buffer>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                m_functions.glUniformBlockBinding(renderProgram->id, uniform.second, castFromUniformBufferUnit(UniformBufferUnit::Bones));
+                bindUniformBuffer(uniformValue->data(), castFromUniformBufferUnit(UniformBufferUnit::Bones));
             }
-            m_functions.glBindVertexArray(0);
+            break;
         }
-
-        drawable->postrender();
+        case UniformId::LightsBuffer:
+        {
+            m_functions.glUniformBlockBinding(renderProgram->id, uniform.second, castFromUniformBufferUnit(UniformBufferUnit::Lights));
+            bindUniformBuffer(renderInfo.lightsBuffer(), castFromUniformBufferUnit(UniformBufferUnit::Lights));
+            break;
+        }
+        case UniformId::Color:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<glm::vec4>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+                m_functions.glUniform4fv(uniform.second, 1, glm::value_ptr(uniformValue->data()));
+            break;
+        }
+        case UniformId::Roughness:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<float>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+                m_functions.glUniform1f(uniform.second, uniformValue->data());
+            break;
+        }
+        case UniformId::BaseColorMap:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::BaseColor));
+                bindTexture(uniformValue->data(), castFromTextureUnit(TextureUnit::BaseColor));
+            }
+            break;
+        }
+        case UniformId::OpacityMap:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Opacity));
+                bindTexture(uniformValue->data(), castFromTextureUnit(TextureUnit::Opacity));
+            }
+            break;
+        }
+        case UniformId::NormalMap:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Normal));
+                bindTexture(uniformValue->data(), castFromTextureUnit(TextureUnit::Normal));
+            }
+            break;
+        }
+        case UniformId::MetallicMap:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Metallic));
+                bindTexture(uniformValue->data(), castFromTextureUnit(TextureUnit::Metallic));
+            }
+            break;
+        }
+        case UniformId::RoughnessMap:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Roughness));
+                bindTexture(uniformValue->data(), castFromTextureUnit(TextureUnit::Roughness));
+            }
+            break;
+        }
+        case UniformId::LightIndicesList:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<LightIndicesList>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                std::shared_ptr<LightIndicesList> lightIndices = uniformValue->data();
+                for (size_t i = 0; i < lightIndices->size(); ++i)
+                    m_functions.glUniform1i(uniform.second + i, lightIndices->at(i));
+            }
+            break;
+        }
+        case UniformId::GBufferMap0:
+        {
+            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::GBuffer0));
+            bindTexture(m_gFramebuffer->depthStencilAttachment->texture, castFromTextureUnit(TextureUnit::GBuffer0));
+            break;
+        }
+        case UniformId::GBufferMap1:
+        {
+            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::GBuffer1));
+            bindTexture(m_gFramebuffer->colorAttachments[0]->texture, castFromTextureUnit(TextureUnit::GBuffer1));
+            break;
+        }
+        case UniformId::GBufferMap2:
+        {
+            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::GBuffer2));
+            bindTexture(m_gFramebuffer->colorAttachments[1]->texture, castFromTextureUnit(TextureUnit::GBuffer2));
+            break;
+        }
+        case UniformId::HDRMap:
+        {
+            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::BaseColor));
+            bindTexture(m_hdrFramebuffer->colorAttachments[0]->texture, castFromTextureUnit(TextureUnit::BaseColor));
+            break;
+        }
+        }
     }
 }
 
-GLbitfield Renderer::calcClearMask() const
+void Renderer::renderMesh(std::shared_ptr<Mesh> mesh)
 {
-    GLbitfield clearMask = 0;
-    if (m_clearColorBit) clearMask |= GL_COLOR_BUFFER_BIT;
-    if (m_clearDepthBit) clearMask |= GL_DEPTH_BUFFER_BIT;
-
-    return clearMask;
+    m_functions.glBindVertexArray(mesh->id);
+    for (auto ibo : mesh->indexBuffers)
+        m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
 }
 
-std::string Renderer::precompileShader(const QString &dir, QByteArray &text)
+void Renderer::resizeHDRFramebuffer(const glm::uvec2& sz)
 {
+    m_hdrFramebuffer = std::make_shared<Framebuffer>();
+    m_hdrFramebuffer->attachDepthStencil(std::make_shared<Renderbuffer>(GL_DEPTH24_STENCIL8, sz.x, sz.y));
+    m_hdrFramebuffer->attachColor(0, createTexture2D(GL_RGBA16F, sz.x, sz.y, 0, 0, nullptr, false));
+}
+
+void Renderer::resizeGFramebuffer(const glm::uvec2& sz)
+{
+    m_gFramebuffer = std::make_shared<Framebuffer>();
+    m_gFramebuffer->attachDepthStencil(createTexture2D(GL_DEPTH24_STENCIL8, sz.x, sz.y, 0, 0, nullptr, false));
+    m_gFramebuffer->attachColor(0, createTexture2D(GL_RGBA8, sz.x, sz.y, 0, 0, nullptr, false));
+    m_gFramebuffer->attachColor(1, createTexture2D(GL_RGB10_A2, sz.x, sz.y, 0, 0, nullptr, false));
+    m_gFramebuffer->drawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1});
+}
+
+std::string Renderer::precompileShader(const QString &dir, QByteArray &text, const std::set<std::string>& defines)
+{
+    static const QString versionString = "#version 330 core";
     static const QString includeString = "#include<";
     static const QString closedBracket = ">";
 
+    // add included files
     std::set<QByteArray> includedFiles;
-
     for (auto pos = text.indexOf(includeString); pos != -1; pos = text.indexOf(includeString, pos))
     {
         auto pos2 = text.indexOf(closedBracket, pos);
@@ -1127,7 +1526,32 @@ std::string Renderer::precompileShader(const QString &dir, QByteArray &text)
         includedFiles.insert(includedFilename);
     }
 
+    // add defines
+    for (const auto& define : defines)
+        text.prepend(QByteArray::fromStdString("#define " + define + "\n"));
+
+    // add version string
+    text.prepend((versionString + "\n").toUtf8());
+
+
     return "";
+}
+
+RenderInfo::RenderInfo(const glm::mat4x4& vm, const glm::mat4x4& pm, const glm::uvec2& vs)
+    : m_viewMatrix(vm)
+    , m_projMatrix(pm)
+    , m_viewportSize(vs)
+    , m_lightsBuffer(nullptr)
+    , m_shadowMaps(nullptr)
+    , m_IBLDiffuseMap(nullptr)
+    , m_IBLSpecularMap(nullptr)
+    , m_maxIBLSpecularMapMipmapLevel(0)
+    , m_IBLContribution(0.2f)
+{
+    m_viewMatrixInverse = glm::inverse(m_viewMatrix);
+    m_viewProjMatrix = m_projMatrix * m_viewMatrix;
+    m_viewProjMatrixInverse = glm::inverse(m_viewProjMatrix);
+    m_viewPosition = glm::vec3(m_viewMatrixInverse * glm::vec4(0.f, 0.f, 0.f, 1.f));
 }
 
 } // namespace

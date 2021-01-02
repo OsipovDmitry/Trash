@@ -29,8 +29,6 @@ class CORESHARED_EXPORT Node : public utils::TreeNode<Node>
     PIMPL(Node)
 
 public:
-    bool frustum = false;
-
     Node();
     ~Node() override;
 

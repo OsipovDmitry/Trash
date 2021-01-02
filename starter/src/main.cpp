@@ -5,10 +5,9 @@
 
 #include <core/core.h>
 #include <game/game.h>
+#include <teeth/teeth.h>
 
 #include <iostream>
-
-#include <utils/boundingbox.h>
 
 int main(int argc, char *argv[])
 {
@@ -22,7 +21,7 @@ int main(int argc, char *argv[])
     {
         surfaceFormat.setVersion(3, 3);
         surfaceFormat.setProfile(QSurfaceFormat::CoreProfile);
-        surfaceFormat.setSamples(16);
+        surfaceFormat.setSamples(4);
     }
     else
     {

@@ -51,6 +51,38 @@ public:
                 vp[2][3] - vp[2][2],
                 vp[3][3] - vp[3][2]));
 
+        static const std::vector<glm::vec4> clipPoints {
+            glm::vec4(-1.f, -1.f, -1.f, 1.f),
+            glm::vec4(-1.f,  1.f, -1.f, 1.f),
+            glm::vec4( 1.f,  1.f, -1.f, 1.f),
+            glm::vec4( 1.f, -1.f, -1.f, 1.f),
+            glm::vec4(-1.f, -1.f,  1.f, 1.f),
+            glm::vec4(-1.f,  1.f,  1.f, 1.f),
+            glm::vec4( 1.f,  1.f,  1.f, 1.f),
+            glm::vec4( 1.f, -1.f,  1.f, 1.f)
+        };
+
+        const auto vpInverse = glm::inverse(vp);
+        vertices.resize(8);
+        for (size_t i = 0; i < 8; ++i)
+        {
+            const glm::vec4 p = vpInverse * clipPoints[i];
+            vertices[i] = glm::vec3(p) / p.w;
+        }
+    }
+
+    float distanceToPlane(const Plane& p) const
+    {
+        float minDist = std::numeric_limits<float>::max(), maxDist = std::numeric_limits<float>::min();
+        for (const auto& v : vertices)
+        {
+            float d = p.distanceTo(v);
+            minDist = glm::min(minDist, d);
+            maxDist = glm::max(maxDist, d);
+        }
+        return (minDist * maxDist <= .0f) ?
+                    0.0f :
+                    (minDist > .0f) ? minDist : maxDist;
     }
 
     bool contain(const BoundingSphere& bs) const {
@@ -70,7 +102,21 @@ public:
         return true;
     }
 
+    bool contain(const Frustum& f) const
+    {
+        for (const auto& plane : planes)
+            if (f.distanceToPlane(plane) < .0f)
+                return false;
+
+        for (const auto& plane : f.planes)
+            if (distanceToPlane(plane) < .0f)
+                return false;
+
+        return true;
+    }
+
     std::vector<Plane> planes;
+    std::vector<glm::vec3> vertices;
 };
 
 class OpenFrustum : public Frustum

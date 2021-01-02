@@ -5,24 +5,16 @@
 #include <vector>
 #include <set>
 
-#include <core/forwarddecl.h>
+#include <core/types.h>
 #include <core/node.h>
 
 #include "nodeprivate.h"
+#include "typesprivate.h"
 
 namespace trash
 {
 namespace core
 {
-
-class SceneRootNode : public Node
-{
-public:
-    SceneRootNode(Scene*);
-    Scene *scene() const;
-private:
-    Scene *m_scene;
-};
 
 struct Buffer;
 struct Texture;
@@ -39,38 +31,40 @@ public:
     bool detachLight(std::shared_ptr<Light>);
 
     void dirtyLightParams(Light*);
-    std::shared_ptr<Buffer> getLightParamsBuffer();
-    void updateLightParams();
-
     void dirtyShadowMap(Light*);
-    std::shared_ptr<Texture> getLightsShadowMaps();
-    void updateShadowMaps();
-    void updateShadowMap(std::shared_ptr<Light>);
 
     static void dirtyNodeLightIndices(Node&);
     static void dirtyNodeShadowMaps(Node&);
+    static utils::Transform calcLightViewTransform(std::shared_ptr<Light>);
+    static glm::mat4x4 calcLightProjMatrix(std::shared_ptr<Light>, const std::pair<float, float>&);
 
     void renderScene(uint64_t, uint64_t);
     PickData pickScene(int32_t, int32_t);
     IntersectionData intersectScene(const utils::Ray&);
     IntersectionData intersectScene(const utils::Frustum&);
 
-    std::pair<float, float> calculateZPlanes(const glm::mat4x4&, float) const;
-
     Scene& thisScene;
     std::shared_ptr<SceneRootNode> rootNode;
     std::shared_ptr<Camera> camera;
     std::shared_ptr<LightsList> lights;
     std::shared_ptr<Buffer> lightsUbo;
+    std::shared_ptr<Framebuffer> lightsFramebuffer;
     std::shared_ptr<Texture> lightsShadowMaps;
+    std::shared_ptr<Texture> iblDiffuseMap, iblSpecularMap, iblBrdfLutMap;
+    float iblContribution;
     std::shared_ptr<Drawable> backgroundDrawable;
+    std::shared_ptr<Drawable> postEffectDrawable;
+    std::array<std::shared_ptr<Drawable>, numElementsLightType()> lightsDrawables;
+    std::shared_ptr<Drawable> iblDrawable;
 
-    static const float CameraMinZNear;
-    static const float ShadowMapMinZNear;
-    static const int32_t ShadowMapSize;
+    float cameraMinZNear, cameraMaxZFar;
+    float shadowMapMinZNear, shadowMapMaxZFar;
+    int32_t shadowMapSize;
 
     std::set<uint32_t> freeLightIndices;
     std::set<uint32_t> dirtyLights, dirtyShadowMaps;
+
+    bool useDeferredTechnique;
 };
 
 } // namespace

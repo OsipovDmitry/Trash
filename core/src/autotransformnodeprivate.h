@@ -15,7 +15,7 @@ class AutoTransformNodePrivate : public NodePrivate
 public:
     AutoTransformNodePrivate(Node&);
 
-    void doUpdate(uint64_t, uint64_t, bool) override;
+    void doUpdate(uint64_t, uint64_t) override;
 };
 
 } // namespace

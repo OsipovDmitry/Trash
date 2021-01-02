@@ -80,14 +80,20 @@ void RenderWidget::paintGL()
     int textXY = static_cast<int>(static_cast<float>(height()) / 720 * 10);
 
     QPainter painter(this);
-    painter.setPen(Qt::black);
+    painter.setPen(Qt::red);
     painter.setFont(QFont("Arial", textSize));
     painter.drawStaticText(QPoint(textXY, textXY), QStaticText("FPS: " + QString::number(static_cast<double>(m_lastFps), 'f', 1)));
 }
 
 void RenderWidget::mousePressEvent(QMouseEvent *event)
 {
-    m_core.sendMessage(std::make_shared<RenderWidgetWasClickedMessage>(event->x(), event->y()));
+    m_core.sendMessage(std::make_shared<RenderWidgetMouseClickMessage>(mouseButtonMask(event->buttons()), event->x(), event->y()));
+    event->accept();
+}
+
+void RenderWidget::mouseMoveEvent(QMouseEvent *event)
+{
+    m_core.sendMessage(std::make_shared<RenderWidgetMouseMoveMessage>(event->buttons(), event->x(), event->y()));
     event->accept();
 }
 
@@ -96,6 +102,15 @@ void RenderWidget::closeEvent(QCloseEvent *event)
     m_core.sendMessage(std::make_shared<RenderWidgetWasClosedMessage>());
     m_core.process();
     event->accept();
+}
+
+uint32_t RenderWidget::mouseButtonMask(const Qt::MouseButtons& qtMask)
+{
+    uint32_t result =
+            (qtMask.testFlag(Qt::MouseButton::LeftButton) ? MouseButton::LeftButton : 0) |
+            (qtMask.testFlag(Qt::MouseButton::MiddleButton) ? MouseButton::MiddleButton : 0) |
+            (qtMask.testFlag(Qt::MouseButton::RightButton) ? MouseButton::RightButton : 0);
+    return result;
 }
 
 } // namespace

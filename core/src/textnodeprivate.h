@@ -17,14 +17,12 @@ public:
     void dirtyDrawable();
     void updateDrawable();
 
-    void doUpdate(uint64_t, uint64_t, bool) override;
+    void doUpdate(uint64_t, uint64_t) override;
 
     // it's unnecessary to update lighting and shading for textnode
     void doUpdateLightIndices() override {}
     void doDirtyLightIndices() override {}
     void doDirtyShadowMaps() override {}
-
-    void doShadow() override {}
 
     std::shared_ptr<Drawable> textDrawable;
     std::string text;

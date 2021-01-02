@@ -20,10 +20,10 @@ GraphicsControllerPrivate::~GraphicsControllerPrivate()
 
 void GraphicsControllerPrivate::resize(int32_t width, int32_t height)
 {
-    currentViewport = glm::ivec4(0, 0, width, height);
+    currentViewportSize = glm::uvec2(width, height);
 
     if (scene)
-        scene->camera()->setViewport(currentViewport);
+        scene->camera()->setViewportSize(currentViewportSize);
 }
 
 void GraphicsControllerPrivate::updateScene(uint64_t time, uint64_t dt)

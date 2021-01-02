@@ -3,7 +3,9 @@
 #include <core/camera.h>
 #include <core/graphicscontroller.h>
 
+#include "coreprivate.h"
 #include "graphicscontrollerprivate.h"
+#include "typesprivate.h"
 
 namespace trash
 {
@@ -14,7 +16,7 @@ void GraphicsController::setMainScene(std::shared_ptr<Scene> scene)
 {
     auto& gcPrivate = m();
     gcPrivate.scene = scene;
-    gcPrivate.scene->camera()->setViewport(gcPrivate.currentViewport);
+    gcPrivate.scene->camera()->setViewportSize(gcPrivate.currentViewportSize);
 }
 
 std::shared_ptr<Scene> GraphicsController::mainScene()

@@ -2,12 +2,8 @@
 #define TYPES_H
 
 #include <inttypes.h>
-#include <array>
-#include <bitset>
 
 #include <utils/enumclass.h>
-
-#include <core/forwarddecl.h>
 
 namespace trash
 {
@@ -19,45 +15,17 @@ ENUMCLASS(ControllerType, uint32_t,
           Graphics,
           Audio)
 
-ENUMCLASS(ControllerMessageType, uint32_t,
-          RenderWidgetWasInitialized,
-          RenderWidgetWasResized,
-          RenderWidgetWasUpdated,
-          RenderWidgetWasClicked,
-          RenderWidgetWasClosed,
+ENUMCLASS(LightType, uint32_t, Point, Direction, Spot)
 
-          Resize,
-          Update)
+ENUMCLASS(TextNodeAlignment, uint8_t, Negative, Center, Positive)
 
-ENUMCLASS(VertexAttribute, uint32_t,
-          Position,
-          Normal,
-          TexCoord,
-          BonesIDs,
-          BonesWeights,
-          Tangent)
-
-ENUMCLASS(TextureUnit, int32_t,
-          BaseColor,
-          Opacity,
-          Normal,
-          Metallic,
-          Roughness,
-          DiffuseIBL,
-          SpecularIBL,
-          BrdfLUT,
-          ShadowMaps)
-
-} // namespace
-} // namespace
-
-namespace std
-{
-template<> struct hash<trash::core::VertexAttribute> {
-    std::size_t operator()(trash::core::VertexAttribute const& key) const noexcept { return castFromVertexAttribute(key); }
-};
+namespace MouseButton {
+    const uint32_t LeftButton = 1 << 0;
+    const uint32_t MiddleButton = 1 << 1;
+    const uint32_t RightButton = 1 << 2;
 }
 
-
+} // namespace
+} // namespace
 
 #endif // TYPES_H

@@ -18,7 +18,8 @@ public:
     virtual void doInitialize() {}
     virtual void doUnitialize() {}
     virtual void doUpdate(uint64_t, uint64_t) {}
-    virtual void doMouseClick(int, int) {}
+    virtual void doMouseClick(uint32_t, int, int) {}
+    virtual void doMouseMove(uint32_t, int, int) {}
 
 protected:
     AbstractGame() {}

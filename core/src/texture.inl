@@ -2,7 +2,6 @@
 
 #include <QtCore/QFile>
 #include <QtGui/QOpenGLExtraFunctions>
-#include <QtGui/QImage>
 
 #include <glm/gtc/type_ptr.hpp>
 
@@ -11,6 +10,7 @@
 
 #include "renderer.h"
 #include "image.h"
+#include "utils.h"
 #include "hdrloader/hdrloader.h"
 #include "rapidjson/document.h"
 
@@ -27,8 +27,7 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
         GLuint id;
         m_functions.glGenTextures(1, &id);
 
-        auto ext = utils::fileExt(filename);
-        if (ext == "json")
+        if (utils::fileExt(filename) == "json")
         {
             const std::string dir = utils::fileDir(filename);
 
@@ -88,6 +87,7 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
                 return nullptr;
 
             auto byteArray = file.readAll();
+            file.close();
 
             rapidjson::Document document;
             document.Parse(byteArray);
@@ -121,7 +121,7 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
                     return nullptr;
             }
 
-            int32_t numGeneratedMimmaps = numMipmaps;
+            int32_t numGeneratedMipmaps = numMipmaps;
             bool autoGenMipmaps = false;
             int filter = (numMipmaps > 1) ? 3 : 2;
 
@@ -131,7 +131,7 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
                 if (autoGenMipmaps)
                 {
                     filter = 3;
-                    numGeneratedMimmaps = 1 + glm::floor(glm::log2(static_cast<float>(glm::max(images[0]->width(), images[0]->height()))));
+                    numGeneratedMipmaps = numberOfMipmaps(images[0]->width(), images[0]->height());
                 }
             }
 
@@ -140,8 +140,8 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
 
 
             m_functions.glBindTexture(target, id);
-            m_functions.glTexStorage2D(target, numGeneratedMimmaps, internalFormat, images[0]->width(), images[0]->height());
-            m_functions.glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, numGeneratedMimmaps-1);
+            m_functions.glTexStorage2D(target, numGeneratedMipmaps, internalFormat, images[0]->width(), images[0]->height());
+            m_functions.glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, numGeneratedMipmaps-1);
 
             loadImages(m_functions, target, 0, images);
 
@@ -163,9 +163,7 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
             object->setFilter(filter);
 
             if (autoGenMipmaps)
-            {
-                object->generateMipmaps();
-            }
+                m_functions.glGenerateMipmap(target);
 
             if (document.HasMember("Wrap"))
             {
@@ -186,13 +184,16 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
             if (!utils::formatAndTypeToInternalFormat(image->format(), image->type(), internalFormat))
                 return nullptr;
 
+            int32_t numMipmaps = numberOfMipmaps(image->width(), image->height());
+
             m_functions.glBindTexture(GL_TEXTURE_2D, id);
-            m_functions.glTexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(internalFormat), image->width(), image->height(), 0, image->format(), image->type(), image->data());
-            m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-            m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+            m_functions.glTexStorage2D(GL_TEXTURE_2D, numMipmaps, internalFormat, image->width(), image->height());
+            m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, numMipmaps-1);
+            m_functions.glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image->width(), image->height(), image->format(), image->type(), image->data());
+            m_functions.glGenerateMipmap(GL_TEXTURE_2D);
 
             object = std::make_shared<Texture>(id, GL_TEXTURE_2D);
-            object->generateMipmaps();
+            object->setFilter(3);
         }
 
         m_resourceStorage->store(filename, object);
@@ -207,19 +208,38 @@ std::shared_ptr<Texture> Renderer::createTexture2D(GLenum internalFormat,
                                                    GLenum format,
                                                    GLenum type,
                                                    const void *data,
+                                                   bool genMipmaps,
                                                    const std::string &resourceName)
 {
     auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(resourceName));
     if (!object)
     {
+        int32_t numMipmaps = 1;
+        if (genMipmaps)
+            numMipmaps = numberOfMipmaps(width, height);
+
+        int32_t filter = 1;
+
         GLuint id;
         m_functions.glGenTextures(1, &id);
         m_functions.glBindTexture(GL_TEXTURE_2D, id);
-        m_functions.glTexImage2D(GL_TEXTURE_2D, 0, static_cast<GLint>(internalFormat), width, height, 0, format, type, data);
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
+        m_functions.glTexStorage2D(GL_TEXTURE_2D, numMipmaps, internalFormat, width, height);
+        m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, numMipmaps-1);
+
+        if (data)
+        {
+            m_functions.glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, format, type, data);
+            filter = 2;
+        }
+
+        if (genMipmaps)
+        {
+            m_functions.glGenerateMipmap(GL_TEXTURE_2D);
+            filter = 3;
+        }
 
         object = std::make_shared<Texture>(id, GL_TEXTURE_2D);
+        object->setFilter(filter);
 
         if (!resourceName.empty())
             m_resourceStorage->store(resourceName, object);

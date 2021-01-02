@@ -7,6 +7,7 @@
 #include "../glm/vec3.hpp"
 
 #include "transform.h"
+#include "boundingsphere.h"
 #include "plane.h"
 
 namespace trash
@@ -15,7 +16,8 @@ namespace utils
 {
 
 struct BoundingBox;
-inline BoundingBox operator +(const BoundingBox& s1, const BoundingBox& s2);
+inline BoundingBox operator +(const BoundingBox&, const BoundingBox&);
+inline BoundingBox operator +(const BoundingBox&, const BoundingSphere&);
 
 struct BoundingBox
 {
@@ -49,24 +51,30 @@ struct BoundingBox
         for (size_t k = 0; k < 3; ++k)
             if (p[k] < .0f) std::swap(vmin[k], vmax[k]);
         const float vMinDist = p.distanceTo(vmin), vMaxDist = p.distanceTo(vmax);
-        return (vMinDist * vMaxDist < .0f) ?
+        return (vMinDist * vMaxDist <= .0f) ?
                     .0f :
                     (vMinDist > .0f) ? vMinDist  : vMaxDist;
     }
 
-    void distanceToPlane(const Plane& p, std::pair<float, float>& dists) const
+    std::pair<float, float> pairDistancesToPlane(const Plane& p) const
     {
         glm::vec3 vmin = minPoint, vmax = maxPoint;
         for (size_t k = 0; k < 3; ++k)
             if (p[k] < .0f) std::swap(vmin[k], vmax[k]);
         const float vMinDist = p.distanceTo(vmin), vMaxDist = p.distanceTo(vmax);
-        dists = std::make_pair(vMinDist, vMaxDist);
+        return std::make_pair(vMinDist, vMaxDist);
+    }
+
+    glm::vec3 closestPoint(const glm::vec3& v) const
+    {
+        return glm::clamp(v, minPoint, maxPoint);
     }
 
     glm::vec3 center() const { return .5f * (minPoint + maxPoint); }
     glm::vec3 halfSize() const { return .5f * (maxPoint - minPoint); }
 
     BoundingBox& operator += (const BoundingBox& b) { *this = *this + b; return *this; }
+    BoundingBox& operator += (const BoundingSphere& s) { *this = *this + s; return *this; }
 };
 
 inline BoundingBox operator +(const BoundingBox& b1, const BoundingBox& b2)
@@ -77,6 +85,11 @@ inline BoundingBox operator +(const BoundingBox& b1, const BoundingBox& b2)
         result.maxPoint[k] = (b1.maxPoint[k] > b2.maxPoint[k]) ? b1.maxPoint[k] : b2.maxPoint[k];
     }
     return result;
+}
+
+inline BoundingBox operator +(const BoundingBox& b1, const BoundingSphere& s2)
+{
+    return b1 + BoundingBox(s2.center() - glm::vec3(s2.radius()), s2.center() + glm::vec3(s2.radius()));
 }
 
 inline BoundingBox operator *(const Transform& t, const BoundingBox& b)

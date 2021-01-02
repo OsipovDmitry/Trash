@@ -42,25 +42,24 @@ ModelNode::ModelNode(const std::string &filename)
 
             if (mesh->material)
             {
-                diffuseTexture = mesh->material->diffuseTexture.second;
-                opacityTexture = mesh->material->opacityTexture.second;
-                normalTexture = mesh->material->normalTexture.second;
-                metallicTexture = mesh->material->metallicOrSpecularTexture.second;
-                roughTexture = mesh->material->roughOrGlossTexture.second;
-                isMetallicRoughTexture = mesh->material->isMetallicRoughWorkflow;
+                diffuseTexture = mesh->material->baseColorMap.second;
+                opacityTexture = mesh->material->opacityMap.second;
+                normalTexture = mesh->material->normalMap.second;
+                metallicTexture = mesh->material->metallicMap.second;
+                roughTexture = mesh->material->roughnessMap.second;
             }
 
             auto meshNode = std::make_shared<DrawableNode>();
             auto& meshNodePrivate = meshNode->m();
             meshNode->setTransform(transform);
             meshNodePrivate.addDrawable(std::make_shared<TexturedMeshDrawable>(mesh->mesh,
+                                                                         mPrivate.bonesBuffer,
+                                                                         glm::vec4(1.f, 1.f, 1.f, 1.f),
                                                                          diffuseTexture,
                                                                          opacityTexture,
                                                                          normalTexture,
                                                                          metallicTexture,
                                                                          roughTexture,
-                                                                         isMetallicRoughTexture,
-                                                                         mPrivate.bonesBuffer,
                                                                          meshNodePrivate.lightIndices));
             attach(meshNode);
 

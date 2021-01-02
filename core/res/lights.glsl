@@ -4,6 +4,13 @@ struct LightStruct
     mat4x4 matrix;
 };
 
+layout (std140) uniform u_lightsBuffer
+{
+    LightStruct u_lights[128];
+};
+
+uniform sampler2DArrayShadow u_shadowMaps;
+
 #define LIGHT_POSITION(light) (light.params[0].xyz)
 #define LIGHT_DIRECTION(light) (light.params[1].xyz)
 #define LIGHT_COLOR(light) (light.params[2].xyz)
@@ -14,12 +21,11 @@ struct LightStruct
 #define LIGHT_IS_SHADOW_ENABLED(light) (light.params[3][3] > 0.0)
 #define LIGHT_MATRIX(light) (light.matrix)
 
+#define LIGHT_TYPE_POINT (0)
+#define LIGHT_TYPE_DIRECTION (1)
+#define LIGHT_TYPE_SPOT (2)
 
-#define LIGHT_TYPE_NONE (0)
-#define LIGHT_TYPE_POINT (1)
-#define LIGHT_TYPE_DIRECTION (2)
-#define LIGHT_TYPE_SPOT (3)
-#define LIGHT_TYPE_COUNT (4)
+#define MAX_LIGHTS 8
 
 vec3 toLightVector(in LightStruct light, vec3 v)
 {
@@ -42,18 +48,29 @@ float lightAttenuation(in LightStruct light, vec3 toLight)
         vec2 radiuses = LIGHT_RADIUSES(light);
 
         float dist = length(toLight);
-        float arg = clamp((dist-radiuses.x)/radiuses.y, 0.0, 1.0);
-        att *= 1.0 - arg*arg;
+        att *= 1.0 - smoothstep(radiuses.x, radiuses.x + radiuses.y, dist);
 
         if (type == LIGHT_TYPE_SPOT)
         {
             vec3 l = normalize(toLight);
             float cosAngle = dot(-l, LIGHT_DIRECTION(light));
-            float spotAtt = (cosAngle - LIGHT_SPOT_COS_OUTER(light)) / (LIGHT_SPOT_COS_INNER(light) - LIGHT_SPOT_COS_OUTER(light));
-            spotAtt = clamp(spotAtt, 0.0, 1.0);
-            att *= spotAtt;
+            att *= smoothstep(LIGHT_SPOT_COS_OUTER(light), LIGHT_SPOT_COS_INNER(light), cosAngle);
         }
     }
 
     return att;
+}
+
+float lightShadow(in vec3 posInLightSpace, in int lightIdx)
+{
+    const int N = 2;
+
+    vec2 shadowMapSize = textureSize(u_shadowMaps, 0).xy;
+    float shadow = 0.0;
+    int x, y;
+    for (x = -N; x <= N; ++x)
+        for (y = -N; y <= N; ++y)
+            shadow += texture(u_shadowMaps, vec4(posInLightSpace.xy + vec2(x,y) / shadowMapSize, float(lightIdx), posInLightSpace.z));
+
+    return shadow / ((2*N+1) * (2*N+1));
 }

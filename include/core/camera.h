@@ -28,11 +28,8 @@ public:
     Camera();
     virtual ~Camera();
 
-    void setViewport(const glm::ivec4&);
-    const glm::ivec4& viewport() const;
-
-    void setClearColor(bool, const glm::vec4& = glm::vec4(0.5f, 0.5f, 1.0f, 1.0f));
-    void setClearDepth(bool, float);
+    void setViewportSize(const glm::uvec2&);
+    const glm::uvec2& viewportSize() const;
 
     const glm::mat4x4& viewMatrix() const;
     void setViewMatrix(const glm::mat4x4&);

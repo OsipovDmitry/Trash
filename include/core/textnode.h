@@ -4,14 +4,16 @@
 #include <glm/vec4.hpp>
 
 #include <utils/enumclass.h>
+
 #include <core/drawablenode.h>
+#include <core/types.h>
+
+// based on https://evanw.github.io/font-texture-generator/
 
 namespace trash
 {
 namespace core
 {
-
-ENUMCLASS(TextNodeAlignment, uint8_t, Negative, Center, Positive)
 
 class TextNodePrivate;
 

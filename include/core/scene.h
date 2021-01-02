@@ -46,15 +46,15 @@ public:
     IntersectionData intersectScene(const utils::Ray&) const;
     IntersectionData intersectScene(const utils::Frustum&) const;
 
-    std::shared_ptr<Node> rootNode();
-    std::shared_ptr<const Node> rootNode() const;
+    std::shared_ptr<SceneRootNode> rootNode();
+    std::shared_ptr<const SceneRootNode> rootNode() const;
 
     std::shared_ptr<Camera> camera();
     std::shared_ptr<const Camera> camera() const;
 
     void attachLight(std::shared_ptr<Light>);
     bool detachLight(std::shared_ptr<Light>);
-    std::shared_ptr<const LightsList> lights() const;
+    //std::shared_ptr<const LightsList> lights() const;
 
 private:
     std::unique_ptr<ScenePrivate> m_;

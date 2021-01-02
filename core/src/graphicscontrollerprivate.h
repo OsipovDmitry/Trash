@@ -4,7 +4,7 @@
 #include <memory>
 #include <unordered_map>
 
-#include <glm/vec4.hpp>
+#include <glm/vec2.hpp>
 
 #include <core/forwarddecl.h>
 
@@ -21,7 +21,7 @@ class GraphicsControllerPrivate : public AbstractControllerPrivate
 {
 public:
     std::shared_ptr<Scene> scene;
-    glm::ivec4 currentViewport;
+    glm::uvec2 currentViewportSize;
 
     GraphicsControllerPrivate();
     ~GraphicsControllerPrivate();
