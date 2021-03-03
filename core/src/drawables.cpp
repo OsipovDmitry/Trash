@@ -13,44 +13,20 @@ namespace trash
 namespace core
 {
 
-MeshDrawable::MeshDrawable(std::shared_ptr<Mesh> mesh, std::shared_ptr<Buffer> bonesBuffer)
-    : m_mesh(mesh)
-    , m_bonesBufferUniform(bonesBuffer ? std::make_shared<Uniform<std::shared_ptr<Buffer>>>(bonesBuffer) : nullptr)
-{
-}
-
-std::shared_ptr<Mesh> MeshDrawable::mesh() const
-{
-    return m_mesh;
-}
-
-std::shared_ptr<AbstractUniform> MeshDrawable::uniform(UniformId id) const
-{
-    std::shared_ptr<AbstractUniform> result = Drawable::uniform(id);
-
-    switch (id)
-    {
-    case UniformId::BonesBuffer:
-    {
-        result = m_bonesBufferUniform;
-        break;
-    }
-    }
-
-    return result;
-}
-
-TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> mesh,
+StandardDrawable::StandardDrawable(std::shared_ptr<Mesh> mesh,
                                            std::shared_ptr<Buffer> bonesBuffer,
                                            const glm::vec4& color,
+                                           const glm::vec2& metallicRoughness,
                                            std::shared_ptr<Texture> baseColorTexture,
                                            std::shared_ptr<Texture> opacityTexture,
                                            std::shared_ptr<Texture> normalTexture,
                                            std::shared_ptr<Texture> metallicTexture,
                                            std::shared_ptr<Texture> roughnessTexture,
                                            std::shared_ptr<LightIndicesList> lightIndicesList)
-    : MeshDrawable(mesh, bonesBuffer)
-    , m_colorUniform(std::make_shared<Uniform<glm::vec4>>(color))
+    : m_mesh(mesh)
+    , m_bonesBufferUniform(bonesBuffer ? std::make_shared<Uniform<std::shared_ptr<Buffer>>>(bonesBuffer) : nullptr)
+    , m_baseColorUniform(std::make_shared<Uniform<glm::vec4>>(color))
+    , m_metallicRoughnessUniform(std::make_shared<Uniform<glm::vec2>>(metallicRoughness))
     , m_baseColorTextureUniform(baseColorTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(baseColorTexture) : nullptr)
     , m_opacityTextureUniform(opacityTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(opacityTexture) : nullptr)
     , m_normalTextureUniform(normalTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(normalTexture) : nullptr)
@@ -58,19 +34,23 @@ TexturedMeshDrawable::TexturedMeshDrawable(std::shared_ptr<Mesh> mesh,
     , m_roughnessTextureUniform(roughnessTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(roughnessTexture) : nullptr)
     , m_lightIndicesListUniform(lightIndicesList ? std::make_shared<Uniform<std::shared_ptr<LightIndicesList>>>(lightIndicesList) : nullptr)
 {
-    auto& renderer = Renderer::instance();
-
-    if (!m_baseColorTextureUniform)
-        m_baseColorTextureUniform = std::make_shared<Uniform<std::shared_ptr<Texture>>>(renderer.loadTexture(standardDiffuseTextureName));
-
-    if (!m_metallicTextureUniform)
-        m_metallicTextureUniform = std::make_shared<Uniform<std::shared_ptr<Texture>>>(renderer.createTexture2D(GL_R8, 1, 1, GL_RED, GL_UNSIGNED_BYTE, &standardMetallicTexture.second, false, standardMetallicTexture.first));
-
-    if (!m_roughnessTextureUniform)
-        m_roughnessTextureUniform = std::make_shared<Uniform<std::shared_ptr<Texture>>>(renderer.createTexture2D(GL_R8, 1, 1, GL_RED, GL_UNSIGNED_BYTE, &standardRoughnessTexture.second, false, standardRoughnessTexture.first));
 }
 
-std::shared_ptr<RenderProgram> TexturedMeshDrawable::renderProgram(DrawableRenderProgramId id) const
+LayerId StandardDrawable::layerId() const
+{
+    LayerId result;
+
+    if (m_baseColorUniform->get().a < .999f || m_opacityTextureUniform)
+        result = LayerId::TransparentGeometry;
+    else if (m_lightIndicesListUniform && m_lightIndicesListUniform->get()->isEnabled && m_mesh && m_mesh->vertexBuffer(VertexAttribute::Normal))
+        result = LayerId::OpaqueGeometry;
+    else
+        result = LayerId::NotLightedGeometry;
+
+    return result;
+}
+
+std::shared_ptr<RenderProgram> StandardDrawable::renderProgram(DrawableRenderProgramId id) const
 {
     auto& renderer = Renderer::instance();
 
@@ -114,15 +94,30 @@ std::shared_ptr<RenderProgram> TexturedMeshDrawable::renderProgram(DrawableRende
     return result;
 }
 
-std::shared_ptr<AbstractUniform> TexturedMeshDrawable::uniform(UniformId id) const
+std::shared_ptr<Mesh> StandardDrawable::mesh() const
 {
-    std::shared_ptr<AbstractUniform> result = MeshDrawable::uniform(id);
+    return m_mesh;
+}
+
+std::shared_ptr<AbstractUniform> StandardDrawable::uniform(UniformId id) const
+{
+    std::shared_ptr<AbstractUniform> result = Drawable::uniform(id);
 
     switch (id)
     {
+    case UniformId::BonesBuffer:
+    {
+        result = m_bonesBufferUniform;
+        break;
+    }
     case UniformId::Color:
     {
-        result = m_colorUniform;
+        result = m_baseColorUniform;
+        break;
+    }
+    case UniformId::MetallicRoughness:
+    {
+        result = m_metallicRoughnessUniform;
         break;
     }
     case UniformId::BaseColorMap:
@@ -160,51 +155,83 @@ std::shared_ptr<AbstractUniform> TexturedMeshDrawable::uniform(UniformId id) con
     return result;
 }
 
-std::set<std::string> TexturedMeshDrawable::renderProgramDefines() const
+void StandardDrawable::dirtyCache()
+{
+    m_forwardRenderProgram = nullptr;
+    m_deferredRenderProgram = nullptr;
+    m_shadowProgram = nullptr;
+    m_selectionProgram = nullptr;
+}
+
+std::set<std::string> StandardDrawable::renderProgramDefines() const
 {
     std::set<std::string> defines;
-    //defines.insert("DEBUG");
+
+    bool hasPositions = m_mesh->vertexBuffer(VertexAttribute::Position) != nullptr;
+    if (hasPositions)
+        defines.insert("HAS_POSITIONS");
+
+    bool hasNormals = m_mesh->vertexBuffer(VertexAttribute::Normal) != nullptr;
+    if (hasNormals)
+        defines.insert("HAS_NORMALS");
+
+    if (m_mesh->vertexBuffer(VertexAttribute::TexCoord))
+        defines.insert("HAS_TEXCOORDS");
 
     if (m_bonesBufferUniform && m_mesh->vertexBuffer(VertexAttribute::BonesIDs) && m_mesh->vertexBuffer(VertexAttribute::BonesWeights))
         defines.insert("HAS_BONES");
 
-    if (m_mesh->vertexBuffer(VertexAttribute::Normal))
-    {
+    if (m_mesh->vertexBuffer(VertexAttribute::Tangent))
+        defines.insert("HAS_TANGENTS");
+
+    if (m_mesh->vertexBuffer(VertexAttribute::Color))
+        defines.insert("HAS_COLORS");
+
+    if (m_lightIndicesListUniform && m_lightIndicesListUniform->get()->isEnabled)
         defines.insert("HAS_LIGHTING");
-        if (m_normalTextureUniform && m_mesh->vertexBuffer(VertexAttribute::Tangent))
-            defines.insert("HAS_NORMALMAPPING");
-    }
+
+    if (m_baseColorTextureUniform)
+        defines.insert("HAS_BASECOLORMAPPING");
 
     if (m_opacityTextureUniform)
         defines.insert("HAS_OPACITYMAPPING");
+
+    if (m_normalTextureUniform)
+        defines.insert("HAS_NORMALMAPPING");
+
+    if (m_metallicTextureUniform)
+        defines.insert("HAS_METALLICMAPPING");
+
+    if (m_roughnessTextureUniform)
+        defines.insert("HAS_ROUGHNESSMAPPING");
 
     return defines;
 }
 
 SphereDrawable::SphereDrawable(uint32_t segs, const utils::BoundingSphere &bs, const glm::vec4& c)
-    : TexturedMeshDrawable(buildSphereMesh(segs, bs, true), nullptr, c, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
+    : StandardDrawable(buildSphereMesh(segs, bs, true), nullptr, c, glm::vec2(1.f, 1.f), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
 {   
 }
 
 BoxDrawable::BoxDrawable(const utils::BoundingBox& box, const glm::vec4& c)
-    : TexturedMeshDrawable(buildBoxMesh(box, true), nullptr, c, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
+    : StandardDrawable(buildBoxMesh(box, true), nullptr, c, glm::vec2(1.f, 1.f), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
 {
 
 }
 
 FrustumDrawable::FrustumDrawable(const utils::Frustum &frustum, const glm::vec4& c)
-    : TexturedMeshDrawable(buildFrustumMesh(frustum), nullptr, c, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
+    : StandardDrawable(buildFrustumMesh(frustum), nullptr, c, glm::vec2(1.f, 1.f), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
 {
 }
 
 ConeDrawable::ConeDrawable(uint32_t segs, float r, float l, const glm::vec4& c)
-    : TexturedMeshDrawable(buildConeMesh(segs, r, l, true), nullptr, c, nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
+    : StandardDrawable(buildConeMesh(segs, r, l, true), nullptr, c, glm::vec2(1.f, 1.f), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
 {
 }
 
 BackgroundDrawable::BackgroundDrawable(float r)
     : Drawable()
-    , m_roughnessUniform(std::make_shared<Uniform<float>>(r))
+    , m_metallicRoughnessUniform(std::make_shared<Uniform<glm::vec2>>(glm::vec2(1.f, r)))
 {
 }
 
@@ -236,9 +263,9 @@ std::shared_ptr<AbstractUniform> BackgroundDrawable::uniform(UniformId id) const
 
     switch (id)
     {
-    case UniformId::Roughness:
+    case UniformId::MetallicRoughness:
     {
-        result = m_roughnessUniform;
+        result = m_metallicRoughnessUniform;
         break;
     }
     }
@@ -247,7 +274,7 @@ std::shared_ptr<AbstractUniform> BackgroundDrawable::uniform(UniformId id) const
 }
 
 TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& c, float lineSpacing)
-    : TexturedMeshDrawable(buildTextMesh(font, str, alignX, alignY, lineSpacing), nullptr, c, nullptr, font->texture, nullptr, nullptr, nullptr, nullptr)
+    : StandardDrawable(buildTextMesh(font, str, alignX, alignY, lineSpacing), nullptr, c, glm::vec2(1.f, 1.f), nullptr, font->texture, nullptr, nullptr, nullptr, nullptr)
 {
 }
 

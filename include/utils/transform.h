@@ -49,7 +49,7 @@ public:
         translation = -glm::vec3(rotation  * glm::vec4(translation * scale, 1.0f));
         return *this;
     }
-    Transform inverse() const
+    Transform inverted() const
     {
         return Transform(*this).invert();
     }

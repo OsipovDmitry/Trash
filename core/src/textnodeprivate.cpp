@@ -22,7 +22,8 @@ void TextNodePrivate::updateDrawable()
 {
     if (drawableIsDyrty)
     {
-        removeDrawable(textDrawable);
+        if (textDrawable)
+            removeDrawable(textDrawable);
         textDrawable = std::make_shared<TextDrawable>(Renderer::instance().loadFont(":/res/PurisaDesc.json"), text, alignX, alignY, color, lineSpacing);
         addDrawable(textDrawable);
 

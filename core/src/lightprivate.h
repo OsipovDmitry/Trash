@@ -19,11 +19,12 @@ public:
     glm::vec3 pos, dir, color;
     glm::vec2 angles, cosAngles, radiuses;
     LightType type;
+    bool shadowMapIsEnabled;
 
-    Scene *scene;
     Light *thisLight;
 
-    bool shadowMapIsEnabled;
+    Scene *scene;
+    uint32_t indexInScene;
 
     LightPrivate(Light*, LightType);
     float intensity(const utils::BoundingBox&) const;

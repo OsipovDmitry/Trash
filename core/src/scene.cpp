@@ -21,16 +21,6 @@ PickData Scene::pickScene(int32_t x, int32_t y) const
     return m_->pickScene(x, y);
 }
 
-IntersectionData Scene::intersectScene(const utils::Ray &ray) const
-{
-    return m_->intersectScene(ray);
-}
-
-IntersectionData Scene::intersectScene(const utils::Frustum &frustum) const
-{
-    return m_->intersectScene(frustum);
-}
-
 std::shared_ptr<SceneRootNode> Scene::rootNode()
 {
     return m_->rootNode;

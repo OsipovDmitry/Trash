@@ -3,6 +3,7 @@
 
 #include <set>
 
+#include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
 
 #include <utils/forwarddecl.h>
@@ -17,6 +18,7 @@ namespace core
 {
 
 class AbstractUniform;
+template<typename T> class Uniform;
 struct RenderProgram;
 struct Mesh;
 struct Buffer;
@@ -31,28 +33,17 @@ public:
     virtual std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const = 0;
     virtual std::shared_ptr<Mesh> mesh() const = 0;
     virtual std::shared_ptr<AbstractUniform> uniform(UniformId) const { return nullptr; }
+
+    virtual void dirtyCache() {}
 };
 
-class MeshDrawable : public Drawable
+class StandardDrawable : public Drawable
 {
 public:
-    MeshDrawable(std::shared_ptr<Mesh>, std::shared_ptr<Buffer>);
-
-    std::shared_ptr<Mesh> mesh() const override;
-    std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
-
-public:
-    std::shared_ptr<Mesh> m_mesh;
-    std::shared_ptr<AbstractUniform> m_bonesBufferUniform;
-
-};
-
-class TexturedMeshDrawable : public MeshDrawable
-{
-public:
-    TexturedMeshDrawable(std::shared_ptr<Mesh>,
+    StandardDrawable(std::shared_ptr<Mesh>,
                          std::shared_ptr<Buffer>,
                          const glm::vec4&,
+                         const glm::vec2&,
                          std::shared_ptr<Texture>,
                          std::shared_ptr<Texture>,
                          std::shared_ptr<Texture>,
@@ -60,42 +51,49 @@ public:
                          std::shared_ptr<Texture>,
                          std::shared_ptr<LightIndicesList>);
 
-    LayerId layerId() const override { return LayerId::OpaqueGeometry; }
+    LayerId layerId() const override;
     std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
+    std::shared_ptr<Mesh> mesh() const override;
     std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
+    void dirtyCache() override;
 
 protected:
     std::set<std::string> renderProgramDefines() const;
 
+    std::shared_ptr<Mesh> m_mesh;
+    std::shared_ptr<AbstractUniform> m_bonesBufferUniform;
+
     mutable std::shared_ptr<RenderProgram> m_forwardRenderProgram, m_deferredRenderProgram, m_shadowProgram, m_selectionProgram;
-    std::shared_ptr<AbstractUniform> m_colorUniform;
+    mutable bool hasLighting;
+    std::shared_ptr<Uniform<glm::vec4>> m_baseColorUniform;
+    std::shared_ptr<AbstractUniform> m_metallicRoughnessUniform;
     std::shared_ptr<AbstractUniform> m_baseColorTextureUniform;
     std::shared_ptr<AbstractUniform> m_opacityTextureUniform;
     std::shared_ptr<AbstractUniform> m_normalTextureUniform;
     std::shared_ptr<AbstractUniform> m_metallicTextureUniform;
     std::shared_ptr<AbstractUniform> m_roughnessTextureUniform;
-    std::shared_ptr<AbstractUniform> m_lightIndicesListUniform;
+    std::shared_ptr<Uniform<std::shared_ptr<LightIndicesList>>> m_lightIndicesListUniform;
 };
 
-class SphereDrawable : public TexturedMeshDrawable
+class SphereDrawable : public StandardDrawable
 {
 public:
     SphereDrawable(uint32_t, const utils::BoundingSphere&, const glm::vec4&);
 };
 
-class BoxDrawable : public TexturedMeshDrawable
+class BoxDrawable : public StandardDrawable
 {
 public:
     BoxDrawable(const utils::BoundingBox&, const glm::vec4&);
 };
 
-class FrustumDrawable : public TexturedMeshDrawable
+class FrustumDrawable : public StandardDrawable
 {
 public:
     FrustumDrawable(const utils::Frustum&, const glm::vec4&);
 };
 
-class ConeDrawable : public TexturedMeshDrawable
+class ConeDrawable : public StandardDrawable
 {
 public:
     ConeDrawable(uint32_t, float, float, const glm::vec4&);
@@ -114,10 +112,10 @@ public:
 protected:
     mutable std::shared_ptr<RenderProgram> m_renderProgram;
     mutable std::shared_ptr<Mesh> m_mesh;
-    std::shared_ptr<AbstractUniform> m_roughnessUniform;
+    std::shared_ptr<AbstractUniform> m_metallicRoughnessUniform;
 };
 
-class TextDrawable : public TexturedMeshDrawable
+class TextDrawable : public StandardDrawable
 {
 public:
     TextDrawable(std::shared_ptr<Font>, const std::string&, TextNodeAlignment, TextNodeAlignment, const glm::vec4&, float);

@@ -18,8 +18,12 @@ struct Texture;
 
 using LightsList = std::vector<std::shared_ptr<Light>>;
 const int32_t MAX_LIGHTS_PER_NODE = 8;
-using LightIndicesList = std::array<int32_t, MAX_LIGHTS_PER_NODE>;
-using ShadowMapsList = std::array<std::shared_ptr<Texture>, MAX_LIGHTS_PER_NODE>;
+
+struct LightIndicesList : public std::array<int32_t, MAX_LIGHTS_PER_NODE>
+{
+    LightIndicesList(bool e) : std::array<int32_t, MAX_LIGHTS_PER_NODE>(), isEnabled(e) {}
+    bool isEnabled;
+};
 
 ENUMCLASS(ControllerMessageType, uint32_t,
           RenderWidgetWasInitialized,
@@ -37,7 +41,8 @@ ENUMCLASS(VertexAttribute, uint32_t,
           TexCoord,
           BonesIDs,
           BonesWeights,
-          Tangent)
+          Tangent,
+          Color)
 
 ENUMCLASS(TextureUnit, int32_t,
           BaseColor,
@@ -60,6 +65,7 @@ ENUMCLASS(UniformBufferUnit, uint32_t,
 ENUMCLASS(LayerId, uint32_t,
           Background,
           OpaqueGeometry,
+          NotLightedGeometry,
           TransparentGeometry,
           Lights,
           PostEffect)
@@ -79,10 +85,12 @@ ENUMCLASS(UniformId, uint32_t,
           ModelMatrix,
           NormalMatrix,
           ViewMatrix,
+          ViewMatrixInverse,
           ProjMatrix,
           ViewProjMatrix,
           ViewProjMatrixInverse,
           ModelViewMatrix,
+          NormalViewMatrix,
           ModelViewProjMatrix,
           ViewPosition,
           ViewportSize,
@@ -95,7 +103,7 @@ ENUMCLASS(UniformId, uint32_t,
           BonesBuffer,
           LightsBuffer,
           Color,
-          Roughness,
+          MetallicRoughness,
           BaseColorMap,
           OpacityMap,
           NormalMap,

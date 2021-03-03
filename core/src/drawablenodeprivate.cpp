@@ -1,3 +1,5 @@
+#include <utils/frustum.h>
+
 #include <core/scene.h>
 #include <core/light.h>
 #include <core/drawablenode.h>
@@ -15,10 +17,11 @@ namespace core
 
 DrawableNodePrivate::DrawableNodePrivate(Node &node)
     : NodePrivate(node)
-    , lightIndices(std::make_shared<LightIndicesList>())
+    , lightIndices(std::make_shared<LightIndicesList>(true))
     , intersectionMode(IntersectionMode::UseBoundingBox)
     , isLightIndicesDirty(true)
     , isLocalBoundingBoxDirty(true)
+    , areShadowsEnabled(true)
 
 {
 }
@@ -31,6 +34,8 @@ void DrawableNodePrivate::addDrawable(std::shared_ptr<Drawable> drawable)
     dirtyBoundingBox();
     doDirtyLightIndices();
     doDirtyShadowMaps();
+
+    drawable->dirtyCache();
 }
 
 void DrawableNodePrivate::removeDrawable(std::shared_ptr<Drawable> drawable)
@@ -41,6 +46,24 @@ void DrawableNodePrivate::removeDrawable(std::shared_ptr<Drawable> drawable)
     dirtyBoundingBox();
     doDirtyLightIndices();
     doDirtyShadowMaps();
+
+    drawable->dirtyCache();
+}
+
+void DrawableNodePrivate::removeAllDrawables()
+{
+    drawables.clear();
+    isLocalBoundingBoxDirty = true;
+
+    dirtyBoundingBox();
+    doDirtyLightIndices();
+    doDirtyShadowMaps();
+}
+
+void DrawableNodePrivate::dirtyDrawables()
+{
+    for (auto drawable : drawables)
+        drawable->dirtyCache();
 }
 
 const utils::BoundingBox &DrawableNodePrivate::getLocalBoundingBox()
@@ -65,7 +88,10 @@ std::shared_ptr<LightIndicesList> DrawableNodePrivate::getLightIndices()
 
 void DrawableNodePrivate::doUpdateLightIndices()
 {
-    if (isLightIndicesDirty)
+    if (!getScene())
+        return;
+
+    if (isLightIndicesDirty && lightIndices->isEnabled)
     {
         auto lightsList = getScene()->m().lights;
         auto boundingBox = getGlobalTransform() * getLocalBoundingBox();
@@ -114,12 +140,16 @@ void DrawableNodePrivate::doDirtyShadowMaps()
 
     auto& scenePrivate = scene->m();
     auto lightsList = scenePrivate.lights;
-    auto lightIndicesList = getLightIndices();
+    auto boundingBox = getGlobalTransform() * getLocalBoundingBox();
 
-    for (auto index : *lightIndicesList)
-    { // add check for including bounding box of this node to light's frustum
-        if (index != -1)
-            scenePrivate.dirtyShadowMap(lightsList->at(static_cast<size_t>(index)).get());
+    for (auto light : *lightsList)
+    {
+        if (!light)
+            continue;
+
+        const utils::OpenFrustum lightOpenFrustum(ScenePrivate::calcLightProjMatrix(light, {0.0f, 1.0f}) * ScenePrivate::calcLightViewTransform(light));
+        if (lightOpenFrustum.contain(boundingBox))
+            scenePrivate.dirtyShadowMap(light.get());
     }
 }
 

@@ -59,13 +59,13 @@ void NodePrivate::doAfterChangingTransformation()
 
 Scene *NodePrivate::getScene() const
 {
-    Node *node = &thisNode;
+    std::shared_ptr<Node> node = thisNode.shared_from_this();
 
     while (node->parent())
         node = node->parent();
 
     Scene *scene = nullptr;
-    if (auto sceneRootNode = dynamic_cast<SceneRootNode*>(node))
+    if (auto sceneRootNode = std::dynamic_pointer_cast<SceneRootNode>(node))
         scene = sceneRootNode->scene();
 
     return scene;

@@ -18,11 +18,11 @@ TeapotNode::TeapotNode(const glm::vec3 &baseColor, float metallic, float roughne
 {
     auto& renderer = Renderer::instance();
 
-    if (auto drawableNode = children().at(0)->asDrawableNode())
+    if (auto drawableNode = std::dynamic_pointer_cast<DrawableNode>(children().at(0)))
     {
         for (auto drawable : drawableNode->m().drawables)
         {
-            auto texturedMeshDrawable = std::dynamic_pointer_cast<TexturedMeshDrawable>(drawable);
+            auto texturedMeshDrawable = std::dynamic_pointer_cast<StandardDrawable>(drawable);
             if (texturedMeshDrawable)
             {
 //                texturedMeshDrawable->baseColor = renderer.createTexture2D(GL_RGB16F, 1, 1, GL_RGB, GL_FLOAT, glm::value_ptr(baseColor));

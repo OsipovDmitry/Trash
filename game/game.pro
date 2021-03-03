@@ -15,7 +15,9 @@ HEADERS += \
     src/floor.h \
     src/person.h \
     src/teapot.h \
-    src/waypoint.h
+    src/level.h \
+    src/waypointsystem.h \
+    src/typesprivate.h
 
 SOURCES += \
     src/game.cpp \
@@ -24,7 +26,8 @@ SOURCES += \
     src/floor.cpp \
     src/person.cpp \
     src/teapot.cpp \
-    src/waypoint.cpp
+    src/level.cpp \
+    src/waypointsystem.cpp
 
 LIBS += \
     -lcore

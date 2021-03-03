@@ -24,9 +24,10 @@ LightPrivate::LightPrivate(Light* l, LightType lightType)
     , angles(glm::pi<float>()/6.0f, glm::pi<float>()/4.0f)
     , cosAngles(glm::cos(0.5f*angles))
     , type(lightType)
-    , scene(nullptr)
-    , thisLight(l)
     , shadowMapIsEnabled(true)
+    , scene(nullptr)
+    , indexInScene(static_cast<uint32_t>(-1))
+    , thisLight(l)
 {
 }
 

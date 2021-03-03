@@ -14,23 +14,33 @@ namespace trash
 namespace game
 {
 
+class SceneUserData : public core::NodeUserData
+{
+public:
+    SceneUserData(Scene& sc) : thisScene(sc) {}
+
+    Scene &thisScene;
+};
+
 Scene::Scene()
     : m_scene(std::make_shared<core::Scene>())
 {
     auto& graphicsController = core::Core::instance().graphicsController();
     graphicsController.setMainScene(m_scene);
+
+    m_scene->rootNode()->setUserData(std::make_shared<SceneUserData>(*this));
 }
 
 Scene::~Scene()
 {
 }
 
-std::shared_ptr<core::Scene> Scene::scene()
+std::shared_ptr<core::Scene> Scene::graphicsScene()
 {
     return m_scene;
 }
 
-std::shared_ptr<const core::Scene> Scene::scene() const
+std::shared_ptr<const core::Scene> Scene::graphicsScene() const
 {
     return m_scene;
 }
@@ -67,11 +77,8 @@ void Scene::update(uint64_t time , uint64_t dt)
         object->update(time, dt);
 }
 
-std::shared_ptr<Object> Scene::findObject(core::Node *node) const
+std::shared_ptr<Object> Scene::findObject(std::shared_ptr<core::Node> node)
 {
-    if (node->relationDegree(m_scene->rootNode()) == -1)
-        return nullptr;
-
     std::shared_ptr<ObjectUserData> data = nullptr;
     while (!data && node)
     {
@@ -82,12 +89,7 @@ std::shared_ptr<Object> Scene::findObject(core::Node *node) const
     if (!data)
         return nullptr;
 
-    auto it = std::find_if(m_objects.begin(), m_objects.end(), [p = &data->thisObject](auto obj) {
-        return p == obj.get();
-    });
-    assert(it != m_objects.end());
-
-    return *it;
+    return data->thisObject.shared_from_this();
 }
 
 } // namespace

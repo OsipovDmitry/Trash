@@ -22,11 +22,6 @@ const std::pair<std::string, std::string> postEffectRenderProgramName { ":/res/p
 const std::string teapotModelName(":/res/teapot.fbx");
 const std::string standardDiffuseTextureName(":/res/chess.png");
 
-const std::pair<std::string, uint8_t> standardMetallicTexture = std::make_pair("StandardMetallic", static_cast<uint8_t>(0.0f*255));
-const std::pair<std::string, uint8_t> standardRoughnessTexture = std::make_pair("StandardRoughness", static_cast<uint8_t>(0.6f*255));
-
-
-
 } // namespace
 } // namespace
 

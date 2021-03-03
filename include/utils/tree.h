@@ -21,11 +21,17 @@ public:
     TreeNode() {}
     virtual ~TreeNode()
     {
+        clear();
+    }
+
+    void clear()
+    {
         for (auto chld : m_children)
         {
             chld->TreeNode<T>::doDetach();
             chld->m_parent = nullptr;
         }
+        m_children.clear();
     }
 
     void attach(std::shared_ptr<T> node)
@@ -52,12 +58,15 @@ public:
 
     int relationDegree(std::shared_ptr<const T> grandParent) const
     {
-        if (grandParent.get() == this) return 0;
-        return (m_parent) ? 1 + m_parent->relationDegree(grandParent) : -1;
+        int degree = 0;
+        auto thisNode = this;
+        while (thisNode && thisNode != grandParent.get())
+            thisNode = thisNode->m_parent;
+        return thisNode ? degree : -1;
     }
 
-    const T *parent() const { return m_parent; }
-    T *parent() { return m_parent; }
+    std::shared_ptr<const T> parent() const { return m_parent ? m_parent->shared_from_this() : nullptr; }
+    std::shared_ptr<T> parent() { return m_parent ? m_parent->shared_from_this() : nullptr; }
 
     const std::vector<std::shared_ptr<T>>& children() const { return m_children; }
     std::vector<std::shared_ptr<T>>& children() { return m_children; }

@@ -10,7 +10,7 @@ namespace trash
 namespace core
 {
 
-ENUMCLASS(IntersectionMode, uint8_t, UseBoundingBox, UseGeometry)
+ENUMCLASS(IntersectionMode, uint8_t, None, UseBoundingBox, UseGeometry)
 
 class DrawableNodePrivate;
 
@@ -21,11 +21,16 @@ class CORESHARED_EXPORT DrawableNode : public Node
 public:
     DrawableNode();
 
-    DrawableNode *asDrawableNode() override;
-    const DrawableNode *asDrawableNode() const override;
+    void removeAllDrawables();
 
     void setIntersectionMode(IntersectionMode);
     IntersectionMode intersectionMode() const;
+
+    void enableLighting(bool);
+    bool isLightingEnabled() const;
+
+    void enableShadows(bool);
+    bool areShadowsEnabled() const;
 
 protected:
     DrawableNode(NodePrivate*);

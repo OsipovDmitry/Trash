@@ -5,10 +5,12 @@
 #include <vector>
 #include <set>
 
-#include <core/types.h>
-#include <core/node.h>
+#include <utils/transform.h>
 
-#include "nodeprivate.h"
+#include <core/forwarddecl.h>
+#include <core/light.h>
+#include <core/types.h>
+
 #include "typesprivate.h"
 
 namespace trash
@@ -40,8 +42,6 @@ public:
 
     void renderScene(uint64_t, uint64_t);
     PickData pickScene(int32_t, int32_t);
-    IntersectionData intersectScene(const utils::Ray&);
-    IntersectionData intersectScene(const utils::Frustum&);
 
     Scene& thisScene;
     std::shared_ptr<SceneRootNode> rootNode;

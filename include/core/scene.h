@@ -2,8 +2,6 @@
 #define SCENE_H
 
 #include <memory>
-#include <vector>
-#include <map>
 
 #include <glm/vec3.hpp>
 
@@ -11,7 +9,6 @@
 #include <utils/pimpl.h>
 #include <utils/forwarddecl.h>
 
-#include <core/node.h>
 #include <core/coreglobal.h>
 #include <core/forwarddecl.h>
 
@@ -22,13 +19,8 @@ namespace core
 
 struct PickData
 {
-    std::shared_ptr<Node> node;
+    std::shared_ptr<DrawableNode> node;
     glm::vec3 localCoord;
-};
-
-struct IntersectionData
-{
-    std::multimap<float, std::shared_ptr<Node>> nodes;
 };
 
 class ScenePrivate;
@@ -43,8 +35,6 @@ public:
     virtual ~Scene();
 
     PickData pickScene(int32_t, int32_t) const;
-    IntersectionData intersectScene(const utils::Ray&) const;
-    IntersectionData intersectScene(const utils::Frustum&) const;
 
     std::shared_ptr<SceneRootNode> rootNode();
     std::shared_ptr<const SceneRootNode> rootNode() const;

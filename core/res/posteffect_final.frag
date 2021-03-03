@@ -12,7 +12,7 @@ void main(void)
 
     vec3 color = texture(u_hdrMap, texCoord).rgb;
 
-    color = color / (color + vec3(1.0));
+    //color = color / (color + vec3(1.0));
     color = toSRGB(color);
 
     fragColor = vec4(color, 1.0);

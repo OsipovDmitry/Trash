@@ -120,6 +120,24 @@ bool diffuseSpecularGlossinessToBaseColorMetallicRoughness(
 
     return true;
 }
+
+
+std::shared_ptr<Mesh> buildLineMesh(const std::vector<glm::vec3>& vertices, const std::vector<glm::vec3>& colors, bool loop)
+{
+    std::vector<uint32_t> indices(vertices.size());
+    for (size_t i = 0; i < indices.size(); ++i)
+        indices[i] = i;
+
+    auto mesh = std::make_shared<Mesh>();
+    mesh->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 3, glm::value_ptr(*vertices.data()), GL_STATIC_DRAW));
+    mesh->attachIndexBuffer(std::make_shared<IndexBuffer>(loop ? GL_LINE_LOOP : GL_LINE_STRIP, indices.size(), indices.data(), GL_STATIC_DRAW));
+
+    if (!colors.empty())
+        mesh->declareVertexAttribute(VertexAttribute::Color, std::make_shared<VertexBuffer>(colors.size(), 3, glm::value_ptr(*colors.data()), GL_STATIC_DRAW));
+
+    return mesh;
+}
+
 std::shared_ptr<Mesh> buildSphereMesh(uint32_t segs, const utils::BoundingSphere& bs, bool wf)
 {
     segs = glm::max(segs, 3u);

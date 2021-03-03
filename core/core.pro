@@ -35,7 +35,11 @@ HEADERS += \
     src/utils.h \
     src/typesprivate.h \
     src/scenerootnodeprivate.h \
-    src/settingsprivate.h
+    src/settingsprivate.h \
+    src/nodeupdatevisitor.h \
+    src/noderendershadowmapvisitor.h \
+    src/noderendervisitor.h \
+    src/nodepickvisitor.h
 
 SOURCES += \
     src/hdrloader/hdrloader.cpp \
@@ -72,7 +76,9 @@ SOURCES += \
     src/scenerootnode.cpp \
     src/scenerootnodeprivate.cpp \
     src/settings.cpp \
-    src/settingsprivate.cpp
+    src/settingsprivate.cpp \
+    src/primitivenode.cpp \
+    src/nodeintersectionvisitor.cpp
 
 LIBS += \
 #    -lassimp-vc140-mt

@@ -121,10 +121,12 @@ UniformId RenderProgram::uniformIdByName(const std::string& name)
         { "u_modelMatrix", UniformId::ModelMatrix },
         { "u_normalMatrix", UniformId::NormalMatrix },
         { "u_viewMatrix", UniformId::ViewMatrix },
+        { "u_viewMatrixInverse", UniformId::ViewMatrixInverse },
         { "u_projMatrix", UniformId::ProjMatrix },
         { "u_viewProjMatrix", UniformId::ViewProjMatrix },
         { "u_viewProjMatrixInverse", UniformId::ViewProjMatrixInverse },
         { "u_modelViewMatrix", UniformId::ModelViewMatrix },
+        { "u_normalViewMatrix", UniformId::NormalViewMatrix },
         { "u_modelViewProjMatrix", UniformId::ModelViewProjMatrix },
         { "u_viewPosition", UniformId::ViewPosition },
         { "u_viewportSize", UniformId::ViewportSize },
@@ -137,7 +139,7 @@ UniformId RenderProgram::uniformIdByName(const std::string& name)
         { "u_bonesBuffer", UniformId::BonesBuffer },
         { "u_lightsBuffer", UniformId::LightsBuffer },
         { "u_color", UniformId::Color },
-        { "u_roughness", UniformId::Roughness },
+        { "u_metallicRoughness", UniformId::MetallicRoughness },
         { "u_baseColorMap", UniformId::BaseColorMap },
         { "u_opacityMap", UniformId::OpacityMap },
         { "u_normalMap", UniformId::NormalMap },
@@ -675,16 +677,16 @@ void Renderer::initializeResources()
 //    std::vector<glm::vec3> pos {glm::vec3(-L, 0.0f, -L), glm::vec3(-L, 0.0f, +L), glm::vec3(+L, 0.0f, -L), glm::vec3(+L, 0.0f, +L)};
 //    std::vector<glm::vec3> n {glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f), glm::vec3(0.f, 1.0f, 0.f)};
 //    std::vector<glm::vec2> tc {glm::vec2(0.f, 0.f), glm::vec2(0.f, wrap), glm::vec2(wrap, 0.f), glm::vec2(wrap, wrap)};
-//    std::vector<uint32_t> indices {0, 1, 2, 3};
+//    std::vector<uint32_t> indices {0, 1, 2, 1, 3, 2};
 
 //    auto mesh = std::make_shared<Mesh>();
 //    mesh->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(4, 3, &pos[0].x, GL_STATIC_DRAW));
 //    mesh->declareVertexAttribute(VertexAttribute::Normal, std::make_shared<VertexBuffer>(4, 3, &n[0].x, GL_STATIC_DRAW));
 //    mesh->declareVertexAttribute(VertexAttribute::TexCoord, std::make_shared<VertexBuffer>(4, 2, &tc[0].x, GL_STATIC_DRAW));
-//    mesh->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_TRIANGLE_STRIP, 4, indices.data(), GL_STATIC_DRAW));
+//    mesh->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_TRIANGLES, 6, indices.data(), GL_STATIC_DRAW));
 
 //    auto mat = std::make_shared<Model::Material>();
-//    mat->diffuseTexture = std::make_pair(std::string("textures/floor.jpg"), loadTexture("textures/floor.jpg"));
+//    mat->baseColorMap = std::make_pair(std::string("textures/floor.jpg"), loadTexture("textures/floor.jpg"));
 
 //    auto mdl = std::make_shared<Model>();
 //    mdl->rootNode = std::make_shared<Model::Node>();
@@ -1068,6 +1070,18 @@ void Renderer::renderDeffered(const RenderInfo& renderInfo)
         renderMesh(mesh);
     }
 
+    m_functions.glDisable(GL_STENCIL_TEST);
+    m_functions.glEnable(GL_DEPTH_TEST);
+    m_functions.glDepthMask(GL_TRUE);
+    m_functions.glDisable(GL_BLEND);
+    m_functions.glEnable(GL_CULL_FACE);
+    m_functions.glCullFace(GL_BACK);
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::NotLightedGeometry)])
+    {
+        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+        renderMesh(std::get<0>(drawData)->mesh());
+    }
+
     DrawDataLayerContainer& transparentLayer = m_drawData[castFromLayerId(LayerId::TransparentGeometry)];
     std::sort(transparentLayer.begin(), transparentLayer.end(), [&renderInfo](const DrawDataLayerContainer::value_type& first, const DrawDataLayerContainer::value_type& second) -> bool
     {
@@ -1139,6 +1153,11 @@ void Renderer::renderForward(const RenderInfo& renderInfo)
 
     m_functions.glEnable(GL_DEPTH_TEST);
     for (const auto& drawData : m_drawData[castFromLayerId(LayerId::OpaqueGeometry)])
+    {
+        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+        renderMesh(std::get<0>(drawData)->mesh());
+    }
+    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::NotLightedGeometry)])
     {
         setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
         renderMesh(std::get<0>(drawData)->mesh());
@@ -1247,7 +1266,8 @@ void Renderer::readPixel(const RenderInfo& renderInfo, std::shared_ptr<Framebuff
 void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId programId, const RenderInfo& renderInfo)
 {
     std::shared_ptr<Drawable> drawable = std::get<0>(data);
-    glm::mat4x4 modelMatrix = std::get<1>(data).operator glm::mat4x4();
+    const utils::Transform& modelTransform = std::get<1>(data);
+    glm::mat4x4 modelMatrix = modelTransform.operator glm::mat4x4();
     uint32_t id = std::get<2>(data);
 
     auto renderProgram = drawable->renderProgram(programId);
@@ -1277,6 +1297,11 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.viewMatrix()));
             break;
         }
+        case UniformId::ViewMatrixInverse:
+        {
+            m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.viewMatrixInverse()));
+            break;
+        }
         case UniformId::ProjMatrix:
         {
             m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.projMatrix()));
@@ -1295,6 +1320,11 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
         case UniformId::ModelViewMatrix:
         {
             m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.viewMatrix() * modelMatrix));
+            break;
+        }
+        case UniformId::NormalViewMatrix:
+        {
+            m_functions.glUniformMatrix3fv(uniform.second, 1, GL_FALSE, glm::value_ptr(glm::mat3x3(glm::inverseTranspose(renderInfo.viewMatrix() * modelMatrix))));
             break;
         }
         case UniformId::ModelViewProjMatrix:
@@ -1352,7 +1382,7 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             if (uniformValue)
             {
                 m_functions.glUniformBlockBinding(renderProgram->id, uniform.second, castFromUniformBufferUnit(UniformBufferUnit::Bones));
-                bindUniformBuffer(uniformValue->data(), castFromUniformBufferUnit(UniformBufferUnit::Bones));
+                bindUniformBuffer(uniformValue->get(), castFromUniformBufferUnit(UniformBufferUnit::Bones));
             }
             break;
         }
@@ -1366,14 +1396,14 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
         {
             auto uniformValue = std::dynamic_pointer_cast<Uniform<glm::vec4>>(drawable->uniform(uniform.first));
             if (uniformValue)
-                m_functions.glUniform4fv(uniform.second, 1, glm::value_ptr(uniformValue->data()));
+                m_functions.glUniform4fv(uniform.second, 1, glm::value_ptr(uniformValue->get()));
             break;
         }
-        case UniformId::Roughness:
+        case UniformId::MetallicRoughness:
         {
-            auto uniformValue = std::dynamic_pointer_cast<Uniform<float>>(drawable->uniform(uniform.first));
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<glm::vec2>>(drawable->uniform(uniform.first));
             if (uniformValue)
-                m_functions.glUniform1f(uniform.second, uniformValue->data());
+                m_functions.glUniform2fv(uniform.second, 1, glm::value_ptr(uniformValue->get()));
             break;
         }
         case UniformId::BaseColorMap:
@@ -1382,7 +1412,7 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             if (uniformValue)
             {
                 m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::BaseColor));
-                bindTexture(uniformValue->data(), castFromTextureUnit(TextureUnit::BaseColor));
+                bindTexture(uniformValue->get(), castFromTextureUnit(TextureUnit::BaseColor));
             }
             break;
         }
@@ -1392,7 +1422,7 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             if (uniformValue)
             {
                 m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Opacity));
-                bindTexture(uniformValue->data(), castFromTextureUnit(TextureUnit::Opacity));
+                bindTexture(uniformValue->get(), castFromTextureUnit(TextureUnit::Opacity));
             }
             break;
         }
@@ -1402,7 +1432,7 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             if (uniformValue)
             {
                 m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Normal));
-                bindTexture(uniformValue->data(), castFromTextureUnit(TextureUnit::Normal));
+                bindTexture(uniformValue->get(), castFromTextureUnit(TextureUnit::Normal));
             }
             break;
         }
@@ -1412,7 +1442,7 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             if (uniformValue)
             {
                 m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Metallic));
-                bindTexture(uniformValue->data(), castFromTextureUnit(TextureUnit::Metallic));
+                bindTexture(uniformValue->get(), castFromTextureUnit(TextureUnit::Metallic));
             }
             break;
         }
@@ -1422,7 +1452,7 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             if (uniformValue)
             {
                 m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Roughness));
-                bindTexture(uniformValue->data(), castFromTextureUnit(TextureUnit::Roughness));
+                bindTexture(uniformValue->get(), castFromTextureUnit(TextureUnit::Roughness));
             }
             break;
         }
@@ -1431,7 +1461,7 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<LightIndicesList>>>(drawable->uniform(uniform.first));
             if (uniformValue)
             {
-                std::shared_ptr<LightIndicesList> lightIndices = uniformValue->data();
+                std::shared_ptr<LightIndicesList> lightIndices = uniformValue->get();
                 for (size_t i = 0; i < lightIndices->size(); ++i)
                     m_functions.glUniform1i(uniform.second + i, lightIndices->at(i));
             }

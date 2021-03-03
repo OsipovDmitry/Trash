@@ -21,9 +21,11 @@ class DrawableNode;
 class TextNode;
 class ModelNode;
 class TeapotNode;
+class PrimitiveNode;
 class Camera;
 class Scene;
 class Light;
+class NodeVisitor;
 
 struct PickData;
 struct IntersectionData;

@@ -10,6 +10,7 @@
 #include <core/drawablenode.h>
 #include <core/scenerootnode.h>
 #include <core/settings.h>
+#include <core/nodevisitor.h>
 
 #include "renderer.h"
 #include "drawables.h"
@@ -18,8 +19,10 @@
 #include "sceneprivate.h"
 #include "scenerootnodeprivate.h"
 #include "lightprivate.h"
-
-#include <QOpenGLExtraFunctions>
+#include "nodeupdatevisitor.h"
+#include "noderendershadowmapvisitor.h"
+#include "noderendervisitor.h"
+#include "nodepickvisitor.h"
 
 namespace trash
 {
@@ -51,7 +54,6 @@ ScenePrivate::ScenePrivate(Scene *scene)
 
     backgroundDrawable = std::make_shared<BackgroundDrawable>(settings.readFloat("Renderer.Background.Roughness", 0.05f));
 
-    //lightsFramebuffer->attachColor(0, std::make_shared<Renderbuffer>(GL_RGBA8, ShadowMapSize, ShadowMapSize));
     lightsFramebuffer->drawBuffers({GL_NONE});
 
     for (size_t i = 0; i < lightsDrawables.size(); ++i)
@@ -66,19 +68,7 @@ void ScenePrivate::attachLight(std::shared_ptr<Light> light)
     if (lightPrivate.scene)
         lightPrivate.scene->detachLight(light);
 
-    lightPrivate.scene = &thisScene;
-
-    if (!freeLightIndices.empty())
-    {
-        auto freeIndexIt = freeLightIndices.begin();
-        auto index = *freeIndexIt;
-        freeLightIndices.erase(freeIndexIt);
-        lights->at(static_cast<size_t>(index)) = light;
-        dirtyLights.insert(index);
-        dirtyShadowMaps.insert(index);
-
-    }
-    else
+    if (freeLightIndices.empty())
     {
         const auto numLights = lights->size();
         lights->resize(numLights+32);
@@ -100,9 +90,16 @@ void ScenePrivate::attachLight(std::shared_ptr<Light> light)
         lightsShadowMaps->setBorderColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
         lightsShadowMaps->setCompareMode(GL_COMPARE_REF_TO_TEXTURE);
         lightsShadowMaps->setCompareFunc(GL_LEQUAL);
-
-        attachLight(light);
     }
+
+    auto freeIndexIt = freeLightIndices.begin();
+    auto index = *freeIndexIt;
+    freeLightIndices.erase(freeIndexIt);
+    lights->at(static_cast<size_t>(index)) = light;
+    dirtyLights.insert(index);
+    dirtyShadowMaps.insert(index);
+    lightPrivate.scene = &thisScene;
+    lightPrivate.indexInScene = index;
 
     ScenePrivate::dirtyNodeLightIndices(*rootNode);
 }
@@ -114,13 +111,11 @@ bool ScenePrivate::detachLight(std::shared_ptr<Light> light)
     if (&thisScene != lightPrivate.scene)
         return false;
 
-    auto lightIter = std::find(lights->begin(), lights->end(), light);
-    if (lightIter == lights->end())
-        return false;
+    freeLightIndices.insert(lightPrivate.indexInScene);
+    lights->at(lightPrivate.indexInScene) = nullptr;
 
-    freeLightIndices.insert(std::distance(lights->begin(), lightIter));
-    *lightIter = nullptr;
     lightPrivate.scene = nullptr;
+    lightPrivate.indexInScene = static_cast<uint32_t>(-1);
 
     ScenePrivate::dirtyNodeLightIndices(*rootNode);
     return true;
@@ -128,54 +123,32 @@ bool ScenePrivate::detachLight(std::shared_ptr<Light> light)
 
 void ScenePrivate::dirtyLightParams(Light *light)
 {
-    dirtyLights.insert(static_cast<uint32_t>(std::distance(
-                                                 lights->begin(),
-                                                 std::find_if(lights->begin(), lights->end(),
-                                                              [light](const std::shared_ptr<trash::core::Light>& l){ return l.get() == light; }))
-                                             ));
+    dirtyLights.insert(light->m().indexInScene);
 }
 
 void ScenePrivate::dirtyShadowMap(Light *light)
 {
-    dirtyShadowMaps.insert(static_cast<uint32_t>(std::distance(
-                                                     lights->begin(),
-                                                     std::find_if(lights->begin(), lights->end(),
-                                                                  [light](const std::shared_ptr<trash::core::Light>& l){ return l.get() == light; }))
-                                                 ));
+    dirtyShadowMaps.insert(light->m().indexInScene);
 }
 
 void ScenePrivate::dirtyNodeLightIndices(Node& dirtyNode)
 {
-    std::queue<Node*> nodes;
-    nodes.push(&dirtyNode);
-
-    while (!nodes.empty())
-    {
-        auto node = nodes.front();
-        nodes.pop();
-        if (auto drawableNode = node->asDrawableNode())
+    static NodeSimpleVisitor nv([](std::shared_ptr<Node> node){
+        if (auto drawableNode = std::dynamic_pointer_cast<DrawableNode>(node))
             drawableNode->m().doDirtyLightIndices();
+    });
 
-        for (auto child : node->children())
-            nodes.push(child.get());
-    }
+    dirtyNode.accept(nv);
 }
 
 void ScenePrivate::dirtyNodeShadowMaps(Node& dirtyNode)
 {
-    std::queue<Node*> nodes;
-    nodes.push(&dirtyNode);
-
-    while (!nodes.empty())
-    {
-        auto node = nodes.front();
-        nodes.pop();
-        if (auto drawableNode = node->asDrawableNode())
+    static NodeSimpleVisitor nv([](std::shared_ptr<Node> node){
+        if (auto drawableNode = std::dynamic_pointer_cast<DrawableNode>(node))
             drawableNode->m().doDirtyShadowMaps();
+    });
 
-        for (auto child : node->children())
-            nodes.push(child.get());
-    }
+    dirtyNode.accept(nv);
 }
 
 utils::Transform ScenePrivate::calcLightViewTransform(std::shared_ptr<Light> light)
@@ -223,7 +196,7 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
 
     auto& renderer = Renderer::instance();
 
-    //update camera
+    //updating camera
     auto distsToSceneBox = std::make_pair(cameraMinZNear, cameraMinZNear + 1.f);
     auto& cameraPrivate = camera->m();
     const utils::OpenFrustum cameraOpenFrustum(cameraPrivate.calcProjectionMatrix({0.0f, 1.0f}) * camera->viewMatrix());
@@ -240,18 +213,8 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
     const utils::Frustum cameraFrustum(camera->projectionMatrix() * camera->viewMatrix());
 
     // updating nodes
-    std::queue<std::shared_ptr<Node>> nodes;
-    nodes.push(rootNode);
-    while (!nodes.empty())
-    {
-        auto node = nodes.front();
-        nodes.pop();
-
-        node->m().doUpdate(time, dt);
-
-        for (auto child : node->children())
-            nodes.push(child);
-    }
+    NodeUpdateVisitor nodeUpdateVisitor(time, dt);
+    rootNode->accept(nodeUpdateVisitor);
 
     // updating lights and shadows
     for (auto lightIdx : dirtyLights)
@@ -297,7 +260,7 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
             it = dirtyShadowMaps.erase(it);
             continue;
         }
-        dists = { glm::max(shadowMapMinZNear, dists.first), glm::min(shadowMapMaxZFar, dists.second) };
+        dists = { glm::max(shadowMapMinZNear, dists.first), glm::min(shadowMapMaxZFar, dists.second) }; // add dependency on light's radius
         const auto lightMatrix = calcLightProjMatrix(light, dists) * calcLightViewTransform(light);
 
         const utils::Frustum lightFrustum(lightMatrix);
@@ -307,24 +270,8 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
             continue;
         }
 
-        nodes.push(rootNode);
-        while (!nodes.empty())
-        {
-            auto node = nodes.front();
-            nodes.pop();
-
-            if (!lightFrustum.contain(node->globalTransform() * node->boundingBox()))
-                continue;
-
-            if (auto drawableNode = node->asDrawableNode())
-            {
-                if (lightFrustum.contain(drawableNode->globalTransform() * drawableNode->m().getLocalBoundingBox()))
-                    drawableNode->m().doRender(0);
-            }
-
-            for (auto child : node->children())
-                nodes.push(child);
-        }
+        NodeRenderShadowMapVisitor nodeRenderShadowMapVisitor(lightFrustum);
+        rootNode->accept(nodeRenderShadowMapVisitor);
 
         lightsFramebuffer->attachDepth(lightsShadowMaps, static_cast<uint32_t>(lightIdx));
         renderer.renderShadows(RenderInfo(glm::mat4x4(1.0f), lightMatrix, glm::uvec2(shadowMapSize, shadowMapSize)), lightsFramebuffer);
@@ -338,24 +285,8 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
     }
 
     // render nodes
-    nodes.push(rootNode);
-    while (!nodes.empty())
-    {
-        auto node = nodes.front();
-        nodes.pop();
-
-        if (!cameraFrustum.contain(node->globalTransform() * node->boundingBox()))
-            continue;
-
-        if (auto drawableNode = node->asDrawableNode())
-        {
-            if (cameraFrustum.contain(drawableNode->globalTransform() * drawableNode->m().getLocalBoundingBox()))
-                drawableNode->m().doRender(0);
-        }
-
-        for (auto child : node->children())
-            nodes.push(child);
-    }
+    NodeRenderVisitor nodeRenderVisitor(cameraFrustum);
+    rootNode->accept(nodeRenderVisitor);
 
 //    for (auto light: *lights)
 //    {
@@ -405,7 +336,7 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
                 if (!cameraFrustum.contain(utils::BoundingSphere(pos, radius)))
                     continue;
 
-                lightViewTransformInverse = calcLightViewTransform(light).inverse();
+                lightViewTransformInverse = calcLightViewTransform(light).inverted();
                 const float scaledRadius = radius * 1.15f;
 
                 lightViewTransformInverse.scale *= glm::vec3(scaledRadius, scaledRadius, scaledRadius);
@@ -420,7 +351,7 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
                 if (!cameraFrustum.contain(utils::BoundingSphere(pos, radius)))
                     continue;
 
-                lightViewTransformInverse = calcLightViewTransform(light).inverse();
+                lightViewTransformInverse = calcLightViewTransform(light).inverted();
                 const float scaledRadius = radius * 1.15f;
 
                 const float tan = glm::tan(light->spotAngles().y * .5f);
@@ -481,30 +412,8 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi)
     p0 /= p0.w;
     p1 /= p1.w;
 
-    utils::Ray ray(p0, p1-p0);
-
-    std::queue<std::shared_ptr<Node>> nodes;
-    nodes.push(rootNode);
-
-    std::vector<std::shared_ptr<Node>> nodeIds;
-
-    while (!nodes.empty())
-    {
-        auto node = nodes.front();
-        nodes.pop();
-
-        if (!ray.intersect(node->globalTransform() * node->boundingBox()))
-            continue;
-
-        if (auto drawableNode = node->asDrawableNode())
-        {
-            nodeIds.push_back(node);
-            drawableNode->m().doRender(static_cast<uint32_t>(nodeIds.size()));
-        }
-
-        for (auto child : node->children())
-            nodes.push(child);
-    }
+    NodePickVisitor nodePickVisitor(utils::Ray(p0, p1-p0));
+    rootNode->accept(nodePickVisitor);
 
     auto pickBuffer = std::make_shared<Framebuffer>();
     pickBuffer->attachColor(0, std::make_shared<Renderbuffer>(GL_R32UI, viewportSize.x, viewportSize.y));
@@ -521,7 +430,7 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi)
     renderer.readPixel(renderInfo, pickBuffer, GL_COLOR_ATTACHMENT0, xi, yi, GL_RED_INTEGER, GL_UNSIGNED_INT, static_cast<GLvoid*>(id));
     renderer.readPixel(renderInfo, pickBuffer, GL_DEPTH_ATTACHMENT, xi, yi, GL_DEPTH_COMPONENT, GL_FLOAT, static_cast<GLvoid*>(depth));
 
-    std::shared_ptr<Node> node = (id[0] > 0 && id[0] <= nodeIds.size()) ? nodeIds[id[0] - 1] : nullptr;
+    std::shared_ptr<DrawableNode> node = (id[0] > 0 && id[0] <= nodePickVisitor.nodeIds().size()) ? nodePickVisitor.nodeIds()[id[0] - 1] : nullptr;
 
     depth[0] = depth[0] * 2.0f - 1.0f;
     p0 = viewProjectionMatrixInverse * glm::vec4(x, y, depth[0], 1.0f);
@@ -529,137 +438,9 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi)
 
     glm::vec3 localCoord(0.0f, 0.0f, 0.0f);
     if (node)
-        localCoord = node->globalTransform().inverse() * glm::vec3(p0.x, p0.y, p0.z);
+        localCoord = node->globalTransform().inverted() * glm::vec3(p0.x, p0.y, p0.z);
 
     return PickData{node, localCoord};
-}
-
-IntersectionData ScenePrivate::intersectScene(const utils::Ray& ray)
-{
-    IntersectionData resultData;
-
-    std::queue<std::shared_ptr<Node>> nodes;
-    nodes.push(rootNode);
-
-    while (!nodes.empty())
-    {
-        auto node = nodes.front();
-        nodes.pop();
-
-        if (!ray.intersect(node->globalTransform() * node->boundingBox()))
-            continue;
-
-        if (auto drawableNode = node->asDrawableNode())
-        {
-            float boundBoxT0, boundBoxT1;
-
-            if (!ray.intersect(node->globalTransform() * node->m().getLocalBoundingBox(), &boundBoxT0, &boundBoxT1))
-                continue;
-
-            auto drawableIntersectionMode = drawableNode->intersectionMode();
-            if (drawableIntersectionMode == IntersectionMode::UseBoundingBox)
-            {
-                resultData.nodes.insert({glm::max(.0f, boundBoxT0), node});
-                resultData.nodes.insert({boundBoxT1, node});
-            }
-            else if (drawableIntersectionMode == IntersectionMode::UseGeometry)
-            {
-                for (auto drawable : drawableNode->m().drawables)
-                {
-                    auto mesh = drawable->mesh();
-                    float t0, t1;
-
-                    if (!ray.intersect(node->globalTransform() * mesh->boundingBox, &t0, &t1))
-                        continue;
-
-                    auto verteBuffer = mesh->vertexBuffer(VertexAttribute::Position);
-                    if (!verteBuffer)
-                        continue;
-
-                    assert(verteBuffer->numComponents == 2 || verteBuffer->numComponents == 3);
-
-                    const void *vertexData = verteBuffer->cpuData();
-                    const glm::vec3 *vertexDataAsVec3 = static_cast<const glm::vec3*>(vertexData);
-                    const glm::vec2 *vertexDataAsVec2 = static_cast<const glm::vec2*>(vertexData);
-
-                    for (auto indexBuffer : mesh->indexBuffers)
-                    {
-                        if (indexBuffer->primitiveType != GL_TRIANGLES)
-                            continue;
-
-                        const uint32_t *indexData = static_cast<const uint32_t*>(indexBuffer->cpuData());
-
-                        glm::vec2 barycentric;
-                        float t;
-
-                        for (uint32_t i = 0; i < indexBuffer->numIndices; i += 3)
-                        {
-                            if (verteBuffer->numComponents == 3)
-                            {
-                                if (glm::intersectRayTriangle(ray.pos, ray.dir,
-                                                              vertexDataAsVec3[indexData[i]],
-                                                              vertexDataAsVec3[indexData[i+1]],
-                                                              vertexDataAsVec3[indexData[i+2]],
-                                                              barycentric, t))
-                                    resultData.nodes.insert({t, node});
-                            }
-                            else if (verteBuffer->numComponents == 2)
-                            {
-                                if (glm::intersectRayTriangle(ray.pos, ray.dir,
-                                                              glm::vec3(vertexDataAsVec2[indexData[i]], .0f),
-                                                              glm::vec3(vertexDataAsVec2[indexData[i+1]], .0f),
-                                                              glm::vec3(vertexDataAsVec2[indexData[i+2]], .0f),
-                                                              barycentric, t))
-                                    resultData.nodes.insert({t, node});
-                            }
-                        }
-
-                    }
-                }
-            }
-        }
-
-        for (auto child : node->children())
-            nodes.push(child);
-    }
-
-    return resultData;
-}
-
-IntersectionData ScenePrivate::intersectScene(const utils::Frustum& frustum)
-{
-    IntersectionData resultData;
-
-    std::queue<std::shared_ptr<Node>> nodes;
-    nodes.push(rootNode);
-
-    while (!nodes.empty())
-    {
-        auto node = nodes.front();
-        nodes.pop();
-
-        if (!frustum.contain(node->globalTransform() * node->boundingBox()))
-            continue;
-
-        if (/*auto drawableNode = */node->asDrawableNode())
-        {
-            const auto box = node->globalTransform() * node->m().getLocalBoundingBox();
-            if (frustum.contain(box))
-            {
-                std::pair<float, float> distsToBox = box.pairDistancesToPlane(frustum.planes.at(4));
-                if (distsToBox.second > .0f)
-                {
-                    distsToBox.first = std::max(.0f, distsToBox.first);
-                    resultData.nodes.insert({distsToBox.first, node});
-                }
-            }
-        }
-
-        for (auto child : node->children())
-            nodes.push(child);
-    }
-
-    return resultData;
 }
 
 } // namespace

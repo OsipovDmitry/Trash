@@ -1,51 +1,70 @@
-#ifdef HAS_LIGHTING
-#include<pbr.glsl>
+#include<gammacorrection.glsl>
+
+uniform vec4 u_color;
+uniform vec2 u_metallicRoughness;
+
+#if defined(HAS_TEXCOORDS) && defined(HAS_BASECOLORMAPPING)
+uniform sampler2D u_baseColorMap;
 #endif
 
-#ifdef HAS_NORMALMAPPING
+#if defined(HAS_TEXCOORDS) && defined(HAS_NORMALMAPPING)
 uniform sampler2D u_normalMap;
 #endif
 
-uniform vec4 u_color;
+#if defined(HAS_TEXCOORDS) && defined(HAS_METALLICMAPPING)
+uniform sampler2D u_metallicMap;
+#endif
 
-#ifdef HAS_LIGHTING
+#if defined(HAS_TEXCOORDS) && defined(HAS_ROUGHNESSMAPPING)
+uniform sampler2D u_roughnessMap;
+#endif
+
+
 in vec3 v_normal;
-#ifdef HAS_NORMALMAPPING
+
+#ifdef HAS_TEXCOORDS
+in vec2 v_texCoord;
+#endif
+
+#if defined(HAS_TANGENTS)
 in vec3 v_tangent;
 in vec3 v_binormal;
 #endif
-#endif
 
-in vec2 v_texCoord;
+#ifdef HAS_COLORS
+in vec3 v_color;
+#endif
 
 out vec4 fragColor1;
 out vec4 fragColor2;
 
 void main(void)
 {
-    vec3 color = vec3(0.0, 0.0, 0.0);
-    vec3 N = vec3(0.0, 0.0, 0.0);
-    float metallic = 0.0;
-    float roughness = 0.6;
+    vec3 baseColor = u_color.rgb;
+#ifdef HAS_COLORS
+    baseColor *= v_color;
+#endif
+#if defined(HAS_TEXCOORDS) && defined(HAS_BASECOLORMAPPING)
+    baseColor *= toLinearRGB(texture(u_baseColorMap, v_texCoord).rgb);
+#endif
 
-#ifdef HAS_LIGHTING
-    N = normalize(v_normal);
+    float metallic = u_metallicRoughness.x;
+#if defined(HAS_TEXCOORDS) && defined(HAS_METALLICMAPPING)
+    metallic *= texture(u_metallicMap, v_texCoord).r;
+#endif
 
-#ifdef HAS_NORMALMAPPING
+    float roughness = u_metallicRoughness.y;
+#if defined(HAS_TEXCOORDS) && defined(HAS_ROUGHNESSMAPPING)
+    roughness *= texture(u_roughnessMap, v_texCoord).r;
+#endif
+
+    vec3 N = normalize(v_normal);
+#if defined(HAS_TEXCOORDS) && defined(HAS_NORMALMAPPING)
     vec3 tangent = normalize(v_tangent);
     vec3 binormal = normalize(v_binormal);
     N = normalize(mat3(tangent, binormal, N) * (texture(u_normalMap, v_texCoord).xyz * 2.0 - vec3(1.0)));
 #endif
 
-    PbrData pbr = getPbrData(v_texCoord);
-    color = pbr.baseColor * u_color.rgb;
-    metallic = pbr.metallic;
-    roughness = pbr.roughness;
-
-#else
-    color = u_color.rgb;
-#endif
-
-    fragColor1 = vec4(color, roughness);
-    fragColor2 = vec4(N * 0.5 + vec3(0.5), metallic);
+    fragColor1 = vec4(baseColor, roughness);
+    fragColor2 = vec4(N.xy * 0.5 + vec2(0.5), 0.0, metallic);
 }

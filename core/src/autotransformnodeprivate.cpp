@@ -2,6 +2,7 @@
 
 #include <core/scene.h>
 #include <core/camera.h>
+#include <core/node.h>
 
 #include "autotransformnodeprivate.h"
 

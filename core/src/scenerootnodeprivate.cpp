@@ -41,7 +41,7 @@ const utils::BoundingBox &SceneRootNodePrivate::getLocalBoundingBox()
             }
         }
 
-        localBoundingBox = getGlobalTransform().inverse() * localBoundingBox;
+        localBoundingBox = getGlobalTransform().inverted() * localBoundingBox;
 
         isLocalBoundingBoxDirty = false;
     }

@@ -1,5 +1,6 @@
 #include <utils/transform.h>
 #include <core/node.h>
+#include <core/nodevisitor.h>
 
 #include "nodeprivate.h"
 
@@ -46,7 +47,19 @@ const utils::BoundingBox &Node::boundingBox() const
     return m_->getBoundingBox();
 }
 
-std::shared_ptr<NodeUserData> Node::userData() const
+void Node::accept(NodeVisitor& nodeVisitor)
+{
+    if (nodeVisitor.visit(shared_from_this()))
+        for (auto child : children())
+            child->accept(nodeVisitor);
+}
+
+std::shared_ptr<const NodeUserData> Node::userData() const
+{
+    return m_->userData;
+}
+
+std::shared_ptr<NodeUserData> Node::userData()
 {
     return m_->userData;
 }

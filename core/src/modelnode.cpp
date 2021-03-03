@@ -5,6 +5,7 @@
 
 #include "modelnodeprivate.h"
 #include "drawablenodeprivate.h"
+#include "sceneprivate.h"
 #include "renderer.h"
 #include "drawables.h"
 
@@ -38,7 +39,6 @@ ModelNode::ModelNode(const std::string &filename)
         for (auto mesh : node->meshes)
         {
             std::shared_ptr<Texture> diffuseTexture, opacityTexture, normalTexture, metallicTexture, roughTexture;
-            bool isMetallicRoughTexture = true;
 
             if (mesh->material)
             {
@@ -52,15 +52,16 @@ ModelNode::ModelNode(const std::string &filename)
             auto meshNode = std::make_shared<DrawableNode>();
             auto& meshNodePrivate = meshNode->m();
             meshNode->setTransform(transform);
-            meshNodePrivate.addDrawable(std::make_shared<TexturedMeshDrawable>(mesh->mesh,
+            meshNodePrivate.addDrawable(std::make_shared<StandardDrawable>(mesh->mesh,
                                                                          mPrivate.bonesBuffer,
                                                                          glm::vec4(1.f, 1.f, 1.f, 1.f),
+                                                                         glm::vec2(1.f, 1.f),
                                                                          diffuseTexture,
                                                                          opacityTexture,
                                                                          normalTexture,
                                                                          metallicTexture,
                                                                          roughTexture,
-                                                                         meshNodePrivate.lightIndices));
+                                                                         meshNodePrivate.getLightIndices()));
             attach(meshNode);
 
             minimalBoundingBox += transform * mesh->mesh->boundingBox;
@@ -71,7 +72,7 @@ ModelNode::ModelNode(const std::string &filename)
     }
 
     for (auto meshNode : children())
-        meshNode->m().minimalBoundingBox = meshNode->transform().inverse() * minimalBoundingBox;
+        meshNode->m().minimalBoundingBox = meshNode->transform().inverted() * minimalBoundingBox;
 }
 
 void ModelNode::showBones(bool state)
@@ -96,7 +97,7 @@ void ModelNode::showBones(bool state)
 //    model->animations[animIter->first] = animIter->second;
 //}
 
-void ModelNode::playAnimation(const std::string& animationName, uint64_t timeOffset)
+void ModelNode::setAnimationFrame(const std::string& animationName, uint64_t animationTime)
 {
     auto& privateData = m();
 
@@ -107,17 +108,34 @@ void ModelNode::playAnimation(const std::string& animationName, uint64_t timeOff
         privateData.model->animations.insert({animationName, anim});
     }
 
+    if (privateData.animationName == animationName && privateData.animationTime == animationTime)
+        return;
+
     privateData.animationName = animationName;
-    privateData.timeOffset = timeOffset;
-    privateData.startAnimation = true;
+    privateData.animationTime = animationTime;
+
+    ScenePrivate::dirtyNodeShadowMaps(*this);
+
+    std::vector<glm::mat3x4> bones;
+    privateData.model->calcBoneTransforms(animationName, animationTime * 0.001f, bones);
+    privateData.bonesBuffer->setSubData(0, static_cast<GLsizeiptr>(bones.size()*sizeof(glm::mat3x4)), bones.data());
 }
 
 uint64_t ModelNode::animationTime(const std::string& animationName) const
 {
-    auto anim = m().model->animations[animationName];
+    auto& privateData = m();
+
+    if (!privateData.model->animations.count(animationName))
+    {
+        auto anim = Renderer::instance().loadAnimation(animationName + ".anim");
+        assert(anim != nullptr);
+        privateData.model->animations.insert({animationName, anim});
+    }
+
+    auto anim = privateData.model->animations[animationName];
     if (!anim)
         return 0;
-    return static_cast<uint64_t>(anim->duration / anim->framesPerSecond * 1000.0f);
+    return static_cast<uint64_t>(anim->duration / anim->framesPerSecond * 1000.0f + .5f);
 }
 
 } // namespace

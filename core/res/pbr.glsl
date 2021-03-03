@@ -1,10 +1,3 @@
-#include<lights.glsl>
-#include<gammacorrection.glsl>
-
-uniform sampler2D u_baseColorMap;
-uniform sampler2D u_metallicMap;
-uniform sampler2D u_roughnessMap;
-
 const float PI = 3.14159265359;
 
 struct PbrData
@@ -13,15 +6,6 @@ struct PbrData
     float metallic;
     float roughness;
 };
-
-PbrData getPbrData(in vec2 texCoord)
-{
-    PbrData pbr;
-    pbr.baseColor = toLinearRGB(texture(u_baseColorMap, texCoord).rgb);
-    pbr.metallic = texture(u_metallicMap, texCoord).r;
-    pbr.roughness = texture(u_roughnessMap, texCoord).r;
-    return pbr;
-}
 
 float DistributionGGX(float NdotH, float roughness)
 {

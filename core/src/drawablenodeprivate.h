@@ -21,6 +21,8 @@ public:
 
     void addDrawable(std::shared_ptr<Drawable>);
     void removeDrawable(std::shared_ptr<Drawable>);
+    void removeAllDrawables();
+    void dirtyDrawables();
 
     const utils::BoundingBox& getLocalBoundingBox() override;
     std::shared_ptr<LightIndicesList> getLightIndices();
@@ -41,6 +43,7 @@ public:
     IntersectionMode intersectionMode;
     bool isLightIndicesDirty;
     bool isLocalBoundingBoxDirty;
+    bool areShadowsEnabled;
 
 };
 

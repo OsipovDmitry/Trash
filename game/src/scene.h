@@ -20,17 +20,17 @@ class Scene
 
 public:
     Scene();
-    ~Scene();
+    virtual ~Scene();
 
-    std::shared_ptr<core::Scene> scene();
-    std::shared_ptr<const core::Scene> scene() const;
+    std::shared_ptr<core::Scene> graphicsScene();
+    std::shared_ptr<const core::Scene> graphicsScene() const;
 
     void detachObject(std::shared_ptr<Object>);
     void attachObject(std::shared_ptr<Object>, std::shared_ptr<core::Node> = nullptr);
 
     void update(uint64_t, uint64_t);
 
-    std::shared_ptr<Object> findObject(core::Node*) const;
+    static std::shared_ptr<Object> findObject(std::shared_ptr<core::Node>);
 
 protected:
     std::unordered_set<std::shared_ptr<Object>> m_objects;

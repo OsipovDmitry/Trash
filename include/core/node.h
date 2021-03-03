@@ -21,10 +21,9 @@ public:
     virtual ~NodeUserData() = default;
 };
 
-class DrawableNode;
 class NodePrivate;
 
-class CORESHARED_EXPORT Node : public utils::TreeNode<Node>
+class CORESHARED_EXPORT Node : public utils::TreeNode<Node>, public std::enable_shared_from_this<Node>
 {
     PIMPL(Node)
 
@@ -32,16 +31,16 @@ public:
     Node();
     ~Node() override;
 
-    virtual DrawableNode *asDrawableNode() { return nullptr; }
-    virtual const DrawableNode *asDrawableNode() const { return nullptr; }
-
     void setTransform(const utils::Transform&);
     const utils::Transform& transform() const;
     const utils::Transform& globalTransform() const;
 
     const utils::BoundingBox& boundingBox() const;
 
-    std::shared_ptr<NodeUserData> userData() const;
+    void accept(NodeVisitor&);
+
+    std::shared_ptr<const NodeUserData> userData() const;
+    std::shared_ptr<NodeUserData> userData();
     void setUserData(std::shared_ptr<NodeUserData>);
 
 protected:

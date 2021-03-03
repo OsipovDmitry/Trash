@@ -44,10 +44,11 @@ template <typename T>
 class Uniform : public AbstractUniform
 {
 public:
-    Uniform(const T& d) : m_data(d) {}
+    Uniform(const T& value) : m_data(value) {}
     ~Uniform() = default;
 
-    const T& data() const { return m_data; }
+    const T& get() const { return m_data; }
+    void set(const T& value) { m_data = value; }
 
 private:
     T m_data;

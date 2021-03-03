@@ -17,14 +17,9 @@ DrawableNode::DrawableNode()
 {
 }
 
-DrawableNode *DrawableNode::asDrawableNode()
+void DrawableNode::removeAllDrawables()
 {
-    return this;
-}
-
-const DrawableNode *DrawableNode::asDrawableNode() const
-{
-    return this;
+    m().removeAllDrawables();
 }
 
 void DrawableNode::setIntersectionMode(IntersectionMode mode)
@@ -35,6 +30,37 @@ void DrawableNode::setIntersectionMode(IntersectionMode mode)
 IntersectionMode DrawableNode::intersectionMode() const
 {
     return m().intersectionMode;
+}
+
+void DrawableNode::enableLighting(bool value)
+{
+    auto& nodePrivate = m();
+    if (nodePrivate.lightIndices->isEnabled != value)
+    {
+        nodePrivate.lightIndices->isEnabled = value;
+        nodePrivate.doDirtyLightIndices();
+        nodePrivate.dirtyDrawables();
+    }
+}
+
+bool DrawableNode::isLightingEnabled() const
+{
+    return m().lightIndices->isEnabled;
+}
+
+void DrawableNode::enableShadows(bool value)
+{
+    auto& nodePrivate = m();
+    if (nodePrivate.areShadowsEnabled != value)
+    {
+        nodePrivate.areShadowsEnabled = value;
+        nodePrivate.doDirtyShadowMaps();
+    }
+}
+
+bool DrawableNode::areShadowsEnabled() const
+{
+    return m().areShadowsEnabled;
 }
 
 DrawableNode::DrawableNode(NodePrivate *nodePrivate)

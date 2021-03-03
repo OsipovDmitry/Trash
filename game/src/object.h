@@ -21,7 +21,7 @@ public:
     Object &thisObject;
 };
 
-class Object
+class Object : public std::enable_shared_from_this<Object>
 {
     NONCOPYBLE(Object)
 

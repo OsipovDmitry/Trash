@@ -22,7 +22,7 @@ public:
     void showBones(bool);
 
 //    void copyAnimation(std::shared_ptr<ModelNode>, const std::string&);
-    void playAnimation(const std::string&, uint64_t timeOffset = 0);
+    void setAnimationFrame(const std::string&, uint64_t);
     uint64_t animationTime(const std::string&) const;
 
 };
