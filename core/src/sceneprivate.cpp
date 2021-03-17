@@ -6,7 +6,6 @@
 
 #include <core/scene.h>
 #include <core/light.h>
-#include <core/camera.h>
 #include <core/drawablenode.h>
 #include <core/scenerootnode.h>
 #include <core/settings.h>
@@ -14,7 +13,6 @@
 
 #include "renderer.h"
 #include "drawables.h"
-#include "cameraprivate.h"
 #include "drawablenodeprivate.h"
 #include "sceneprivate.h"
 #include "scenerootnodeprivate.h"
@@ -32,10 +30,11 @@ namespace core
 ScenePrivate::ScenePrivate(Scene *scene)
     : thisScene(*scene)
     , rootNode(std::make_shared<SceneRootNode>(scene))
-    , camera(std::make_shared<Camera>())
     , lights(std::make_shared<LightsList>())
     , lightsFramebuffer(std::make_shared<Framebuffer>())
-    , postEffectDrawable(std::make_shared<PostEffectDrawable>())
+    , viewMatrix(1.0f)
+    , fov(glm::half_pi<float>())
+    , isPerspectiveProjection(true)
 {
     auto& settings = Settings::instance();
     auto& renderer = Renderer::instance();
@@ -51,8 +50,6 @@ ScenePrivate::ScenePrivate(Scene *scene)
     iblSpecularMap = renderer.loadTexture(settings.readString("Renderer.IBL.SpecularMap"));
     iblBrdfLutMap = renderer.loadTexture(settings.readString("Renderer.IBL.BrdfLutMap"));
     iblContribution = settings.readFloat("Renderer.IBL.Contribution", 0.2f);
-
-    backgroundDrawable = std::make_shared<BackgroundDrawable>(settings.readFloat("Renderer.Background.Roughness", 0.05f));
 
     lightsFramebuffer->drawBuffers({GL_NONE});
 
@@ -86,8 +83,6 @@ void ScenePrivate::attachLight(std::shared_ptr<Light> light)
 
         auto& renderer = Renderer::instance();
         lightsShadowMaps = renderer.createTexture2DArray(GL_DEPTH_COMPONENT16, shadowMapSize, shadowMapSize, static_cast<GLint>(lights->size()), GL_DEPTH_COMPONENT, GL_FLOAT, nullptr);
-        lightsShadowMaps->setWrap(GL_CLAMP_TO_BORDER);
-        lightsShadowMaps->setBorderColor(glm::vec4(1.f, 1.f, 1.f, 1.f));
         lightsShadowMaps->setCompareMode(GL_COMPARE_REF_TO_TEXTURE);
         lightsShadowMaps->setCompareFunc(GL_LEQUAL);
     }
@@ -129,6 +124,13 @@ void ScenePrivate::dirtyLightParams(Light *light)
 void ScenePrivate::dirtyShadowMap(Light *light)
 {
     dirtyShadowMaps.insert(light->m().indexInScene);
+}
+
+glm::mat4x4 ScenePrivate::calcProjectionMatrix(float aspect, float zNear, float zFar)
+{
+    return isPerspectiveProjection ?
+                glm::perspective(fov, aspect, zNear, zFar) :
+                glm::ortho(-aspect * fov, +aspect * fov, -fov, +fov, zNear, zFar);
 }
 
 void ScenePrivate::dirtyNodeLightIndices(Node& dirtyNode)
@@ -191,15 +193,15 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
 
     auto sceneBoundingBox = rootNode->globalTransform() * rootNode->boundingBox();
     auto sceneBoundingBoxCenter = sceneBoundingBox.center();
-    auto sceneBoundingBoxScaledHalsSize = sceneBoundingBox.halfSize() * 1.15f;
-    sceneBoundingBox = utils::BoundingBox(sceneBoundingBoxCenter - sceneBoundingBoxScaledHalsSize, sceneBoundingBoxCenter + sceneBoundingBoxScaledHalsSize);
+    auto sceneBoundingBoxScaledHalfSize = sceneBoundingBox.halfSize() * 1.15f;
+    sceneBoundingBox = utils::BoundingBox(sceneBoundingBoxCenter - sceneBoundingBoxScaledHalfSize, sceneBoundingBoxCenter + sceneBoundingBoxScaledHalfSize);
 
     auto& renderer = Renderer::instance();
+    float aspectRatio = static_cast<float>(renderer.viewportSize().x) / static_cast<float>(renderer.viewportSize().y);
 
     //updating camera
     auto distsToSceneBox = std::make_pair(cameraMinZNear, cameraMinZNear + 1.f);
-    auto& cameraPrivate = camera->m();
-    const utils::OpenFrustum cameraOpenFrustum(cameraPrivate.calcProjectionMatrix({0.0f, 1.0f}) * camera->viewMatrix());
+    const utils::OpenFrustum cameraOpenFrustum(calcProjectionMatrix(aspectRatio, 0.0f, 1.0f) * viewMatrix);
 
     if (cameraOpenFrustum.contain(sceneBoundingBox))
     {
@@ -209,8 +211,8 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
                                 glm::min(cameraMaxZFar, distsToSceneBox.second) };
     }
 
-    cameraPrivate.setZPlanes(distsToSceneBox);
-    const utils::Frustum cameraFrustum(camera->projectionMatrix() * camera->viewMatrix());
+    const glm::mat4x4 projectionMatrix = calcProjectionMatrix(aspectRatio, distsToSceneBox.first, distsToSceneBox.second);
+    const utils::Frustum cameraFrustum(projectionMatrix * viewMatrix);
 
     // updating nodes
     NodeUpdateVisitor nodeUpdateVisitor(time, dt);
@@ -273,8 +275,8 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
         NodeRenderShadowMapVisitor nodeRenderShadowMapVisitor(lightFrustum);
         rootNode->accept(nodeRenderShadowMapVisitor);
 
-        lightsFramebuffer->attachDepth(lightsShadowMaps, static_cast<uint32_t>(lightIdx));
-        renderer.renderShadows(RenderInfo(glm::mat4x4(1.0f), lightMatrix, glm::uvec2(shadowMapSize, shadowMapSize)), lightsFramebuffer);
+        lightsFramebuffer->attachDepth(lightsShadowMaps, 0u, lightIdx);
+        renderer.renderShadows(RenderInfo(glm::mat4x4(1.0f), lightMatrix), lightsFramebuffer, glm::uvec2(shadowMapSize, shadowMapSize));
         renderer.clear();
 
         auto *p = reinterpret_cast<glm::mat4x4*>(lightsUbo->map(sizeof(glm::mat4x4) * (2 * lightIdx + 1), sizeof(glm::mat4x4), GL_MAP_WRITE_BIT));
@@ -287,31 +289,6 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
     // render nodes
     NodeRenderVisitor nodeRenderVisitor(cameraFrustum);
     rootNode->accept(nodeRenderVisitor);
-
-//    for (auto light: *lights)
-//    {
-//        if (!light)
-//            continue;
-
-//        auto lightViewTransformInverse = calcLightViewTransform(light).inverse();
-//        const float scaledRadius = (light->radiuses().x + light->radiuses().y) * 1.15f;
-
-//        if (light->type() == LightType::Point)
-//        {
-//            lightViewTransformInverse.scale *= glm::vec3(scaledRadius, scaledRadius, scaledRadius);
-//            renderer.draw(std::make_shared<SphereDrawable>(6, utils::BoundingSphere(glm::vec3(), 1.0f), glm::vec4(light->color(), 1)),
-//                          lightViewTransformInverse,
-//                          0);
-//        }
-//        else if (light->type() == LightType::Spot)
-//        {
-//            const float tan = glm::tan(light->spotAngles().y * .5f);
-//            lightViewTransformInverse.scale *= glm::vec3(scaledRadius*tan, scaledRadius*tan, scaledRadius);
-//            renderer.draw(std::make_shared<ConeDrawable>(6, 1.f, 1.f, glm::vec4(light->color(), 1)),
-//                          lightViewTransformInverse,
-//                          0);
-//        }
-//    }
 
     if (useDeferredTechnique)
     {
@@ -369,26 +346,13 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
             }
 
             renderer.draw(lightsDrawables[castFromLightType(light->type())], lightViewTransformInverse, static_cast<uint32_t>(lightIdx));
-
-//            renderer.draw(std::make_shared<SphereDrawable>(2, utils::BoundingSphere(glm::vec3(), 10.0f), glm::vec4(light->color(),1)),
-//                        utils::Transform(glm::vec3(1,1,1), glm::quat(1,0,0,0), light->position()), 0);
-
-//            const utils::OpenFrustum lightOpenFrustum(calcLightProjMatrix(light, {0.0f, 1.0f}) * calcLightViewTransform(light));
-//            auto dists = std::make_pair(ShadowMapMinZNear, ShadowMapMinZNear + 1.0f);
-//            dists = sceneBoundingBox.pairDistancesToPlane(lightOpenFrustum.planes.at(4));
-//            dists = { glm::max(ShadowMapMinZNear, dists.first), glm::min(ShadowMapMaxZFar, dists.second) };
-//            const auto lightMatrix = calcLightProjMatrix(light, dists) * calcLightViewTransform(light);
-//            renderer.draw(std::make_shared<FrustumDrawable>(utils::Frustum(lightMatrix), glm::vec4(light->color(),1)), utils::Transform(), 0);
         }
     }
 
-    RenderInfo renderInfo(camera->viewMatrix(), camera->projectionMatrix(), camera->viewportSize());
+    RenderInfo renderInfo(viewMatrix, projectionMatrix);
     renderInfo.setIBLData(iblDiffuseMap, iblSpecularMap, iblBrdfLutMap, iblContribution);
     renderInfo.setLightsBuffer(lightsUbo);
     renderInfo.setShadowMaps(lightsShadowMaps);
-
-    renderer.draw(backgroundDrawable, utils::Transform(), 0);
-    renderer.draw(postEffectDrawable, utils::Transform(), 0);
 
     useDeferredTechnique ?
                 renderer.renderDeffered(renderInfo) :
@@ -399,15 +363,33 @@ void ScenePrivate::renderScene(uint64_t time, uint64_t dt)
 PickData ScenePrivate::pickScene(int32_t xi, int32_t yi)
 {
     auto& renderer = Renderer::instance();
-    const auto& viewportSize = camera->viewportSize();
+    const auto& viewportSize = renderer.viewportSize();
+    float aspectRatio = static_cast<float>(renderer.viewportSize().x) / static_cast<float>(renderer.viewportSize().y);
+
+    auto sceneBoundingBox = rootNode->globalTransform() * rootNode->boundingBox();
+    auto sceneBoundingBoxCenter = sceneBoundingBox.center();
+    auto sceneBoundingBoxScaledHalfSize = sceneBoundingBox.halfSize() * 1.15f;
+    sceneBoundingBox = utils::BoundingBox(sceneBoundingBoxCenter - sceneBoundingBoxScaledHalfSize, sceneBoundingBoxCenter + sceneBoundingBoxScaledHalfSize);
+
+    auto distsToSceneBox = std::make_pair(cameraMinZNear, cameraMinZNear + 1.f);
+    const utils::OpenFrustum cameraOpenFrustum(calcProjectionMatrix(aspectRatio, 0.0f, 1.0f) * viewMatrix);
+
+    if (cameraOpenFrustum.contain(sceneBoundingBox))
+    {
+        distsToSceneBox = sceneBoundingBox.pairDistancesToPlane(cameraOpenFrustum.planes.at(4));
+        if (distsToSceneBox.second > cameraMinZNear)
+            distsToSceneBox = { glm::max(cameraMinZNear, distsToSceneBox.first),
+                                glm::min(cameraMaxZFar, distsToSceneBox.second) };
+    }
+
+    const glm::mat4x4 projectionMatrix = calcProjectionMatrix(aspectRatio, distsToSceneBox.first, distsToSceneBox.second);
+    RenderInfo renderInfo(viewMatrix, projectionMatrix);
 
     const float x = static_cast<float>(xi) / static_cast<float>(viewportSize.x) * 2.0f - 1.0f;
     const float y = (1.0f - static_cast<float>(yi) / static_cast<float>(viewportSize.y)) * 2.0f - 1.0f;
 
-    auto viewProjectionMatrixInverse = glm::inverse(camera->projectionMatrix() * camera->viewMatrix());
-
-    glm::vec4 p0 = viewProjectionMatrixInverse * glm::vec4(x, y, -1.0f, 1.0f);
-    glm::vec4 p1 = viewProjectionMatrixInverse * glm::vec4(x, y, 1.0f, 1.0f);
+    glm::vec4 p0 = renderInfo.viewProjMatrixInverse() * glm::vec4(x, y, -1.0f, 1.0f);
+    glm::vec4 p1 = renderInfo.viewProjMatrixInverse() * glm::vec4(x, y, 1.0f, 1.0f);
 
     p0 /= p0.w;
     p1 /= p1.w;
@@ -419,21 +401,19 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi)
     pickBuffer->attachColor(0, std::make_shared<Renderbuffer>(GL_R32UI, viewportSize.x, viewportSize.y));
     pickBuffer->attachDepth(std::make_shared<Renderbuffer>(GL_DEPTH_COMPONENT32, viewportSize.x, viewportSize.y));
 
-    RenderInfo renderInfo(camera->viewMatrix(), camera->projectionMatrix(), viewportSize);
-
-    renderer.renderIds(renderInfo, pickBuffer);
+    renderer.renderIds(renderInfo, pickBuffer, viewportSize);
     renderer.clear();
 
     GLuint id[1] = {0u};
     GLfloat depth[1] = {1.0f};
 
-    renderer.readPixel(renderInfo, pickBuffer, GL_COLOR_ATTACHMENT0, xi, yi, GL_RED_INTEGER, GL_UNSIGNED_INT, static_cast<GLvoid*>(id));
-    renderer.readPixel(renderInfo, pickBuffer, GL_DEPTH_ATTACHMENT, xi, yi, GL_DEPTH_COMPONENT, GL_FLOAT, static_cast<GLvoid*>(depth));
+    renderer.readPixel(pickBuffer, GL_COLOR_ATTACHMENT0, xi, viewportSize.y - yi - 1, GL_RED_INTEGER, GL_UNSIGNED_INT, static_cast<GLvoid*>(id));
+    renderer.readPixel(pickBuffer, GL_DEPTH_ATTACHMENT, xi, viewportSize.y - yi - 1, GL_DEPTH_COMPONENT, GL_FLOAT, static_cast<GLvoid*>(depth));
 
     std::shared_ptr<DrawableNode> node = (id[0] > 0 && id[0] <= nodePickVisitor.nodeIds().size()) ? nodePickVisitor.nodeIds()[id[0] - 1] : nullptr;
 
     depth[0] = depth[0] * 2.0f - 1.0f;
-    p0 = viewProjectionMatrixInverse * glm::vec4(x, y, depth[0], 1.0f);
+    p0 = renderInfo.viewProjMatrixInverse() * glm::vec4(x, y, depth[0], 1.0f);
     p0 /= p0.w;
 
     glm::vec3 localCoord(0.0f, 0.0f, 0.0f);
@@ -441,6 +421,43 @@ PickData ScenePrivate::pickScene(int32_t xi, int32_t yi)
         localCoord = node->globalTransform().inverted() * glm::vec3(p0.x, p0.y, p0.z);
 
     return PickData{node, localCoord};
+}
+
+utils::Ray ScenePrivate::throwRay(int32_t xi, int32_t yi)
+{
+    auto& renderer = Renderer::instance();
+    const auto& viewportSize = renderer.viewportSize();
+    float aspectRatio = static_cast<float>(renderer.viewportSize().x) / static_cast<float>(renderer.viewportSize().y);
+
+    auto sceneBoundingBox = rootNode->globalTransform() * rootNode->boundingBox();
+    auto sceneBoundingBoxCenter = sceneBoundingBox.center();
+    auto sceneBoundingBoxScaledHalfSize = sceneBoundingBox.halfSize() * 1.15f;
+    sceneBoundingBox = utils::BoundingBox(sceneBoundingBoxCenter - sceneBoundingBoxScaledHalfSize, sceneBoundingBoxCenter + sceneBoundingBoxScaledHalfSize);
+
+    auto distsToSceneBox = std::make_pair(cameraMinZNear, cameraMinZNear + 1.f);
+    const utils::OpenFrustum cameraOpenFrustum(calcProjectionMatrix(aspectRatio, 0.0f, 1.0f) * viewMatrix);
+
+    if (cameraOpenFrustum.contain(sceneBoundingBox))
+    {
+        distsToSceneBox = sceneBoundingBox.pairDistancesToPlane(cameraOpenFrustum.planes.at(4));
+        if (distsToSceneBox.second > cameraMinZNear)
+            distsToSceneBox = { glm::max(cameraMinZNear, distsToSceneBox.first),
+                                glm::min(cameraMaxZFar, distsToSceneBox.second) };
+    }
+
+    const glm::mat4x4 projectionMatrix = calcProjectionMatrix(aspectRatio, distsToSceneBox.first, distsToSceneBox.second);
+
+    const float xf = static_cast<float>(xi) / static_cast<float>(viewportSize.x) * 2.0f - 1.0f;
+    const float yf = (1.0f - static_cast<float>(yi) / static_cast<float>(viewportSize.y)) * 2.0f - 1.0f;
+
+    auto viewProjectionMatrixInverse = glm::inverse(projectionMatrix * viewMatrix);
+    glm::vec4 p0 = viewProjectionMatrixInverse * glm::vec4(xf, yf, -1.0f, 1.0f);
+    glm::vec4 p1 = viewProjectionMatrixInverse * glm::vec4(xf, yf, 1.0f, 1.0f);
+
+    p0 /= p0.w;
+    p1 /= p1.w;
+
+    return utils::Ray(p0, p1-p0);
 }
 
 } // namespace

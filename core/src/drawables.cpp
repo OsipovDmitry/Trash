@@ -1,12 +1,17 @@
+#include <random>
+
 #include <glm/gtc/type_ptr.hpp>
+#include <glm/gtx/functions.hpp>
 
 #include <utils/frustum.h>
+#include <utils/epsilon.h>
 #include <core/types.h>
 
 #include "renderer.h"
 #include "drawables.h"
 #include "resources.h"
 #include "utils.h"
+#include "typesprivate.h"
 
 namespace trash
 {
@@ -163,47 +168,49 @@ void StandardDrawable::dirtyCache()
     m_selectionProgram = nullptr;
 }
 
-std::set<std::string> StandardDrawable::renderProgramDefines() const
+std::map<std::string, std::string> StandardDrawable::renderProgramDefines() const
 {
-    std::set<std::string> defines;
+    std::map<std::string, std::string> defines;
+
+    defines.insert({"MAX_LIGHTS_PER_NODE", std::to_string(MAX_LIGHTS_PER_NODE)});
 
     bool hasPositions = m_mesh->vertexBuffer(VertexAttribute::Position) != nullptr;
     if (hasPositions)
-        defines.insert("HAS_POSITIONS");
+        defines.insert({"HAS_POSITIONS", ""});
 
     bool hasNormals = m_mesh->vertexBuffer(VertexAttribute::Normal) != nullptr;
     if (hasNormals)
-        defines.insert("HAS_NORMALS");
+        defines.insert({"HAS_NORMALS", ""});
 
     if (m_mesh->vertexBuffer(VertexAttribute::TexCoord))
-        defines.insert("HAS_TEXCOORDS");
+        defines.insert({"HAS_TEXCOORDS", ""});
 
     if (m_bonesBufferUniform && m_mesh->vertexBuffer(VertexAttribute::BonesIDs) && m_mesh->vertexBuffer(VertexAttribute::BonesWeights))
-        defines.insert("HAS_BONES");
+        defines.insert({"HAS_BONES", ""});
 
     if (m_mesh->vertexBuffer(VertexAttribute::Tangent))
-        defines.insert("HAS_TANGENTS");
+        defines.insert({"HAS_TANGENTS", ""});
 
     if (m_mesh->vertexBuffer(VertexAttribute::Color))
-        defines.insert("HAS_COLORS");
+        defines.insert({"HAS_COLORS", ""});
 
     if (m_lightIndicesListUniform && m_lightIndicesListUniform->get()->isEnabled)
-        defines.insert("HAS_LIGHTING");
+        defines.insert({"HAS_LIGHTING", ""});
 
     if (m_baseColorTextureUniform)
-        defines.insert("HAS_BASECOLORMAPPING");
+        defines.insert({"HAS_BASECOLORMAPPING", ""});
 
     if (m_opacityTextureUniform)
-        defines.insert("HAS_OPACITYMAPPING");
+        defines.insert({"HAS_OPACITYMAPPING", ""});
 
     if (m_normalTextureUniform)
-        defines.insert("HAS_NORMALMAPPING");
+        defines.insert({"HAS_NORMALMAPPING", ""});
 
     if (m_metallicTextureUniform)
-        defines.insert("HAS_METALLICMAPPING");
+        defines.insert({"HAS_METALLICMAPPING", ""});
 
     if (m_roughnessTextureUniform)
-        defines.insert("HAS_ROUGHNESSMAPPING");
+        defines.insert({"HAS_ROUGHNESSMAPPING", ""});
 
     return defines;
 }
@@ -227,50 +234,6 @@ FrustumDrawable::FrustumDrawable(const utils::Frustum &frustum, const glm::vec4&
 ConeDrawable::ConeDrawable(uint32_t segs, float r, float l, const glm::vec4& c)
     : StandardDrawable(buildConeMesh(segs, r, l, true), nullptr, c, glm::vec2(1.f, 1.f), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
 {
-}
-
-BackgroundDrawable::BackgroundDrawable(float r)
-    : Drawable()
-    , m_metallicRoughnessUniform(std::make_shared<Uniform<glm::vec2>>(glm::vec2(1.f, r)))
-{
-}
-
-std::shared_ptr<RenderProgram> BackgroundDrawable::renderProgram(DrawableRenderProgramId id) const
-{
-    if (id != DrawableRenderProgramId::ForwardRender)
-        return nullptr;
-
-    if (m_renderProgram)
-        return m_renderProgram;
-
-    auto& renderer = Renderer::instance();
-    m_renderProgram = renderer.loadRenderProgram(backgroundRenderProgramName.first, backgroundRenderProgramName.second, {});
-
-    return m_renderProgram;
-}
-
-std::shared_ptr<Mesh> BackgroundDrawable::mesh() const
-{
-    if (!m_mesh)
-        m_mesh = buildPlaneMesh();
-
-    return m_mesh;
-}
-
-std::shared_ptr<AbstractUniform> BackgroundDrawable::uniform(UniformId id) const
-{
-    std::shared_ptr<AbstractUniform> result = Drawable::uniform(id);
-
-    switch (id)
-    {
-    case UniformId::MetallicRoughness:
-    {
-        result = m_metallicRoughnessUniform;
-        break;
-    }
-    }
-
-    return result;
 }
 
 TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& c, float lineSpacing)
@@ -339,10 +302,10 @@ std::shared_ptr<Mesh> LightDrawable::mesh() const
     return m_mesh;
 }
 
-std::set<std::string> LightDrawable::renderProgramDefines() const
+std::map<std::string, std::string> LightDrawable::renderProgramDefines() const
 {
-    std::set<std::string> defines;
-    defines.insert("LIGHT");
+    std::map<std::string, std::string> defines;
+    defines.insert({"LIGHT", ""});
 
     return defines;
 }
@@ -391,32 +354,40 @@ std::shared_ptr<Mesh> IBLDrawable::mesh() const
     return m_mesh;
 }
 
-std::set<std::string> IBLDrawable::renderProgramDefines() const
+std::map<std::string, std::string> IBLDrawable::renderProgramDefines() const
 {
-    std::set<std::string> defines;
-    defines.insert("IBL");
+    std::map<std::string, std::string> defines;
+    defines.insert({"IBL", ""});
 
     return defines;
 }
 
-PostEffectDrawable::PostEffectDrawable()
+BackgroundDrawable::BackgroundDrawable(float r)
+    : Drawable()
+    , m_metallicRoughnessUniform(std::make_shared<Uniform<glm::vec2>>(glm::vec2(1.f, r)))
 {
 }
 
-std::shared_ptr<RenderProgram> PostEffectDrawable::renderProgram(DrawableRenderProgramId id) const
+std::shared_ptr<RenderProgram> BackgroundDrawable::renderProgram(DrawableRenderProgramId) const
 {
-    std::shared_ptr<RenderProgram> result;
+    if (!m_renderProgram)
+    {
+        auto& renderer = Renderer::instance();
+        m_renderProgram = renderer.loadRenderProgram(backgroundRenderProgramName.first, backgroundRenderProgramName.second, {});
+    }
 
-    auto& renderer = Renderer::instance();
+    return m_renderProgram;
+}
+
+std::shared_ptr<AbstractUniform> BackgroundDrawable::uniform(UniformId id) const
+{
+    std::shared_ptr<AbstractUniform> result = Drawable::uniform(id);
 
     switch (id)
     {
-    case DrawableRenderProgramId::PostEffect:
+    case UniformId::MetallicRoughness:
     {
-        if (!m_renderProgram)
-            m_renderProgram = renderer.loadRenderProgram(postEffectRenderProgramName.first, postEffectRenderProgramName.second, {});
-
-        result = m_renderProgram;
+        result = m_metallicRoughnessUniform;
         break;
     }
     }
@@ -424,23 +395,253 @@ std::shared_ptr<RenderProgram> PostEffectDrawable::renderProgram(DrawableRenderP
     return result;
 }
 
-std::shared_ptr<Mesh> PostEffectDrawable::mesh() const
+SSAODrawable::SSAODrawable(float radius, uint32_t numSamples)
+    : Drawable()
+    , m_radius(radius)
+    , m_numSamples(numSamples)
 {
-    static std::weak_ptr<Mesh> s_weakMesh;
-
-    if (!m_mesh)
-    {
-        if (!s_weakMesh.expired())
-            m_mesh = s_weakMesh.lock();
-        else
+    const GLsizeiptr bufferSize = 64 * 4 * sizeof(float);
+    auto samplesBuffer = std::make_shared<Buffer>(bufferSize, nullptr, GL_STATIC_DRAW);
+    auto *bufferData = static_cast<glm::vec4*>(samplesBuffer->map(0, bufferSize, GL_MAP_WRITE_BIT));
+        std::uniform_real_distribution<float> randomFloats(0.3f, 1.0f);
+        std::default_random_engine generator;
+        for (size_t i = 0; i < 64; ++i)
         {
-            m_mesh = buildPlaneMesh();
-            s_weakMesh = m_mesh;
+            glm::vec3 sample(randomFloats(generator) * 2.0f - 1.0f, randomFloats(generator) * 2.0f - 1.0f, randomFloats(generator));
+            sample = glm::normalize(sample);
+            sample *= randomFloats(generator);
+            bufferData[i] = glm::vec4(sample, randomFloats(generator) * glm::two_pi<float>());
         }
+    samplesBuffer->unmap();
+
+    m_samplesBufferUniform = std::make_shared<Uniform<std::shared_ptr<Buffer>>>(samplesBuffer);
+}
+
+std::shared_ptr<RenderProgram> SSAODrawable::renderProgram(DrawableRenderProgramId) const
+{
+    if (!m_renderProgram)
+    {
+        auto& renderer = Renderer::instance();
+        m_renderProgram = renderer.loadRenderProgram(ssaoRenderProgramName.first, ssaoRenderProgramName.second,
+                                                     {{"RADIUS", std::to_string(m_radius)}, {"NUM_SAMPLES", std::to_string(m_numSamples)}});
     }
 
-    return m_mesh;
+    return m_renderProgram;
 }
+
+std::shared_ptr<AbstractUniform> SSAODrawable::uniform(UniformId id) const
+{
+    std::shared_ptr<AbstractUniform> result = Drawable::uniform(id);
+
+    switch (id)
+    {
+    case UniformId::SSAOSamplesBuffer:
+    {
+        result = m_samplesBufferUniform;
+        break;
+    }
+    }
+
+    return result;
+}
+
+BloomDrawable::BloomDrawable()
+    : Drawable()
+{
+}
+
+std::shared_ptr<RenderProgram> BloomDrawable::renderProgram(DrawableRenderProgramId) const
+{
+    if (!m_renderProgram)
+    {
+        auto& renderer = Renderer::instance();
+        m_renderProgram = renderer.loadRenderProgram(bloomRenderProgramName.first, bloomRenderProgramName.second, {});
+    }
+
+    return m_renderProgram;
+}
+
+PostEffectDrawable::PostEffectDrawable()
+    : Drawable()
+{
+}
+
+std::shared_ptr<RenderProgram> PostEffectDrawable::renderProgram(DrawableRenderProgramId) const
+{
+    if (!m_renderProgram)
+    {
+        auto& renderer = Renderer::instance();
+        m_renderProgram = renderer.loadRenderProgram(postEffectRenderProgramName.first, postEffectRenderProgramName.second, {});
+    }
+
+    return m_renderProgram;
+}
+
+BlurDrawable::BlurDrawable(float sigma)
+    : Drawable()
+    , m_type(0)
+    , m_levelUniform(std::make_shared<Uniform<uint32_t>>(0u))
+{
+    const GLsizeiptr bufferSize = 16 * 4 * sizeof(float);
+    auto kernelBuffer = std::make_shared<Buffer>(bufferSize, nullptr, GL_STATIC_DRAW);
+    auto *bufferData = static_cast<glm::vec4*>(kernelBuffer->map(0, bufferSize, GL_MAP_WRITE_BIT));
+        for (uint32_t i = 0; i < 64; ++i)
+        {
+            float value = glm::gauss(static_cast<float>(i), 0.0f, sigma);
+            bufferData[i/4][i%4] = value;
+            m_radius = i+1;
+            if (value < utils::epsilon)
+                break;
+        }
+    kernelBuffer->unmap();
+
+    m_kernelBufferUniform = std::make_shared<Uniform<std::shared_ptr<Buffer>>>(kernelBuffer);
+}
+
+void BlurDrawable::setType(BlurType pass)
+{
+    m_type = castFromBlurType(pass);
+}
+
+void BlurDrawable::setLevel(uint32_t level)
+{
+    m_levelUniform->set(level);
+}
+
+void BlurDrawable::setTextures(std::shared_ptr<Texture> src0, std::shared_ptr<Texture> src1)
+{
+    m_sourceTextureUniform[0] = std::make_shared<Uniform<std::shared_ptr<Texture>>>(src0);
+    m_sourceTextureUniform[1] = std::make_shared<Uniform<std::shared_ptr<Texture>>>(src1);
+}
+
+std::shared_ptr<RenderProgram> BlurDrawable::renderProgram(DrawableRenderProgramId) const
+{
+    if (!m_renderProgram)
+    {
+        auto& renderer = Renderer::instance();
+        m_renderProgram = renderer.loadRenderProgram(blurRenderProgramName.first, blurRenderProgramName.second, {{"RADIUS", std::to_string(m_radius)}});
+    }
+
+    return m_renderProgram;
+}
+
+std::shared_ptr<AbstractUniform> BlurDrawable::uniform(UniformId id) const
+{
+    std::shared_ptr<AbstractUniform> result = Drawable::uniform(id);
+
+    switch (id)
+    {
+    case UniformId::BlurSourceMap:
+    {
+        result = m_sourceTextureUniform[m_type];
+        break;
+    }
+    case UniformId::BlurKernelBuffer:
+    {
+        result = m_kernelBufferUniform;
+        break;
+    }
+    case UniformId::BlurOffset:
+    {
+        static std::array<std::shared_ptr<AbstractUniform>, 2> offsetUniform {std::make_shared<Uniform<glm::vec2>>(glm::vec2(0.0f, 1.0f)),
+                                                                              std::make_shared<Uniform<glm::vec2>>(glm::vec2(1.0f, 0.0f))};
+        result = offsetUniform[m_type];
+        break;
+    }
+    case UniformId::BlurLevel:
+    {
+        result = m_levelUniform;
+        break;
+    }
+    }
+
+    return result;
+}
+
+CombineDrawable::CombineDrawable(CombineType type)
+    : Drawable()
+    , m_type(type)
+{
+}
+
+void CombineDrawable::setTexture0(std::shared_ptr<Texture> texture)
+{
+    m_sourceTextureUniform[0] = std::make_shared<Uniform<std::shared_ptr<Texture>>>(texture);
+}
+
+
+void CombineDrawable::setLevel0(uint32_t level)
+{
+    m_levelUniform[0] = std::make_shared<Uniform<uint32_t>>(level);
+}
+
+void CombineDrawable::setTexture1(std::shared_ptr<Texture> texture)
+{
+    m_sourceTextureUniform[1] = std::make_shared<Uniform<std::shared_ptr<Texture>>>(texture);
+}
+
+void CombineDrawable::setLevel1(uint32_t level)
+{
+    m_levelUniform[1] = std::make_shared<Uniform<uint32_t>>(level);
+}
+
+std::shared_ptr<RenderProgram> CombineDrawable::renderProgram(DrawableRenderProgramId) const
+{
+    if (!m_renderProgram)
+    {
+        auto& renderer = Renderer::instance();
+        m_renderProgram = renderer.loadRenderProgram(combineRenderProgramName.first, combineRenderProgramName.second, renderProgramDefines());
+    }
+
+    return m_renderProgram;
+}
+
+std::shared_ptr<AbstractUniform> CombineDrawable::uniform(UniformId id) const
+{
+    std::shared_ptr<AbstractUniform> result = Drawable::uniform(id);
+
+    switch (id)
+    {
+    case UniformId::CombineSourceMap0:
+    {
+        result = m_sourceTextureUniform[0];
+        break;
+    }
+    case UniformId::CombineSourceMap1:
+    {
+        result = m_sourceTextureUniform[1];
+        break;
+    }
+    case UniformId::CombineLevel0:
+    {
+        result = m_levelUniform[0];
+        break;
+    }
+    case UniformId::CombineLevel1:
+    {
+        result = m_levelUniform[1];
+        break;
+    }
+    }
+
+    return result;
+}
+
+std::map<std::string, std::string> CombineDrawable::renderProgramDefines() const
+{
+    std::map<std::string, std::string> result;
+
+    switch (m_type) {
+    case CombineType::Add:
+        result.insert({"COMBINE_ADD", ""});
+        break;
+    default:
+        break;
+    }
+
+    return result;
+}
+
 
 } // namespace
 } // namespace

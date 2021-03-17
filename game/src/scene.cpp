@@ -3,7 +3,6 @@
 #include <core/core.h>
 #include <core/scene.h>
 #include <core/graphicscontroller.h>
-#include <core/camera.h>
 #include <core/scenerootnode.h>
 
 #include "scene.h"

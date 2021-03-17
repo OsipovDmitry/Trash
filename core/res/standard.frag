@@ -30,7 +30,7 @@ uniform sampler2D u_roughnessMap;
 #endif
 
 #if defined(HAS_NORMALS) && defined(HAS_LIGHTING)
-uniform int u_lightIndices[MAX_LIGHTS];
+uniform int u_lightIndices[MAX_LIGHTS_PER_NODE];
 #endif
 
 #ifdef HAS_NORMALS
@@ -52,8 +52,8 @@ in vec3 v_color;
 
 #if defined(HAS_NORMALS) && defined(HAS_LIGHTING)
 in vec3 v_toView;
-in vec3 v_toLight[MAX_LIGHTS];
-in vec4 v_posLightSpace[MAX_LIGHTS];
+in vec3 v_toLight[MAX_LIGHTS_PER_NODE];
+in vec4 v_posLightSpace[MAX_LIGHTS_PER_NODE];
 #endif
 
 out vec4 fragColor;
@@ -93,15 +93,13 @@ void main(void)
     vec3 F0 = mix(vec3(dielectricSpecular), pbr.baseColor.rgb, pbr.metallic);
     vec3 Lo = vec3(0.0);
 
-    for (int i = 0; i < MAX_LIGHTS; i++)
+    for (int i = 0; i < MAX_LIGHTS_PER_NODE; i++)
     {
-        int lightIdx = u_lightIndices[i];
-        LightStruct light = u_lights[lightIdx];
-
+        uint lightIdx = uint(u_lightIndices[i]);
         vec3 L = normalize(v_toLight[i]);
 
-        float shadow = LIGHT_IS_SHADOW_ENABLED(light) ? lightShadow(v_posLightSpace[i].xyz / v_posLightSpace[i].w, lightIdx) : 1.0;
-        Lo += calcPbrLighting(pbr, F0, LIGHT_COLOR(light), N, L, V, lightAttenuation(light, v_toLight[i])) * shadow;
+        float shadow = lightShadow(lightIdx, v_posLightSpace[i].xyz / v_posLightSpace[i].w);
+        Lo += calcPbrLighting(pbr, F0, LIGHT_COLOR(u_lights[lightIdx]), N, L, V, lightAttenuation(lightIdx, v_toLight[i])) * shadow;
     }
 
     color = vec3(0.0);

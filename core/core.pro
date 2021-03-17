@@ -13,7 +13,6 @@ HEADERS += \
     ../include/core/*.h \
     src/renderwidget.h \
     src/coreprivate.h \
-    src/cameraprivate.h \
     src/renderer.h \
     src/resourcestorage.h \
     src/model.inl \
@@ -26,7 +25,6 @@ HEADERS += \
     src/importexport.h \
     src/sceneprivate.h \
     src/lightprivate.h \
-    src/cameraprivate.h \
     src/image.h \
     src/texture.inl \
     src/drawablenodeprivate.h \
@@ -58,8 +56,6 @@ SOURCES += \
     src/modelnodeprivate.cpp \
     src/drawables.cpp \
     src/importexport.cpp \
-    src/camera.cpp \
-    src/cameraprivate.cpp \
     src/scene.cpp \
     src/light.cpp \
     src/lightprivate.cpp \

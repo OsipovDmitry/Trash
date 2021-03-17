@@ -12,6 +12,7 @@
 #include <core/primitivenode.h>
 #include <core/nodevisitor.h>
 #include <core/nodeintersectionvisitor.h>
+#include <core/light.h>
 
 #include "level.h"
 #include "waypointsystem.h"
@@ -35,6 +36,21 @@ Level::Level()
 
     m_floorNode = std::make_shared<core::ModelNode>("office_floor.dae");
     rootNode->attach(m_floorNode);
+
+    auto bloomNode = std::make_shared<core::PrimitiveNode>();
+    bloomNode->addBox(glm::vec4(glm::vec3(0.15f, 0.15f, 1.f) * 5.f, 1.0f),
+                      utils::BoundingBox(glm::vec3(-4.1f-0.1f, 0.0f, -3.6f-0.1f), glm::vec3(-4.1f+0.1f, 3.0f, -3.6f+0.1f)),
+                      false);
+    rootNode->attach(bloomNode);
+
+    auto light = std::make_shared<core::Light>(core::LightType::Point);
+    light->setPosition(glm::vec3(-4.1f, 4.0f, -3.0f));
+    light->setDirection(glm::vec3(0.0f, -1.0f, 0.0f));
+    light->setSpotAngles(glm::vec2(2.4f));
+    light->setColor(glm::vec3(0.15f, 0.15f, 1.f) * 15.f);
+    light->setRadiuses(glm::vec2(6.0f, 4.0f));
+    light->enableShadowOutside(true);
+    graphicsScene()->attachLight(light);
 
     core::NodeSimpleVisitor nv([](std::shared_ptr<core::Node> node) {
         if (auto drawableNode = std::dynamic_pointer_cast<core::DrawableNode>(node))

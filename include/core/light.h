@@ -49,6 +49,9 @@ public:
     bool isShadowMapEnabled() const;
     void enableShadowMap(bool);
 
+    bool isShadowOutside() const;
+    void enableShadowOutside(bool);
+
 private:
     std::unique_ptr<LightPrivate> m_;
 

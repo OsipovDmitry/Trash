@@ -21,13 +21,11 @@ class GraphicsControllerPrivate : public AbstractControllerPrivate
 {
 public:
     std::shared_ptr<Scene> scene;
-    glm::uvec2 currentViewportSize;
 
     GraphicsControllerPrivate();
     ~GraphicsControllerPrivate();
 
-    void resize(int32_t, int32_t);
-    void updateScene(uint64_t, uint64_t);
+    void frame(uint64_t, uint64_t);
 };
 
 } // namespace

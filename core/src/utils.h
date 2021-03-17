@@ -3,6 +3,7 @@
 
 #include <memory>
 #include <vector>
+#include <string>
 
 #include <glm/vec3.hpp>
 #include <glm/vec4.hpp>
@@ -23,7 +24,7 @@ struct Font;
 glm::vec4 toLinearRGB(const glm::vec4&);
 glm::vec4 toSRGB(const glm::vec4&);
 
-bool diffuseSpecularGlossinessToBaseColorMetallicRoughness(const QImage&, const QImage&, const QImage&, const QImage&, QImage&, QImage&, QImage&);
+//bool diffuseSpecularGlossinessToBaseColorMetallicRoughness(const QImage&, const QImage&, const QImage&, const QImage&, QImage&, QImage&, QImage&);
 
 std::shared_ptr<Mesh> buildLineMesh(const std::vector<glm::vec3>&, const std::vector<glm::vec3>&, bool);
 std::shared_ptr<Mesh> buildSphereMesh(uint32_t, const utils::BoundingSphere&, bool);

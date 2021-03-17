@@ -1,3 +1,5 @@
+#include <clocale>
+
 #include <core/core.h>
 #include <core/abstractgame.h>
 #include <core/graphicscontroller.h>
@@ -49,16 +51,6 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
             corePrivate.game.lock()->doInitialize();
         }
 
-        break;
-    }
-    case ControllerMessageType::RenderWidgetWasResized:
-    {
-        auto message = msg_cast<RenderWidgetWasResizedMessage>(msg);
-        auto resizeMessage = std::make_shared<ResizeMessage>(message->width, message->height);
-        for (auto controller : corePrivate.controllers)
-        {
-            controller->sendMessage(resizeMessage);
-        }
         break;
     }
     case ControllerMessageType::RenderWidgetWasUpdated:
@@ -118,6 +110,7 @@ void Core::doWork(std::shared_ptr<AbstractController::Message> msg)
 Core::Core()
     : AbstractController(new CorePrivate())
 {
+    std::setlocale(LC_NUMERIC, "C"); // to guarantee that std::to_string separates floating numbers by point (not comma)
     m().renderWidget = new RenderWidget(*this);
 }
 

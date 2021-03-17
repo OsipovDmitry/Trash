@@ -1,6 +1,5 @@
 #include <core/core.h>
 #include <core/scene.h>
-#include <core/camera.h>
 #include <core/graphicscontroller.h>
 
 #include "coreprivate.h"
@@ -16,7 +15,6 @@ void GraphicsController::setMainScene(std::shared_ptr<Scene> scene)
 {
     auto& gcPrivate = m();
     gcPrivate.scene = scene;
-    gcPrivate.scene->camera()->setViewportSize(gcPrivate.currentViewportSize);
 }
 
 std::shared_ptr<Scene> GraphicsController::mainScene()
@@ -35,16 +33,10 @@ void GraphicsController::doWork(std::shared_ptr<AbstractController::Message> msg
 
     switch (msg->type())
     {
-    case ControllerMessageType::Resize:
-    {
-        auto resizeMessage = msg_cast<ResizeMessage>(msg);
-        gcPrivate.resize(resizeMessage->width, resizeMessage->height);
-        break;
-    }
     case ControllerMessageType::Update:
     {
         auto updateMessage = msg_cast<UpdateMessage>(msg);
-        gcPrivate.updateScene(updateMessage->time, updateMessage->dt);
+        gcPrivate.frame(updateMessage->time, updateMessage->dt);
         break;
     }
     default:

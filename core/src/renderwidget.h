@@ -65,14 +65,6 @@ public:
     RenderWidgetWasUpdatedMessage(uint64_t time_, uint64_t dt_) : AbstractController::Message(messageType()), time(time_), dt(dt_) {}
 };
 
-class RenderWidgetWasResizedMessage : public AbstractController::Message
-{
-    MESSAGE(ControllerMessageType::RenderWidgetWasResized)
-public:
-    int32_t width, height;
-    RenderWidgetWasResizedMessage(int32_t w, int32_t h) : AbstractController::Message(messageType()), width(w), height(h) {}
-};
-
 class RenderWidgetMouseClickMessage : public AbstractController::Message
 {
     MESSAGE(ControllerMessageType::RenderWidgetMouseClick)

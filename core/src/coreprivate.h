@@ -30,14 +30,6 @@ public:
 
 };
 
-class ResizeMessage : public AbstractController::Message
-{
-    MESSAGE(ControllerMessageType::Resize)
-public:
-    int32_t width, height;
-    ResizeMessage(int32_t w, int32_t h) : AbstractController::Message(messageType()), width(w), height(h) {}
-};
-
 class UpdateMessage : public AbstractController::Message
 {
     MESSAGE(ControllerMessageType::Update)

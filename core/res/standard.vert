@@ -1,4 +1,4 @@
-#ifndef HAS_POSITIONS
+#if !defined(HAS_POSITIONS) || !defined(MAX_LIGHTS_PER_NODE)
   error!!!
 #endif
 
@@ -32,7 +32,7 @@ uniform mat4 u_modelMatrix;
 
 #if defined(HAS_NORMALS) && defined(HAS_LIGHTING)
 #include<lights.glsl>
-uniform int u_lightIndices[MAX_LIGHTS];
+uniform int u_lightIndices[MAX_LIGHTS_PER_NODE];
 uniform vec3 u_viewPosition;
 #endif
 
@@ -55,8 +55,8 @@ out vec3 v_color;
 
 #if defined(HAS_NORMALS) && defined(HAS_LIGHTING)
 out vec3 v_toView;
-out vec3 v_toLight[MAX_LIGHTS];
-out vec4 v_posLightSpace[MAX_LIGHTS];
+out vec3 v_toLight[MAX_LIGHTS_PER_NODE];
+out vec4 v_posLightSpace[MAX_LIGHTS_PER_NODE];
 #endif
 
 void main(void)
@@ -103,9 +103,9 @@ void main(void)
 
 #if defined(HAS_NORMALS) && defined(HAS_LIGHTING)
     v_toView = u_viewPosition - pos.xyz;
-    for (int i = 0; i < MAX_LIGHTS; i++)
+    for (int i = 0; i < MAX_LIGHTS_PER_NODE; i++)
     {
-        v_toLight[i] = (u_lightIndices[i] >= 0) ? toLightVector(u_lights[u_lightIndices[i]], pos.xyz) : vec3(0.0, 0.0, 0.0);
+        v_toLight[i] = (u_lightIndices[i] >= 0) ? toLightVector(uint(u_lightIndices[i]), pos.xyz) : vec3(0.0, 0.0, 0.0);
         v_posLightSpace[i] = (u_lightIndices[i] >= 0) ? LIGHT_MATRIX(u_lights[u_lightIndices[i]]) * pos : vec4(0.0, 0.0, 0.0, 1.0);
     }
 #endif

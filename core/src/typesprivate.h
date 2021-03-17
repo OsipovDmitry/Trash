@@ -27,12 +27,10 @@ struct LightIndicesList : public std::array<int32_t, MAX_LIGHTS_PER_NODE>
 
 ENUMCLASS(ControllerMessageType, uint32_t,
           RenderWidgetWasInitialized,
-          RenderWidgetWasResized,
           RenderWidgetWasUpdated,
           RenderWidgetMouseClick,
           RenderWidgetMouseMove,
           RenderWidgetWasClosed,
-          Resize,
           Update)
 
 ENUMCLASS(VertexAttribute, uint32_t,
@@ -44,31 +42,12 @@ ENUMCLASS(VertexAttribute, uint32_t,
           Tangent,
           Color)
 
-ENUMCLASS(TextureUnit, int32_t,
-          BaseColor,
-          GBuffer0 = BaseColor,
-          Metallic,
-          GBuffer1 = Metallic,
-          Roughness,
-          GBuffer2 = Roughness,
-          Normal,
-          Opacity,
-          DiffuseIBL,
-          SpecularIBL,
-          BrdfLUT,
-          ShadowMaps)
-
-ENUMCLASS(UniformBufferUnit, uint32_t,
-          Lights,
-          Bones)
-
 ENUMCLASS(LayerId, uint32_t,
-          Background,
+          Undefined,
           OpaqueGeometry,
           NotLightedGeometry,
           TransparentGeometry,
-          Lights,
-          PostEffect)
+          Lights)
 
 ENUMCLASS(DrawableRenderProgramId, uint32_t,
           ForwardRender,
@@ -87,6 +66,7 @@ ENUMCLASS(UniformId, uint32_t,
           ViewMatrix,
           ViewMatrixInverse,
           ProjMatrix,
+          ProjMatrixInverse,
           ViewProjMatrix,
           ViewProjMatrixInverse,
           ModelViewMatrix,
@@ -102,6 +82,8 @@ ENUMCLASS(UniformId, uint32_t,
           ShadowMaps,
           BonesBuffer,
           LightsBuffer,
+          SSAOSamplesBuffer,
+          BlurKernelBuffer,
           Color,
           MetallicRoughness,
           BaseColorMap,
@@ -113,7 +95,21 @@ ENUMCLASS(UniformId, uint32_t,
           GBufferMap0,
           GBufferMap1,
           GBufferMap2,
-          HDRMap)
+          HDRMap,
+          SSAOMap,
+          SSAOContribution,
+          BloomMap,
+          BlurSourceMap,
+          BlurOffset,
+          BlurLevel,
+          CombineSourceMap0,
+          CombineSourceMap1,
+          CombineLevel0,
+          CombineLevel1)
+
+ENUMCLASS(BlurType, uint32_t, Horizontal, Vertical)
+
+ENUMCLASS(CombineType, uint32_t, Add)
 
 } // namespace
 } // namespace

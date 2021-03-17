@@ -94,5 +94,19 @@ void Light::enableShadowMap(bool value)
     }
 }
 
+bool Light::isShadowOutside() const
+{
+    return m_->shadowOutside;
+}
+
+void Light::enableShadowOutside(bool value)
+{
+    if (value != m_->shadowOutside)
+    {
+        m_->shadowOutside = value;
+        m_->dirtyScene();
+    }
+}
+
 } // namespace
 } // namespace

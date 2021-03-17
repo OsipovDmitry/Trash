@@ -40,11 +40,11 @@ Renderer &RenderWidget::renderer()
 void RenderWidget::initializeGL()
 {
     m_renderer = std::make_unique<Renderer>(*context()->extraFunctions(), defaultFramebufferObject());
-    m_renderer->initializeResources();
+    m_renderer->initialize();
 
     m_timer = std::make_unique<QTimer>(this);
     connect(m_timer.get(), SIGNAL(timeout()), SLOT(update()));
-    m_timer->setInterval(16);
+    m_timer->setInterval(0);
     m_timer->start();
 
     m_startTime = m_lastFpsTime = static_cast<uint64_t>(QDateTime::currentMSecsSinceEpoch());
@@ -55,7 +55,7 @@ void RenderWidget::initializeGL()
 
 void RenderWidget::resizeGL(int w, int h)
 {
-    m_core.sendMessage(std::make_shared<RenderWidgetWasResizedMessage>(w, h));
+    m_renderer->resize(w, h);
 }
 
 void RenderWidget::paintGL()

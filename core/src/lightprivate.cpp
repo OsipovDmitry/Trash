@@ -25,6 +25,7 @@ LightPrivate::LightPrivate(Light* l, LightType lightType)
     , cosAngles(glm::cos(0.5f*angles))
     , type(lightType)
     , shadowMapIsEnabled(true)
+    , shadowOutside(false)
     , scene(nullptr)
     , indexInScene(static_cast<uint32_t>(-1))
     , thisLight(l)
@@ -68,7 +69,7 @@ glm::mat4x4 LightPrivate::packParams() const
                 glm::vec4(pos, cosAngles.x),
                 glm::vec4(dir, cosAngles.y),
                 glm::vec4(color, static_cast<float>(type)),
-                glm::vec4(radiuses, 0.0f, shadowMapIsEnabled ? 1.0f : 0.0f)
+                glm::vec4(radiuses, 0.0f, shadowMapIsEnabled ? (shadowOutside ? +1.f : -1.f) : 0.0f)
                 );
 }
 

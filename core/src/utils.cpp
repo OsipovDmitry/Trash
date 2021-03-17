@@ -10,6 +10,7 @@
 #include <utils/boundingsphere.h>
 #include <utils/boundingbox.h>
 #include <utils/frustum.h>
+#include <utils/epsilon.h>
 
 #include "utils.h"
 #include "renderer.h"
@@ -22,7 +23,6 @@ namespace core
 const float gamma = 2.2f;
 const float invGamma = 1.0f / gamma;
 const float dielectricSpecular = 0.04f;
-const float epsilon = 0.001f;
 
 glm::vec4 toLinearRGB(const glm::vec4& color)
 {
@@ -35,91 +35,91 @@ glm::vec4 toSRGB(const glm::vec4& color)
 }
 
 
-bool diffuseSpecularGlossinessToBaseColorMetallicRoughness(
-        const QImage& diffuseMap,
-        const QImage& specularMap,
-        const QImage& glossinessMap,
-        const QImage& opacityMap,
-        QImage& baseColorMap,
-        QImage& metallicMap,
-        QImage& roughnessMap)
-{
-    static auto toVec4 = [](const QColor& color) -> glm::vec4
-    {
-        return glm::vec4(color.redF(), color.greenF(), color.blueF(), color.alphaF());
-    };
+//bool diffuseSpecularGlossinessToBaseColorMetallicRoughness(
+//        const QImage& diffuseMap,
+//        const QImage& specularMap,
+//        const QImage& glossinessMap,
+//        const QImage& opacityMap,
+//        QImage& baseColorMap,
+//        QImage& metallicMap,
+//        QImage& roughnessMap)
+//{
+//    static auto toVec4 = [](const QColor& color) -> glm::vec4
+//    {
+//        return glm::vec4(color.redF(), color.greenF(), color.blueF(), color.alphaF());
+//    };
 
-    static auto toQColor = [](const glm::vec4& color) -> QColor
-    {
-        return QColor::fromRgbF(color.r, color.g, color.b, color.a);
-    };
+//    static auto toQColor = [](const glm::vec4& color) -> QColor
+//    {
+//        return QColor::fromRgbF(color.r, color.g, color.b, color.a);
+//    };
 
-    static auto readPixel = [&toVec4](const QImage& img, double x, double y, const glm::vec4& def) -> glm::vec4
-    {
-        if (img.isNull())
-            return def;
-        return toVec4(img.pixelColor(static_cast<int>(x*(img.width()-1) + 0.5f), static_cast<int>(y*(img.height()-1) + 0.5f)));
-    };
+//    static auto readPixel = [toVec4](const QImage& img, double x, double y, const glm::vec4& def) -> glm::vec4
+//    {
+//        if (img.isNull())
+//            return def;
+//        return toVec4(img.pixelColor(static_cast<int>(x*(img.width()-1) + 0.5f), static_cast<int>(y*(img.height()-1) + 0.5f)));
+//    };
 
-    static auto getPerceivedBrightness = [](const glm::vec4& color) -> float
-    {
-        return glm::sqrt(0.299f * color.r * color.r + 0.587f * color.g * color.g + 0.114f * color.b * color.b);
-    };
+//    static auto getPerceivedBrightness = [](const glm::vec4& color) -> float
+//    {
+//        return glm::sqrt(0.299f * color.r * color.r + 0.587f * color.g * color.g + 0.114f * color.b * color.b);
+//    };
 
-    static auto solveMetallic = [](float diffuse, float specular, float oneMinusSpecularStrength) -> float
-    {
-        if (specular < dielectricSpecular)
-            return 0.0;
+//    static auto solveMetallic = [](float diffuse, float specular, float oneMinusSpecularStrength) -> float
+//    {
+//        if (specular < dielectricSpecular)
+//            return 0.0;
 
-        const float a = dielectricSpecular;
-        const float b = diffuse * oneMinusSpecularStrength / (1.f - dielectricSpecular) + specular - 2.f * dielectricSpecular;
-        const float c = dielectricSpecular - specular;
-        const float D = glm::max(0.f, b*b - 4*a*c);
-        return glm::clamp((-b + glm::sqrt(D)) / (2.f * a), 0.f, 1.f);
-    };
+//        const float a = dielectricSpecular;
+//        const float b = diffuse * oneMinusSpecularStrength / (1.f - dielectricSpecular) + specular - 2.f * dielectricSpecular;
+//        const float c = dielectricSpecular - specular;
+//        const float D = glm::max(0.f, b*b - 4*a*c);
+//        return glm::clamp((-b + glm::sqrt(D)) / (2.f * a), 0.f, 1.f);
+//    };
 
-    if (diffuseMap.isNull())
-        return false;
+//    if (diffuseMap.isNull())
+//        return false;
 
-    auto size = diffuseMap.size();
+//    auto size = diffuseMap.size();
 
-    baseColorMap = QImage(size, QImage::Format_RGBA8888);
-    metallicMap = QImage(size, QImage::Format_Grayscale8);
-    roughnessMap = QImage(size, QImage::Format_Grayscale8);
+//    baseColorMap = QImage(size, QImage::Format_RGBA8888);
+//    metallicMap = QImage(size, QImage::Format_Grayscale8);
+//    roughnessMap = QImage(size, QImage::Format_Grayscale8);
 
-    bool hasAlpha = false;
+//    bool hasAlpha = false;
 
-    for (size_t y = 0; y < size.height(); ++y)
-        for (size_t x = 0; x < size.width(); ++x)
-        {
-            glm::vec4 diffuseColor = toLinearRGB(readPixel(diffuseMap, static_cast<double>(x)/(size.width()-1), static_cast<double>(y)/(size.height()-1), glm::vec4(0.f,0.f,0.f,1.f)));
-            glm::vec4 specularColor = toLinearRGB(readPixel(specularMap, static_cast<double>(x)/(size.width()-1), static_cast<double>(y)/(size.height()-1), glm::vec4(0.f,0.f,0.f,1.f)));
-            float glossiness = readPixel(glossinessMap, static_cast<double>(x)/(size.width()-1), static_cast<double>(y)/(size.height()-1), glm::vec4(0.f,0.f,0.f,1.f)).r;
-            float opacity = readPixel(opacityMap, static_cast<double>(x)/(size.width()-1), static_cast<double>(y)/(size.height()-1), glm::vec4(1.f,1.f,1.f,1.f)).r;
+//    for (size_t y = 0; y < size.height(); ++y)
+//        for (size_t x = 0; x < size.width(); ++x)
+//        {
+//            glm::vec4 diffuseColor = toLinearRGB(readPixel(diffuseMap, static_cast<double>(x)/(size.width()-1), static_cast<double>(y)/(size.height()-1), glm::vec4(0.f,0.f,0.f,1.f)));
+//            glm::vec4 specularColor = toLinearRGB(readPixel(specularMap, static_cast<double>(x)/(size.width()-1), static_cast<double>(y)/(size.height()-1), glm::vec4(0.f,0.f,0.f,1.f)));
+//            float glossiness = readPixel(glossinessMap, static_cast<double>(x)/(size.width()-1), static_cast<double>(y)/(size.height()-1), glm::vec4(0.f,0.f,0.f,1.f)).r;
+//            float opacity = readPixel(opacityMap, static_cast<double>(x)/(size.width()-1), static_cast<double>(y)/(size.height()-1), glm::vec4(1.f,1.f,1.f,1.f)).r;
 
-            const float oneMinusSpecularStrength = 1.f - std::max(specularColor.r, std::max(specularColor.g, specularColor.b));
-            const float metallic = solveMetallic(getPerceivedBrightness(diffuseColor), getPerceivedBrightness(specularColor), oneMinusSpecularStrength);
+//            const float oneMinusSpecularStrength = 1.f - std::max(specularColor.r, std::max(specularColor.g, specularColor.b));
+//            const float metallic = solveMetallic(getPerceivedBrightness(diffuseColor), getPerceivedBrightness(specularColor), oneMinusSpecularStrength);
 
-            glm::vec3 baseColorFromDiffuse = glm::vec3(diffuseColor) * (oneMinusSpecularStrength / (1.f - dielectricSpecular) / glm::max(1.f - metallic, epsilon));
-            glm::vec3 baseColorFromSpecular = (glm::vec3(specularColor) - glm::vec3(dielectricSpecular) * (1.f - metallic))  / glm::max(metallic, epsilon);
+//            glm::vec3 baseColorFromDiffuse = glm::vec3(diffuseColor) * (oneMinusSpecularStrength / (1.f - dielectricSpecular) / glm::max(1.f - metallic, utils::epsilon));
+//            glm::vec3 baseColorFromSpecular = (glm::vec3(specularColor) - glm::vec3(dielectricSpecular) * (1.f - metallic))  / glm::max(metallic, utils::epsilon);
 
-            glm::vec4 baseColor = glm::clamp(
-                        glm::vec4(glm::mix(baseColorFromDiffuse, baseColorFromSpecular, metallic * metallic), diffuseColor.a * opacity),
-                        glm::vec4(0.0f), glm::vec4(1.0f));
+//            glm::vec4 baseColor = glm::clamp(
+//                        glm::vec4(glm::mix(baseColorFromDiffuse, baseColorFromSpecular, metallic * metallic), diffuseColor.a * opacity),
+//                        glm::vec4(0.0f), glm::vec4(1.0f));
 
-            if (baseColor.a < 1.0f - epsilon)
-                hasAlpha = true;
+//            if (baseColor.a < 1.0f - utils::epsilon)
+//                hasAlpha = true;
 
-            baseColorMap.setPixelColor(x, y, toQColor(toSRGB(baseColor)));
-            metallicMap.setPixelColor(x, y, toQColor(glm::vec4(metallic, metallic, metallic, metallic)));
-            roughnessMap.setPixelColor(x, y, toQColor(glm::vec4(1.f - glossiness, 1.f - glossiness, 1.f - glossiness, 1.f - glossiness)));
-        }
+//            baseColorMap.setPixelColor(x, y, toQColor(toSRGB(baseColor)));
+//            metallicMap.setPixelColor(x, y, toQColor(glm::vec4(metallic, metallic, metallic, metallic)));
+//            roughnessMap.setPixelColor(x, y, toQColor(glm::vec4(1.f - glossiness, 1.f - glossiness, 1.f - glossiness, 1.f - glossiness)));
+//        }
 
-    if (!hasAlpha)
-        baseColorMap = baseColorMap.convertToFormat(QImage::Format_RGB888);
+//    if (!hasAlpha)
+//        baseColorMap = baseColorMap.convertToFormat(QImage::Format_RGB888);
 
-    return true;
-}
+//    return true;
+//}
 
 
 std::shared_ptr<Mesh> buildLineMesh(const std::vector<glm::vec3>& vertices, const std::vector<glm::vec3>& colors, bool loop)

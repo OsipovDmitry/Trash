@@ -4,6 +4,7 @@
 #include <memory>
 
 #include <glm/vec3.hpp>
+#include <glm/mat4x4.hpp>
 
 #include <utils/noncopyble.h>
 #include <utils/pimpl.h>
@@ -35,16 +36,18 @@ public:
     virtual ~Scene();
 
     PickData pickScene(int32_t, int32_t) const;
+    utils::Ray throwRay(int32_t, int32_t) const;
 
     std::shared_ptr<SceneRootNode> rootNode();
     std::shared_ptr<const SceneRootNode> rootNode() const;
 
-    std::shared_ptr<Camera> camera();
-    std::shared_ptr<const Camera> camera() const;
+    const glm::mat4x4& viewMatrix() const;
+    void setViewMatrix(const glm::mat4x4&);
+    void setProjectionMatrixAsOrtho(float halfHeight);
+    void setProjectionMatrixAsPerspective(float fov);
 
     void attachLight(std::shared_ptr<Light>);
     bool detachLight(std::shared_ptr<Light>);
-    //std::shared_ptr<const LightsList> lights() const;
 
 private:
     std::unique_ptr<ScenePrivate> m_;

@@ -1,7 +1,6 @@
 #include <glm/gtc/matrix_transform.hpp>
 
 #include <core/core.h>
-#include <core/camera.h>
 #include <core/graphicscontroller.h>
 #include <core/modelnode.h>
 #include <core/drawablenode.h>
@@ -211,7 +210,7 @@ void Game::doInitialize()
     wayPointSystem.insertTwoSided(waypoints[64], waypoints[65]);
     wayPointSystem.insertTwoSided(waypoints[65], waypoints[66]);
     wayPointSystem.insertTwoSided(waypoints[66], waypoints[67]);
-    wayPointSystem.insertTwoSided(waypoints[5], waypoints[9]);
+    wayPointSystem.insertTwoSided(waypoints[5], waypoints[9 ]);
 
     m_->scene->updateGraphics();
 
@@ -263,11 +262,11 @@ void Game::doInitialize()
     l->setSpotAngles(glm::vec2(1.0f, 40.0f));
     m_->scene->graphicsScene()->attachLight(l);
 
-    m_->scene->graphicsScene()->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.25f);
-    m_->scene->graphicsScene()->camera()->setViewMatrix(glm::lookAt(glm::vec3(.0f, 0.f, 0.f), glm::vec3(.0f, 0.f, -1.f), glm::vec3(0.0f, 1.0f, 0.0f)));
+    m_->scene->graphicsScene()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.25f);
+    m_->scene->graphicsScene()->setViewMatrix(glm::lookAt(glm::vec3(.0f, 0.f, 0.f), glm::vec3(.0f, 0.f, -1.f), glm::vec3(0.0f, 1.0f, 0.0f)));
 
 
-    const size_t wpFrom = 2, wpTo = 67;
+    const size_t wpFrom = 2;
     auto person = m_->persons[0];
     auto transform = person->graphicsNode()->transform();
     transform.translation = waypoints[wpFrom]->position;
@@ -287,11 +286,12 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
     m_->scene->update(time, dt);
 
     const float r = 2.2f;
-    const float t = 3.14/4;//time * 0.00005f + 10.0f;
-    m_->scene->graphicsScene()->camera()->setViewMatrix(glm::lookAt(glm::vec3(11 * r * cos(t), 10 * r, -11 * r * sin(t)), glm::vec3(0.0f, 0.0f, 0.0f), glm::vec3(0.0f, 1.0f, 0.0f)));
+    const float t = 3.14f / 4;//time * 0.00005f + 10.0f;
+    m_->scene->graphicsScene()->setViewMatrix(glm::lookAt(glm::vec3(11 * r * cos(t), 10 * r, -11 * r * sin(t)), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f)));
 
     for (int i = 0; i < lights.size(); ++i)
     {
+
         //lights[i]->setPosition(lightsPos[i] + lightsR[i] * glm::vec3(cos(10*t)*lightsCW[i], 0, sin(10*t)));
     }
 
@@ -340,21 +340,7 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
 
 void Game::doMouseClick(uint32_t, int x, int y)
 {
-    auto camera = m_->scene->graphicsScene()->camera();
-    const auto& viewportSize = camera->viewportSize();
-
-    const float xf = static_cast<float>(x) / static_cast<float>(viewportSize.x) * 2.0f - 1.0f;
-    const float yf = (1.0f - static_cast<float>(y) / static_cast<float>(viewportSize.y)) * 2.0f - 1.0f;
-
-    auto viewProjectionMatrixInverse = glm::inverse(camera->projectionMatrix() * camera->viewMatrix());
-
-    glm::vec4 p0 = viewProjectionMatrixInverse * glm::vec4(xf, yf, -1.0f, 1.0f);
-    glm::vec4 p1 = viewProjectionMatrixInverse * glm::vec4(xf, yf, 1.0f, 1.0f);
-
-    p0 /= p0.w;
-    p1 /= p1.w;
-
-    utils::Ray ray(p0, p1-p0);
+    utils::Ray ray = m_->scene->graphicsScene()->throwRay(x, y);
 
     core::NodeRayIntersectionVisitor nv(ray);
     m_->scene->graphicsScene()->rootNode()->accept(nv);

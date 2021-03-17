@@ -1,7 +1,7 @@
 #ifndef DRAWABLES_H
 #define DRAWABLES_H
 
-#include <set>
+#include <map>
 
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
@@ -58,7 +58,7 @@ public:
     void dirtyCache() override;
 
 protected:
-    std::set<std::string> renderProgramDefines() const;
+    std::map<std::string, std::string> renderProgramDefines() const;
 
     std::shared_ptr<Mesh> m_mesh;
     std::shared_ptr<AbstractUniform> m_bonesBufferUniform;
@@ -99,22 +99,6 @@ public:
     ConeDrawable(uint32_t, float, float, const glm::vec4&);
 };
 
-class BackgroundDrawable : public Drawable
-{
-public:
-    BackgroundDrawable(float = .0f);
-
-    LayerId layerId() const override { return LayerId::Background; }
-    std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
-    std::shared_ptr<Mesh> mesh() const override;
-    std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
-
-protected:
-    mutable std::shared_ptr<RenderProgram> m_renderProgram;
-    mutable std::shared_ptr<Mesh> m_mesh;
-    std::shared_ptr<AbstractUniform> m_metallicRoughnessUniform;
-};
-
 class TextDrawable : public StandardDrawable
 {
 public:
@@ -133,7 +117,7 @@ public:
     std::shared_ptr<Mesh> mesh() const override;
 
 protected:
-    std::set<std::string> renderProgramDefines() const;
+    std::map<std::string, std::string> renderProgramDefines() const;
 
     LightType m_lightType;
     mutable std::shared_ptr<RenderProgram> m_stencilRenderProgram, m_lightRenderProgram;
@@ -150,10 +134,103 @@ public:
     std::shared_ptr<Mesh> mesh() const override;
 
 protected:
-    std::set<std::string> renderProgramDefines() const;
+    std::map<std::string, std::string> renderProgramDefines() const;
 
     mutable std::shared_ptr<RenderProgram> m_stencilRenderProgram, m_lightRenderProgram;
     mutable std::shared_ptr<Mesh> m_mesh;
+};
+
+class BackgroundDrawable : public Drawable
+{
+public:
+    BackgroundDrawable(float = .0f);
+
+    LayerId layerId() const override { return LayerId::Undefined; }
+    std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
+    std::shared_ptr<Mesh> mesh() const override { return nullptr; }
+    std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
+
+protected:
+    mutable std::shared_ptr<RenderProgram> m_renderProgram;
+    std::shared_ptr<AbstractUniform> m_metallicRoughnessUniform;
+};
+
+class SSAODrawable : public Drawable
+{
+public:
+    SSAODrawable(float, uint32_t);
+
+    LayerId layerId() const override { return LayerId::Undefined; }
+    std::shared_ptr<Mesh> mesh() const override { return nullptr; }
+    std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
+    std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
+
+protected:
+    mutable std::shared_ptr<RenderProgram> m_renderProgram;
+    std::shared_ptr<AbstractUniform> m_samplesBufferUniform;
+    float m_radius;
+    uint32_t m_numSamples;
+};
+
+class BloomDrawable : public Drawable
+{
+public:
+    BloomDrawable();
+
+    LayerId layerId() const override { return LayerId::Undefined; }
+    std::shared_ptr<Mesh> mesh() const override { return nullptr; }
+    std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
+
+protected:
+    mutable std::shared_ptr<RenderProgram> m_renderProgram;
+};
+
+class BlurDrawable : public Drawable
+{
+public:
+    BlurDrawable(float);
+
+    void setType(BlurType);
+    void setLevel(uint32_t);
+    void setTextures(std::shared_ptr<Texture>, std::shared_ptr<Texture>);
+
+    LayerId layerId() const override { return LayerId::Undefined; }
+    std::shared_ptr<Mesh> mesh() const override { return nullptr; }
+    std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
+    std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
+
+protected:
+    mutable std::shared_ptr<RenderProgram> m_renderProgram;
+    std::array<std::shared_ptr<AbstractUniform>, 2> m_sourceTextureUniform;
+    std::shared_ptr<AbstractUniform> m_kernelBufferUniform;
+    std::shared_ptr<Uniform<uint32_t>> m_levelUniform;
+    uint32_t m_type;
+    uint32_t m_radius;
+};
+
+class CombineDrawable : public Drawable
+{
+public:
+    CombineDrawable(CombineType);
+
+    void setTexture0(std::shared_ptr<Texture>);
+    void setLevel0(uint32_t);
+
+    void setTexture1(std::shared_ptr<Texture>);
+    void setLevel1(uint32_t);
+
+    LayerId layerId() const override { return LayerId::Undefined; }
+    std::shared_ptr<Mesh> mesh() const override { return nullptr; }
+    std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
+    std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
+
+protected:
+    std::map<std::string, std::string> renderProgramDefines() const;
+
+    mutable std::shared_ptr<RenderProgram> m_renderProgram;
+    std::array<std::shared_ptr<AbstractUniform>, 2> m_sourceTextureUniform;
+    std::array<std::shared_ptr<AbstractUniform>, 2> m_levelUniform;
+    const CombineType m_type;
 };
 
 class PostEffectDrawable : public Drawable
@@ -161,12 +238,11 @@ class PostEffectDrawable : public Drawable
 public:
     PostEffectDrawable();
 
-    LayerId layerId() const override { return LayerId::PostEffect; }
+    LayerId layerId() const override { return LayerId::Undefined; }
+    std::shared_ptr<Mesh> mesh() const override { return nullptr; }
     std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
-    std::shared_ptr<Mesh> mesh() const override;
 
 protected:
-    mutable std::shared_ptr<Mesh> m_mesh;
     mutable std::shared_ptr<RenderProgram> m_renderProgram;
 };
 

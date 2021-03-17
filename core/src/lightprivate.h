@@ -20,6 +20,7 @@ public:
     glm::vec2 angles, cosAngles, radiuses;
     LightType type;
     bool shadowMapIsEnabled;
+    bool shadowOutside;
 
     Light *thisLight;
 

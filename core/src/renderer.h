@@ -33,6 +33,8 @@ namespace core
 {
 
 class Drawable;
+class BlurDrawable;
+class CombineDrawable;
 
 class AbstractUniform
 {
@@ -83,7 +85,14 @@ struct Texture : public ResourceStorage::Object
     void setCompareMode(GLenum);
     void setCompareFunc(GLenum);
     void setBorderColor(const glm::vec4&);
-    int32_t maxMipmapLevel() const;
+
+    uint32_t maxMipmapLevel() const;
+    void setMaxMipmapLevel(uint32_t);
+    void generateMipmaps();
+
+    static bool stringToInternalFormat(const std::string& str, GLenum& internalFormat);
+    static bool formatAndTypeToInternalFormat(GLenum format, GLenum type, GLenum& internalFormat);
+    static bool stringToWrap(const std::string& str, GLenum& wrap);
 };
 
 struct Buffer
@@ -183,13 +192,13 @@ struct Framebuffer
     void detachDepth();
     void detachDepthStencil();
 
-    void attachColor(size_t, std::shared_ptr<Texture>, uint32_t = 0);
+    void attachColor(size_t, std::shared_ptr<Texture>, uint32_t, uint32_t);
     void attachColor(size_t, std::shared_ptr<Renderbuffer>);
 
-    void attachDepth(std::shared_ptr<Texture>, uint32_t = 0);
+    void attachDepth(std::shared_ptr<Texture>, uint32_t, uint32_t);
     void attachDepth(std::shared_ptr<Renderbuffer>);
 
-    void attachDepthStencil(std::shared_ptr<Texture>, uint32_t = 0);
+    void attachDepthStencil(std::shared_ptr<Texture>, uint32_t, uint32_t);
     void attachDepthStencil(std::shared_ptr<Renderbuffer>);
 
     void drawBuffers(const std::vector<GLenum>&);
@@ -282,15 +291,15 @@ struct Font : public ResourceStorage::Object
 class RenderInfo
 {
 public:
-    RenderInfo(const glm::mat4x4&, const glm::mat4x4&, const glm::uvec2&);
+    RenderInfo(const glm::mat4x4&, const glm::mat4x4&);
 
     const glm::mat4x4& viewMatrix() const { return m_viewMatrix; }
     const glm::mat4x4& viewMatrixInverse() const { return m_viewMatrixInverse; }
     const glm::mat4x4& projMatrix() const { return m_projMatrix; }
+    const glm::mat4x4& projMatrixInverse() const { return m_projMatrixInverse; }
     const glm::mat4x4& viewProjMatrix() const { return m_viewProjMatrix; }
     const glm::mat4x4& viewProjMatrixInverse() const { return m_viewProjMatrixInverse; }
     const glm::vec3& viewPosition() const { return m_viewPosition; }
-    const glm::uvec2& viewportSize() const { return m_viewportSize; }
 
     void setLightsBuffer(std::shared_ptr<Buffer> buffer) { m_lightsBuffer = buffer; }
     std::shared_ptr<Buffer> lightsBuffer() const { return m_lightsBuffer; }
@@ -315,10 +324,10 @@ private:
     glm::mat4x4 m_viewMatrix;
     glm::mat4x4 m_viewMatrixInverse;
     glm::mat4x4 m_projMatrix;
+    glm::mat4x4 m_projMatrixInverse;
     glm::mat4x4 m_viewProjMatrix;
     glm::mat4x4 m_viewProjMatrixInverse;
     glm::vec3 m_viewPosition;
-    glm::uvec2 m_viewportSize;
 
     std::shared_ptr<Buffer> m_lightsBuffer;
     std::shared_ptr<Texture> m_shadowMaps;
@@ -327,21 +336,26 @@ private:
     float m_IBLContribution;
 };
 
+using RenderSurface = std::pair<std::shared_ptr<Framebuffer>, glm::uvec2>;
+
 class Renderer
 {
     NONCOPYBLE(Renderer)
 
 public:
     Renderer(QOpenGLExtraFunctions&, GLuint);
-    void initializeResources();
+    void initialize();
+    void resize(int, int);
+
+    const glm::uvec2& viewportSize() const;
 
     static Renderer& instance();
     QOpenGLExtraFunctions& functions();
     GLuint defaultFbo() const;
 
-    std::shared_ptr<RenderProgram> loadRenderProgram(const std::string&, const std::string&, const std::set<std::string>& = std::set<std::string>());
+    std::shared_ptr<RenderProgram> loadRenderProgram(const std::string&, const std::string&, const std::map<std::string, std::string>& = std::map<std::string, std::string>());
     std::shared_ptr<Texture> loadTexture(const std::string&);
-    std::shared_ptr<Texture> createTexture2D(GLenum, GLint, GLint, GLenum, GLenum, const void*, bool, const std::string& = "");
+    std::shared_ptr<Texture> createTexture2D(GLenum, GLint, GLint, GLenum, GLenum, const void*, uint32_t, const std::string& = "");
     std::shared_ptr<Texture> createTexture2DArray(GLenum, GLint, GLint, GLint, GLenum, GLenum, const void*, const std::string& = "");
     std::shared_ptr<Model> loadModel(const std::string&);
     std::shared_ptr<Model::Animation> loadAnimation(const std::string&);
@@ -357,34 +371,42 @@ public:
     void renderForward(const RenderInfo&);
     void renderDeffered(const RenderInfo&);
 
-    void renderShadows(const RenderInfo&, std::shared_ptr<Framebuffer>);
-    void renderIds(const RenderInfo&, std::shared_ptr<Framebuffer>);
+    void renderShadows(const RenderInfo&, std::shared_ptr<Framebuffer>, const glm::uvec2&);
+    void renderIds(const RenderInfo&, std::shared_ptr<Framebuffer>, const glm::uvec2&);
 
-    void readPixel(const RenderInfo&, std::shared_ptr<Framebuffer>, GLenum, int, int, GLenum, GLenum, GLvoid*) const;
+    void readPixel(std::shared_ptr<Framebuffer>, GLenum, int, int, GLenum, GLenum, GLvoid*) const;
 
 private:
     using DrawDataType = std::tuple<std::shared_ptr<Drawable>, utils::Transform, uint32_t>;
     using DrawDataLayerContainer = std::deque<DrawDataType>;
     using DrawDataContainer = std::array<DrawDataLayerContainer, numElementsLayerId()>;
 
+    void setupViewportSize(const glm::uvec2&);
     void setupUniforms(const DrawDataType&, DrawableRenderProgramId, const RenderInfo&);
     void renderMesh(std::shared_ptr<Mesh>);
+    void resizeRenderSurfaces(const glm::uvec2&);
 
-    void resizeHDRFramebuffer(const glm::uvec2&);
-    void resizeGFramebuffer(const glm::uvec2&);
-
-    static std::string precompileShader(const QString& dir, QByteArray&, const std::set<std::string>&);
+    static std::string precompileShader(const QString& dir, QByteArray&, const std::map<std::string, std::string>&);
 
     QOpenGLExtraFunctions& m_functions;
     GLuint m_defaultFbo;
     std::unique_ptr<ResourceStorage> m_resourceStorage;
     DrawDataContainer m_drawData;
+    glm::uvec2 m_cachedViewportSize, m_currentViewportSize;
 
-    std::shared_ptr<Framebuffer> m_hdrFramebuffer;
-    glm::uvec2 m_hdrFramebufferSize;
+    RenderSurface m_hdrRenderSurface;
+    RenderSurface m_gRenderSurface;
+    RenderSurface m_ssaoRenderSurface, m_bloomRenderSurface;
+    std::vector<RenderSurface> m_ssaoBlurRenderSurface, m_bloomBlurRenderSurface;
+    std::vector<RenderSurface> m_ssaoCombineRenderSurface, m_bloomCombineRenderSurface;
 
-    std::shared_ptr<Framebuffer> m_gFramebuffer;
-    glm::uvec2 m_gFramebufferSize;
+    std::shared_ptr<Mesh> m_fullscreenQuad;
+    std::shared_ptr<Drawable> m_backgroundDrawable, m_ssaoDrawable, m_bloomDrawable, m_postEffectDrawable;
+    std::shared_ptr<BlurDrawable> m_ssaoBlurDrawable, m_bloomBlurDrawable;
+    std::shared_ptr<CombineDrawable> m_ssaoCombineDrawable, m_bloomCombineDrawable;
+    const uint32_t m_ssaoBlurNumPasses, m_bloomBlurNumPasses;
+    const float m_ssaoContribution;
+    const bool m_isBloomEnabled;
 
     friend class RenderWidget;
 };

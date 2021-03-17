@@ -1,3 +1,5 @@
+#include <utils/ray.h>
+
 #include <core/scene.h>
 
 #include "sceneprivate.h"
@@ -21,6 +23,11 @@ PickData Scene::pickScene(int32_t x, int32_t y) const
     return m_->pickScene(x, y);
 }
 
+utils::Ray Scene::throwRay(int32_t x, int32_t y) const
+{
+    return m_->throwRay(x, y);
+}
+
 std::shared_ptr<SceneRootNode> Scene::rootNode()
 {
     return m_->rootNode;
@@ -31,14 +38,26 @@ std::shared_ptr<const SceneRootNode> Scene::rootNode() const
     return m_->rootNode;
 }
 
-std::shared_ptr<Camera> Scene::camera()
+const glm::mat4x4 &Scene::viewMatrix() const
 {
-    return m_->camera;
+    return m_->viewMatrix;
 }
 
-std::shared_ptr<const Camera> Scene::camera() const
+void Scene::setViewMatrix(const glm::mat4x4& m)
 {
-    return m_->camera;
+    m_->viewMatrix = m;
+}
+
+void Scene::setProjectionMatrixAsOrtho(float halfHeight)
+{
+    m_->fov = halfHeight;
+    m_->isPerspectiveProjection = false;
+}
+
+void Scene::setProjectionMatrixAsPerspective(float fov)
+{
+    m_->fov = fov;
+    m_->isPerspectiveProjection = true;
 }
 
 void Scene::attachLight(std::shared_ptr<Light> light)
@@ -50,11 +69,6 @@ bool Scene::detachLight(std::shared_ptr<Light> light)
 {
     return m_->detachLight(light);
 }
-
-//std::shared_ptr<const LightsList> Scene::lights() const
-//{
-//    return m_->lights;
-//}
 
 } // namespace
 } // namespace

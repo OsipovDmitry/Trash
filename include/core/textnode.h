@@ -1,6 +1,8 @@
 #ifndef TEXTNODE_H
 #define TEXTNODE_H
 
+#include <string>
+
 #include <glm/vec4.hpp>
 
 #include <utils/enumclass.h>

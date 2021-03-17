@@ -6,7 +6,6 @@
 #include <core/core.h>
 #include <core/graphicscontroller.h>
 #include <core/scene.h>
-#include <core/camera.h>
 #include <core/modelnode.h>
 #include <core/scenerootnode.h>
 
@@ -32,8 +31,8 @@ void Teeth::doInitialize()
     m_grpahicsScene = std::make_shared<core::Scene>();
     core::Core::instance().graphicsController().setMainScene(m_grpahicsScene);
 
-    m_grpahicsScene->camera()->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.1f);
-    m_grpahicsScene->camera()->setViewMatrix(glm::lookAt(glm::vec3(0.f, 0.f, 3.f), glm::vec3(.0f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f)));
+    m_grpahicsScene->setProjectionMatrixAsPerspective(glm::pi<float>() * 0.1f);
+    m_grpahicsScene->setViewMatrix(glm::lookAt(glm::vec3(0.f, 0.f, 3.f), glm::vec3(.0f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f)));
 
     auto teethNode = std::make_shared<core::ModelNode>("teeth.mdl");
     m_grpahicsScene->rootNode()->attach(teethNode);

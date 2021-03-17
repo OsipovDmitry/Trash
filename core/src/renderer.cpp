@@ -8,8 +8,10 @@
 #include <glm/gtc/matrix_inverse.hpp>
 
 #include <utils/fileinfo.h>
+#include <utils/epsilon.h>
 
 #include <core/core.h>
+#include <core/settings.h>
 
 #include "coreprivate.h"
 #include "renderwidget.h"
@@ -123,6 +125,7 @@ UniformId RenderProgram::uniformIdByName(const std::string& name)
         { "u_viewMatrix", UniformId::ViewMatrix },
         { "u_viewMatrixInverse", UniformId::ViewMatrixInverse },
         { "u_projMatrix", UniformId::ProjMatrix },
+        { "u_projMatrixInverse", UniformId::ProjMatrixInverse },
         { "u_viewProjMatrix", UniformId::ViewProjMatrix },
         { "u_viewProjMatrixInverse", UniformId::ViewProjMatrixInverse },
         { "u_modelViewMatrix", UniformId::ModelViewMatrix },
@@ -138,6 +141,8 @@ UniformId RenderProgram::uniformIdByName(const std::string& name)
         { "u_shadowMaps", UniformId::ShadowMaps },
         { "u_bonesBuffer", UniformId::BonesBuffer },
         { "u_lightsBuffer", UniformId::LightsBuffer },
+        { "u_ssaoSamplesBuffer", UniformId::SSAOSamplesBuffer },
+        { "u_blurKernelBuffer", UniformId::BlurKernelBuffer },
         { "u_color", UniformId::Color },
         { "u_metallicRoughness", UniformId::MetallicRoughness },
         { "u_baseColorMap", UniformId::BaseColorMap },
@@ -150,6 +155,16 @@ UniformId RenderProgram::uniformIdByName(const std::string& name)
         { "u_gBufferMap1", UniformId::GBufferMap1 },
         { "u_gBufferMap2", UniformId::GBufferMap2 },
         { "u_hdrMap", UniformId::HDRMap },
+        { "u_ssaoMap", UniformId::SSAOMap },
+        { "u_ssaoContribution", UniformId::SSAOContribution },
+        { "u_bloomMap", UniformId::BloomMap },
+        { "u_blurSourceMap", UniformId::BlurSourceMap },
+        { "u_blurOffset", UniformId::BlurOffset },
+        { "u_blurLevel", UniformId::BlurLevel },
+        { "u_combineSourceMap0", UniformId::CombineSourceMap0 },
+        { "u_combineSourceMap1", UniformId::CombineSourceMap1 },
+        { "u_combineLevel0", UniformId::CombineLevel0 },
+        { "u_combineLevel1", UniformId::CombineLevel1 },
     };
 
     auto it = s_names.find(name);
@@ -255,7 +270,7 @@ void Texture::setBorderColor(const glm::vec4& value)
     functions.glTexParameterfv(target, GL_TEXTURE_BORDER_COLOR, glm::value_ptr(value));
 }
 
-int32_t Texture::maxMipmapLevel() const
+uint32_t Texture::maxMipmapLevel() const
 {
     auto& functions = Renderer::instance().functions();
 
@@ -264,7 +279,21 @@ int32_t Texture::maxMipmapLevel() const
     GLint res;
     functions.glGetTexParameteriv(target, GL_TEXTURE_MAX_LEVEL, &res);
 
-    return res;
+    return static_cast<uint32_t>(res);
+}
+
+void Texture::setMaxMipmapLevel(uint32_t value)
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glBindTexture(target, id);
+    functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, static_cast<GLint>(value));
+}
+
+void Texture::generateMipmaps()
+{
+    auto& functions = Renderer::instance().functions();
+    functions.glBindTexture(target, id);
+    functions.glGenerateMipmap(target);
 }
 
 Buffer::Buffer(GLsizeiptr size, const GLvoid *data, GLenum usage)
@@ -532,7 +561,7 @@ void Framebuffer::detachDepthStencil()
     depthStencilAttachment = nullptr;
 }
 
-void Framebuffer::attachColor(size_t idx, std::shared_ptr<Texture> texture, uint32_t layer)
+void Framebuffer::attachColor(size_t idx, std::shared_ptr<Texture> texture, uint32_t level, uint32_t layer)
 {
     detachColor(idx);
 
@@ -541,11 +570,11 @@ void Framebuffer::attachColor(size_t idx, std::shared_ptr<Texture> texture, uint
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
 
     if (texture->target == GL_TEXTURE_2D)
-        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + idx, GL_TEXTURE_2D, texture->id, 0);
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + idx, GL_TEXTURE_2D, texture->id, static_cast<GLint>(level));
     else if (texture->target == GL_TEXTURE_CUBE_MAP)
-        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + idx, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, 0);
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + idx, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, static_cast<GLint>(level));
     else if (texture->target == GL_TEXTURE_2D_ARRAY)
-        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + idx, texture->id, 0, static_cast<GLint>(layer));
+        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0 + idx, texture->id, static_cast<GLint>(level), static_cast<GLint>(layer));
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
     colorAttachments[idx] = std::make_shared<RenderTarget>(texture);
@@ -564,7 +593,7 @@ void Framebuffer::attachColor(size_t idx, std::shared_ptr<Renderbuffer> renderbu
     colorAttachments[idx] = std::make_shared<RenderTarget>(renderbuffer);
 }
 
-void Framebuffer::attachDepth(std::shared_ptr<Texture> texture, uint32_t layer)
+void Framebuffer::attachDepth(std::shared_ptr<Texture> texture, uint32_t level, uint32_t layer)
 {
     detachDepth();
     detachDepthStencil();
@@ -574,11 +603,11 @@ void Framebuffer::attachDepth(std::shared_ptr<Texture> texture, uint32_t layer)
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
 
     if (texture->target == GL_TEXTURE_2D)
-        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture->id, 0);
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_2D, texture->id, static_cast<GLint>(level));
     else if (texture->target == GL_TEXTURE_CUBE_MAP)
-        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, 0);
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, static_cast<GLint>(level));
     else if (texture->target == GL_TEXTURE_2D_ARRAY)
-        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture->id, 0, static_cast<GLint>(layer));
+        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_ATTACHMENT, texture->id, static_cast<GLint>(level), static_cast<GLint>(layer));
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
     depthAttachment = std::make_shared<RenderTarget>(texture);
@@ -598,7 +627,7 @@ void Framebuffer::attachDepth(std::shared_ptr<Renderbuffer> renderbuffer)
     depthAttachment = std::make_shared<RenderTarget>(renderbuffer);
 }
 
-void Framebuffer::attachDepthStencil(std::shared_ptr<Texture> texture, uint32_t layer)
+void Framebuffer::attachDepthStencil(std::shared_ptr<Texture> texture, uint32_t level, uint32_t layer)
 {
     detachDepth();
     detachDepthStencil();
@@ -608,11 +637,11 @@ void Framebuffer::attachDepthStencil(std::shared_ptr<Texture> texture, uint32_t 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, id);
 
     if (texture->target == GL_TEXTURE_2D)
-        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texture->id, 0);
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_2D, texture->id, static_cast<GLint>(level));
     else if (texture->target == GL_TEXTURE_CUBE_MAP)
-        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, 0);
+        functions.glFramebufferTexture2D(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, GL_TEXTURE_CUBE_MAP_POSITIVE_X + layer, texture->id, static_cast<GLint>(level));
     else if (texture->target == GL_TEXTURE_2D_ARRAY)
-        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, texture->id, 0, static_cast<GLint>(layer));
+        functions.glFramebufferTextureLayer(GL_FRAMEBUFFER, GL_DEPTH_STENCIL_ATTACHMENT, texture->id, static_cast<GLint>(level), static_cast<GLint>(layer));
 
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
     depthStencilAttachment = std::make_shared<RenderTarget>(texture);
@@ -651,7 +680,7 @@ bool Framebuffer::isComplete() const
     auto res = functions.glCheckFramebufferStatus(GL_FRAMEBUFFER);
     functions.glBindFramebuffer(GL_FRAMEBUFFER, renderer.defaultFbo());
 
-    return res = GL_FRAMEBUFFER_COMPLETE;
+    return res == GL_FRAMEBUFFER_COMPLETE;
 }
 
 Renderer::Renderer(QOpenGLExtraFunctions& functions, GLuint defaultFbo)
@@ -659,18 +688,29 @@ Renderer::Renderer(QOpenGLExtraFunctions& functions, GLuint defaultFbo)
     , m_defaultFbo(defaultFbo)
     , m_resourceStorage(std::make_unique<ResourceStorage>())
     , m_drawData()
+    , m_ssaoBlurNumPasses(Settings::instance().readUint32("Renderer.SSAO.Blur.NumPasses", 1u))
+    , m_ssaoContribution(Settings::instance().readFloat("Renderer.SSAO.Contribution", 1.f))
+    , m_bloomBlurNumPasses(Settings::instance().readUint32("Renderer.Bloom.Blur.NumPasses", 1u))
+    , m_isBloomEnabled(Settings::instance().readBool("Renderer.Bloom.Enabled", true))
 {
 }
 
-void Renderer::initializeResources()
+void Renderer::initialize()
 {
     m_functions.glEnable(GL_TEXTURE_CUBE_MAP_SEAMLESS);
 
-    m_hdrFramebuffer = std::make_shared<Framebuffer>();
-    m_hdrFramebufferSize = glm::uvec2(0u, 0u);
+    m_fullscreenQuad = buildPlaneMesh();
+    m_backgroundDrawable = std::make_shared<BackgroundDrawable>(Settings::instance().readFloat("Renderer.Background.Roughness", 0.05f));
+    m_ssaoDrawable = std::make_shared<SSAODrawable>(Settings::instance().readFloat("Renderer.SSAO.Radius", 1.f), Settings::instance().readUint32("Renderer.SSAO.NumSamples", 8u));
+    m_ssaoBlurDrawable = std::make_shared<BlurDrawable>(Settings::instance().readFloat("Renderer.SSAO.Blur.Sigma", 2.f));
+    m_ssaoCombineDrawable = std::make_shared<CombineDrawable>(CombineType::Add);
+    m_bloomDrawable = std::make_shared<BloomDrawable>();
+    m_bloomBlurDrawable = std::make_shared<BlurDrawable>(Settings::instance().readFloat("Renderer.Bloom.Blur.Sigma", 2.f));
+    m_bloomCombineDrawable = std::make_shared<CombineDrawable>(CombineType::Add);
+    m_postEffectDrawable = std::make_shared<PostEffectDrawable>();
 
-    m_gFramebuffer = std::make_shared<Framebuffer>();
-    m_gFramebufferSize = glm::uvec2(0u, 0u);
+    m_cachedViewportSize = glm::uvec2(1u, 1u);
+    setupViewportSize(m_cachedViewportSize);
 
 //    const float L = 2500;
 //    const float wrap = 14;
@@ -736,6 +776,20 @@ void Renderer::initializeResources()
 
 }
 
+void Renderer::resize(int w, int h)
+{
+    if (m_cachedViewportSize != glm::uvec2(w, h))
+    {
+        m_cachedViewportSize = glm::uvec2(w, h);
+        resizeRenderSurfaces(m_cachedViewportSize);
+    }
+}
+
+const glm::uvec2 &Renderer::viewportSize() const
+{
+    return m_cachedViewportSize;
+}
+
 Renderer &Renderer::instance()
 {
     return Core::instance().m().renderWidget->renderer();
@@ -751,11 +805,11 @@ GLuint Renderer::defaultFbo() const
     return m_defaultFbo;
 }
 
-std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &vertexFile, const std::string &fragmentFile, const std::set<std::string>& defines)
+std::shared_ptr<RenderProgram> Renderer::loadRenderProgram(const std::string &vertexFile, const std::string &fragmentFile, const std::map<std::string, std::string> &defines)
 {
     std::string key = vertexFile+fragmentFile;
     for (const auto& define : defines)
-        key += define;
+        key += define.first + define.second;
 
     auto object = std::dynamic_pointer_cast<RenderProgram>(m_resourceStorage->get(key));
     if (!object)
@@ -965,27 +1019,11 @@ void Renderer::clear()
 
 void Renderer::renderDeffered(const RenderInfo& renderInfo)
 {
-    if (renderInfo.viewportSize() != m_gFramebufferSize)
-    {
-        m_gFramebufferSize = renderInfo.viewportSize();
-        resizeGFramebuffer(m_gFramebufferSize);
-    }
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_gRenderSurface.first->id);
+    setupViewportSize(m_gRenderSurface.second);
 
-    if (renderInfo.viewportSize() != m_hdrFramebufferSize)
-    {
-        m_hdrFramebufferSize = renderInfo.viewportSize();
-        resizeHDRFramebuffer(m_hdrFramebufferSize);
-    }
-
-    m_functions.glViewport(0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y);
-
-    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_gFramebuffer->id);
-
-    static const GLfloat gcolor[4] = {0.5f, 0.5f, 0.5f, 0.0f};
     static const GLfloat gdepth[1] = {1.0f};
     static const GLint gstencil[1] = {0};
-    m_functions.glClearBufferfv(GL_COLOR, 0, gcolor);
-    m_functions.glClearBufferfv(GL_COLOR, 1, gcolor);
     m_functions.glClearBufferfv(GL_DEPTH, 0, gdepth);
     m_functions.glClearBufferiv(GL_STENCIL, 0, gstencil);
 
@@ -1005,33 +1043,58 @@ void Renderer::renderDeffered(const RenderInfo& renderInfo)
         renderMesh(std::get<0>(drawData)->mesh());
     }
 
-    m_functions.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, m_hdrFramebuffer->id);
-    m_functions.glBindFramebuffer(GL_READ_FRAMEBUFFER, m_gFramebuffer->id);
-    m_functions.glBlitFramebuffer(0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y,
-                                  0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y,
-                                  GL_DEPTH_BUFFER_BIT | GL_STENCIL_BUFFER_BIT, GL_NEAREST);
-    m_functions.glBindFramebuffer(GL_DRAW_FRAMEBUFFER, 0);
-    m_functions.glBindFramebuffer(GL_READ_FRAMEBUFFER, 0);
+    if (m_ssaoContribution > utils::epsilon)
+    {
+        m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_ssaoRenderSurface.first->id);
+        setupViewportSize(m_ssaoRenderSurface.second);
+        m_functions.glDisable(GL_BLEND);
+        m_functions.glDisable(GL_STENCIL_TEST);
+        m_functions.glDisable(GL_DEPTH_TEST);
+        m_functions.glDisable(GL_CULL_FACE);
 
-    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_hdrFramebuffer->id);
+        setupUniforms(std::make_tuple(m_ssaoDrawable, utils::Transform(), 0), DrawableRenderProgramId::ForwardRender, renderInfo);
+        renderMesh(m_fullscreenQuad);
+        m_ssaoRenderSurface.first->colorAttachments[0]->texture->generateMipmaps();
+
+        for (uint32_t pass = m_ssaoBlurNumPasses; pass > 0; --pass)
+        {
+            m_ssaoCombineDrawable->setLevel0(pass-1u);
+            m_ssaoCombineDrawable->setLevel1(pass);
+            m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_ssaoCombineRenderSurface[pass-1u].first->id);
+            setupViewportSize(m_ssaoCombineRenderSurface[pass-1u].second);
+            setupUniforms(std::make_tuple(m_ssaoCombineDrawable, utils::Transform(), 0), DrawableRenderProgramId::ForwardRender, renderInfo);
+            renderMesh(m_fullscreenQuad);
+
+            m_ssaoBlurDrawable->setLevel(pass-1u);
+            m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_ssaoBlurRenderSurface[pass-1u].first->id);
+            setupViewportSize(m_ssaoBlurRenderSurface[pass-1u].second);
+            for (auto type : { BlurType::Horizontal, BlurType::Vertical })
+            {
+                const GLenum colorAttachment[] = {GL_COLOR_ATTACHMENT0+castFromBlurType(type)};
+                m_functions.glDrawBuffers(1, colorAttachment);
+                m_ssaoBlurDrawable->setType(type);
+                setupUniforms(std::make_tuple(m_ssaoBlurDrawable, utils::Transform(), 0), DrawableRenderProgramId::ForwardRender, renderInfo);
+                renderMesh(m_fullscreenQuad);
+            }
+        }
+    }
+
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_hdrRenderSurface.first->id);
+    setupViewportSize(m_hdrRenderSurface.second);
 
     static const GLfloat color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
     m_functions.glClearBufferfv(GL_COLOR, 0, color);
 
     m_functions.glDisable(GL_BLEND);
     m_functions.glEnable(GL_STENCIL_TEST);
-    m_functions.glStencilFunc(GL_NOTEQUAL, 1, 0xFF);
+    m_functions.glStencilFunc(GL_EQUAL, 0, 0xFF);
     m_functions.glStencilMask(0x00);
     m_functions.glDisable(GL_DEPTH_TEST);
     m_functions.glDepthMask(GL_TRUE);
-    m_functions.glEnable(GL_CULL_FACE);
-    m_functions.glCullFace(GL_BACK);
+    m_functions.glDisable(GL_CULL_FACE);
 
-    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::Background)])
-    {
-        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
-        renderMesh(std::get<0>(drawData)->mesh());
-    }
+    setupUniforms(std::make_tuple(m_backgroundDrawable, utils::Transform(), 0), DrawableRenderProgramId::ForwardRender, renderInfo);
+    renderMesh(m_fullscreenQuad);
 
     m_functions.glEnable(GL_STENCIL_TEST);
     m_functions.glStencilOpSeparate(GL_BACK, GL_KEEP, GL_INCR_WRAP, GL_KEEP);
@@ -1050,9 +1113,10 @@ void Renderer::renderDeffered(const RenderInfo& renderInfo)
         m_functions.glDisable(GL_CULL_FACE);
         m_functions.glStencilFunc(GL_ALWAYS, 0, 0xFF);
 
-        m_functions.glClear(GL_STENCIL_BUFFER_BIT);
+        static const GLint stencil[1] = {0};
+        m_functions.glClearBufferiv(GL_STENCIL, 0, stencil);
 
-        static GLenum none[] = {GL_NONE};
+        static const GLenum none[] = {GL_NONE};
         m_functions.glDrawBuffers(1, none);
 
         setupUniforms(drawData, DrawableRenderProgramId::DeferredStencilPass, renderInfo);
@@ -1092,7 +1156,7 @@ void Renderer::renderDeffered(const RenderInfo& renderInfo)
 
     m_functions.glDisable(GL_STENCIL_TEST);
     m_functions.glEnable(GL_DEPTH_TEST);
-    m_functions.glDepthMask(GL_TRUE);
+    m_functions.glDepthMask(GL_FALSE);
     m_functions.glEnable(GL_BLEND);
     m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
     for (const auto& drawData : m_drawData[castFromLayerId(LayerId::TransparentGeometry)])
@@ -1104,33 +1168,59 @@ void Renderer::renderDeffered(const RenderInfo& renderInfo)
         renderMesh(std::get<0>(drawData)->mesh());
     }
 
-    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
+    if (m_isBloomEnabled)
+    {
+        m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_bloomRenderSurface.first->id);
+        setupViewportSize(m_bloomRenderSurface.second);
+        m_functions.glDisable(GL_BLEND);
+        m_functions.glDisable(GL_STENCIL_TEST);
+        m_functions.glDisable(GL_DEPTH_TEST);
+        m_functions.glDisable(GL_CULL_FACE);
 
+        setupUniforms(std::make_tuple(m_bloomDrawable, utils::Transform(), 0), DrawableRenderProgramId::ForwardRender, renderInfo);
+        renderMesh(m_fullscreenQuad);
+        m_bloomRenderSurface.first->colorAttachments[0]->texture->generateMipmaps();
+
+        for (uint32_t pass = m_bloomBlurNumPasses; pass > 0; --pass)
+        {
+            m_bloomCombineDrawable->setLevel0(pass-1u);
+            m_bloomCombineDrawable->setLevel1(pass);
+            m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_bloomCombineRenderSurface[pass-1u].first->id);
+            setupViewportSize(m_bloomCombineRenderSurface[pass-1u].second);
+            setupUniforms(std::make_tuple(m_bloomCombineDrawable, utils::Transform(), 0), DrawableRenderProgramId::ForwardRender, renderInfo);
+            renderMesh(m_fullscreenQuad);
+
+            m_bloomBlurDrawable->setLevel(pass-1u);
+            m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_bloomBlurRenderSurface[pass-1u].first->id);
+            setupViewportSize(m_bloomBlurRenderSurface[pass-1u].second);
+            for (auto type : { BlurType::Horizontal, BlurType::Vertical })
+            {
+                const GLenum colorAttachment[] = {GL_COLOR_ATTACHMENT0+castFromBlurType(type)};
+                m_functions.glDrawBuffers(1, colorAttachment);
+                m_bloomBlurDrawable->setType(type);
+                setupUniforms(std::make_tuple(m_bloomBlurDrawable, utils::Transform(), 0), DrawableRenderProgramId::ForwardRender, renderInfo);
+                renderMesh(m_fullscreenQuad);
+            }
+        }
+    }
+
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
+    setupViewportSize(m_cachedViewportSize);
     m_functions.glDisable(GL_STENCIL_TEST);
     m_functions.glDisable(GL_DEPTH_TEST);
     m_functions.glDisable(GL_BLEND);
-    m_functions.glEnable(GL_CULL_FACE);
-    m_functions.glCullFace(GL_BACK);
-    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::PostEffect)])
-    {
-        setupUniforms(drawData, DrawableRenderProgramId::PostEffect, renderInfo);
-        renderMesh(std::get<0>(drawData)->mesh());
-    }
+    m_functions.glDisable(GL_CULL_FACE);
+
+    setupUniforms(std::make_tuple(m_postEffectDrawable, utils::Transform(), 0), DrawableRenderProgramId::PostEffect, renderInfo);
+    renderMesh(m_fullscreenQuad);
 
     m_functions.glBindVertexArray(0);
 }
 
 void Renderer::renderForward(const RenderInfo& renderInfo)
 {
-    if (renderInfo.viewportSize() != m_hdrFramebufferSize)
-    {
-        m_hdrFramebufferSize = renderInfo.viewportSize();
-        resizeHDRFramebuffer(m_hdrFramebufferSize);
-    }
-
-    m_functions.glViewport(0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y);
-
-    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_hdrFramebuffer->id);
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_hdrRenderSurface.first->id);
+    setupViewportSize(m_hdrRenderSurface.second);
 
     static const GLfloat color[4] = {0.0f, 0.0f, 0.0f, 1.0f};
     static const GLfloat depth[1] = {1.0f};
@@ -1145,11 +1235,8 @@ void Renderer::renderForward(const RenderInfo& renderInfo)
     m_functions.glEnable(GL_CULL_FACE);
     m_functions.glCullFace(GL_BACK);
 
-    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::Background)])
-    {
-        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
-        renderMesh(std::get<0>(drawData)->mesh());
-    }
+    setupUniforms(std::make_tuple(m_backgroundDrawable, utils::Transform(), 0), DrawableRenderProgramId::PostEffect, renderInfo);
+    renderMesh(m_fullscreenQuad);
 
     m_functions.glEnable(GL_DEPTH_TEST);
     for (const auto& drawData : m_drawData[castFromLayerId(LayerId::OpaqueGeometry)])
@@ -1182,25 +1269,61 @@ void Renderer::renderForward(const RenderInfo& renderInfo)
         renderMesh(std::get<0>(drawData)->mesh());
     }
 
-    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
+    if (m_isBloomEnabled)
+    {
+        m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_bloomRenderSurface.first->id);
+        setupViewportSize(m_bloomRenderSurface.second);
+        m_functions.glDisable(GL_BLEND);
+        m_functions.glDisable(GL_STENCIL_TEST);
+        m_functions.glDisable(GL_DEPTH_TEST);
+        m_functions.glDisable(GL_CULL_FACE);
 
+        setupUniforms(std::make_tuple(m_bloomDrawable, utils::Transform(), 0), DrawableRenderProgramId::ForwardRender, renderInfo);
+        renderMesh(m_fullscreenQuad);
+        m_bloomRenderSurface.first->colorAttachments[0]->texture->generateMipmaps();
+
+        for (uint32_t pass = m_bloomBlurNumPasses; pass > 0; --pass)
+        {
+            m_bloomCombineDrawable->setLevel0(pass-1u);
+            m_bloomCombineDrawable->setLevel1(pass);
+            m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_bloomCombineRenderSurface[pass-1u].first->id);
+            setupViewportSize(m_bloomCombineRenderSurface[pass-1u].second);
+            setupUniforms(std::make_tuple(m_bloomCombineDrawable, utils::Transform(), 0), DrawableRenderProgramId::ForwardRender, renderInfo);
+            renderMesh(m_fullscreenQuad);
+
+            m_bloomBlurDrawable->setLevel(pass-1u);
+            m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_bloomBlurRenderSurface[pass-1u].first->id);
+            setupViewportSize(m_bloomBlurRenderSurface[pass-1u].second);
+            for (auto type : { BlurType::Horizontal, BlurType::Vertical })
+            {
+                const GLenum colorAttachment[] = {GL_COLOR_ATTACHMENT0+castFromBlurType(type)};
+                m_functions.glDrawBuffers(1, colorAttachment);
+                m_bloomBlurDrawable->setType(type);
+                setupUniforms(std::make_tuple(m_bloomBlurDrawable, utils::Transform(), 0), DrawableRenderProgramId::ForwardRender, renderInfo);
+                renderMesh(m_fullscreenQuad);
+            }
+        }
+    }
+
+    m_functions.glBindFramebuffer(GL_FRAMEBUFFER, m_defaultFbo);
+    setupViewportSize(m_cachedViewportSize);
+    m_functions.glDisable(GL_STENCIL_TEST);
     m_functions.glDisable(GL_DEPTH_TEST);
     m_functions.glDisable(GL_BLEND);
-    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::PostEffect)])
-    {
-        setupUniforms(drawData, DrawableRenderProgramId::PostEffect, renderInfo);
-        renderMesh(std::get<0>(drawData)->mesh());
-    }
+    m_functions.glDisable(GL_CULL_FACE);
+
+    setupUniforms(std::make_tuple(m_postEffectDrawable, utils::Transform(), 0), DrawableRenderProgramId::PostEffect, renderInfo);
+    renderMesh(m_fullscreenQuad);
 
     m_functions.glBindVertexArray(0);
 }
 
-void Renderer::renderShadows(const RenderInfo& renderInfo, std::shared_ptr<Framebuffer> framebuffer)
+void Renderer::renderShadows(const RenderInfo& renderInfo, std::shared_ptr<Framebuffer> framebuffer, const glm::uvec2& shadowMapSize)
 {
     GLuint framebufferId = framebuffer ? framebuffer->id : m_defaultFbo;
     m_functions.glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
 
-    m_functions.glViewport(0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y);
+    setupViewportSize(shadowMapSize);
 
     static const GLfloat depth[1] = {1.0f};
     m_functions.glClearBufferfv(GL_DEPTH, 0, depth);
@@ -1212,7 +1335,7 @@ void Renderer::renderShadows(const RenderInfo& renderInfo, std::shared_ptr<Frame
     m_functions.glEnable(GL_CULL_FACE);
     m_functions.glCullFace(GL_FRONT);
 
-    for (auto layer : {LayerId::OpaqueGeometry, LayerId::TransparentGeometry})
+    for (auto layer : {LayerId::OpaqueGeometry, LayerId::NotLightedGeometry, LayerId::TransparentGeometry})
         for (const auto& drawData : m_drawData.at(castFromLayerId(layer)))
         {
             setupUniforms(drawData, DrawableRenderProgramId::Shadow, renderInfo);
@@ -1222,12 +1345,12 @@ void Renderer::renderShadows(const RenderInfo& renderInfo, std::shared_ptr<Frame
     m_functions.glBindVertexArray(0);
 }
 
-void Renderer::renderIds(const RenderInfo& renderInfo, std::shared_ptr<Framebuffer> framebuffer)
+void Renderer::renderIds(const RenderInfo& renderInfo, std::shared_ptr<Framebuffer> framebuffer, const glm::uvec2& framebufferSize)
 {
     GLuint framebufferId = framebuffer ? framebuffer->id : m_defaultFbo;
     m_functions.glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
 
-    m_functions.glViewport(0, 0, renderInfo.viewportSize().x, renderInfo.viewportSize().y);
+    setupViewportSize(framebufferSize);
 
     static const GLuint color[4] = {0u, 0u, 0u, 0u};
     static const GLfloat depth[1] = {1.0f};
@@ -1242,7 +1365,7 @@ void Renderer::renderIds(const RenderInfo& renderInfo, std::shared_ptr<Framebuff
     m_functions.glEnable(GL_CULL_FACE);
     m_functions.glCullFace(GL_BACK);
 
-    for (auto layer : {LayerId::OpaqueGeometry, LayerId::TransparentGeometry})
+    for (auto layer : {LayerId::OpaqueGeometry, LayerId::NotLightedGeometry, LayerId::TransparentGeometry})
     {
         for (const auto& drawData : m_drawData.at(castFromLayerId(layer)))
         {
@@ -1254,13 +1377,22 @@ void Renderer::renderIds(const RenderInfo& renderInfo, std::shared_ptr<Framebuff
     m_functions.glBindVertexArray(0);
 }
 
-void Renderer::readPixel(const RenderInfo& renderInfo, std::shared_ptr<Framebuffer> framebuffer, GLenum attachment, int xi, int yi, GLenum format, GLenum type, GLvoid *data) const
+void Renderer::readPixel(std::shared_ptr<Framebuffer> framebuffer, GLenum attachment, int xi, int yi, GLenum format, GLenum type, GLvoid *data) const
 {
     GLuint framebufferId = framebuffer ? framebuffer->id : m_defaultFbo;
     m_functions.glBindFramebuffer(GL_FRAMEBUFFER, framebufferId);
 
     m_functions.glReadBuffer(attachment);
-    m_functions.glReadPixels(xi, renderInfo.viewportSize().y - yi - 1, 1, 1, format, type, data);
+    m_functions.glReadPixels(xi, yi, 1, 1, format, type, data);
+}
+
+void Renderer::setupViewportSize(const glm::uvec2& viewportSize)
+{
+    if (m_currentViewportSize != viewportSize)
+    {
+        m_currentViewportSize = viewportSize;
+        m_functions.glViewport(0, 0, m_currentViewportSize.x, m_currentViewportSize.y);
+    }
 }
 
 void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId programId, const RenderInfo& renderInfo)
@@ -1269,6 +1401,9 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
     const utils::Transform& modelTransform = std::get<1>(data);
     glm::mat4x4 modelMatrix = modelTransform.operator glm::mat4x4();
     uint32_t id = std::get<2>(data);
+
+    GLint textureUnit = 0;
+    GLuint uniformBufferIndex = 0;
 
     auto renderProgram = drawable->renderProgram(programId);
     m_functions.glUseProgram(renderProgram->id);
@@ -1307,6 +1442,11 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.projMatrix()));
             break;
         }
+        case UniformId::ProjMatrixInverse:
+        {
+            m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.projMatrixInverse()));
+            break;
+        }
         case UniformId::ViewProjMatrix:
         {
             m_functions.glUniformMatrix4fv(uniform.second, 1, GL_FALSE, glm::value_ptr(renderInfo.viewProjMatrix()));
@@ -1339,19 +1479,19 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
         }
         case UniformId::ViewportSize:
         {
-            m_functions.glUniform2uiv(uniform.second, 1, glm::value_ptr(renderInfo.viewportSize()));
+            m_functions.glUniform2uiv(uniform.second, 1, glm::value_ptr(m_currentViewportSize));
             break;
         }
         case UniformId::IBLDiffuseMap:
         {
-            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::DiffuseIBL));
-            bindTexture(renderInfo.IBLDiffuseMap(), castFromTextureUnit(TextureUnit::DiffuseIBL));
+            m_functions.glUniform1i(uniform.second, textureUnit);
+            bindTexture(renderInfo.IBLDiffuseMap(), textureUnit++);
             break;
         }
         case UniformId::IBLSpecularMap:
         {
-            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::SpecularIBL));
-            bindTexture(renderInfo.IBLSpecularMap(), castFromTextureUnit(TextureUnit::SpecularIBL));
+            m_functions.glUniform1i(uniform.second, textureUnit);
+            bindTexture(renderInfo.IBLSpecularMap(), textureUnit++);
             break;
         }
         case UniformId::IBLSpecularMapMaxMipmapLevel:
@@ -1361,8 +1501,8 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
         }
         case UniformId::BrdfLutMap:
         {
-            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::BrdfLUT));
-            bindTexture(renderInfo.brdfLutMap(), castFromTextureUnit(TextureUnit::BrdfLUT));
+            m_functions.glUniform1i(uniform.second, textureUnit);
+            bindTexture(renderInfo.brdfLutMap(), textureUnit++);
             break;
         }
         case UniformId::IBLContribution:
@@ -1372,8 +1512,8 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
         }
         case UniformId::ShadowMaps:
         {
-            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::ShadowMaps));
-            bindTexture(renderInfo.shadowMaps(), castFromTextureUnit(TextureUnit::ShadowMaps));
+            m_functions.glUniform1i(uniform.second, textureUnit);
+            bindTexture(renderInfo.shadowMaps(), textureUnit++);
             break;
         }
         case UniformId::BonesBuffer:
@@ -1381,15 +1521,35 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Buffer>>>(drawable->uniform(uniform.first));
             if (uniformValue)
             {
-                m_functions.glUniformBlockBinding(renderProgram->id, uniform.second, castFromUniformBufferUnit(UniformBufferUnit::Bones));
-                bindUniformBuffer(uniformValue->get(), castFromUniformBufferUnit(UniformBufferUnit::Bones));
+                m_functions.glUniformBlockBinding(renderProgram->id, uniform.second, uniformBufferIndex);
+                bindUniformBuffer(uniformValue->get(), uniformBufferIndex++);
             }
             break;
         }
         case UniformId::LightsBuffer:
         {
-            m_functions.glUniformBlockBinding(renderProgram->id, uniform.second, castFromUniformBufferUnit(UniformBufferUnit::Lights));
-            bindUniformBuffer(renderInfo.lightsBuffer(), castFromUniformBufferUnit(UniformBufferUnit::Lights));
+            m_functions.glUniformBlockBinding(renderProgram->id, uniform.second, uniformBufferIndex);
+            bindUniformBuffer(renderInfo.lightsBuffer(), uniformBufferIndex++);
+            break;
+        }
+        case UniformId::SSAOSamplesBuffer:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Buffer>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                m_functions.glUniformBlockBinding(renderProgram->id, uniform.second, uniformBufferIndex);
+                bindUniformBuffer(uniformValue->get(), uniformBufferIndex++);
+            }
+            break;
+        }
+        case UniformId::BlurKernelBuffer:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Buffer>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                m_functions.glUniformBlockBinding(renderProgram->id, uniform.second, uniformBufferIndex);
+                bindUniformBuffer(uniformValue->get(), uniformBufferIndex++);
+            }
             break;
         }
         case UniformId::Color:
@@ -1411,8 +1571,8 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
             if (uniformValue)
             {
-                m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::BaseColor));
-                bindTexture(uniformValue->get(), castFromTextureUnit(TextureUnit::BaseColor));
+                m_functions.glUniform1i(uniform.second, textureUnit);
+                bindTexture(uniformValue->get(), textureUnit++);
             }
             break;
         }
@@ -1421,8 +1581,8 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
             if (uniformValue)
             {
-                m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Opacity));
-                bindTexture(uniformValue->get(), castFromTextureUnit(TextureUnit::Opacity));
+                m_functions.glUniform1i(uniform.second, textureUnit);
+                bindTexture(uniformValue->get(), textureUnit++);
             }
             break;
         }
@@ -1431,8 +1591,8 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
             if (uniformValue)
             {
-                m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Normal));
-                bindTexture(uniformValue->get(), castFromTextureUnit(TextureUnit::Normal));
+                m_functions.glUniform1i(uniform.second, textureUnit);
+                bindTexture(uniformValue->get(), textureUnit++);
             }
             break;
         }
@@ -1441,8 +1601,8 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
             if (uniformValue)
             {
-                m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Metallic));
-                bindTexture(uniformValue->get(), castFromTextureUnit(TextureUnit::Metallic));
+                m_functions.glUniform1i(uniform.second, textureUnit);
+                bindTexture(uniformValue->get(), textureUnit++);
             }
             break;
         }
@@ -1451,8 +1611,8 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
             if (uniformValue)
             {
-                m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::Roughness));
-                bindTexture(uniformValue->get(), castFromTextureUnit(TextureUnit::Roughness));
+                m_functions.glUniform1i(uniform.second, textureUnit);
+                bindTexture(uniformValue->get(), textureUnit++);
             }
             break;
         }
@@ -1469,26 +1629,86 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
         }
         case UniformId::GBufferMap0:
         {
-            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::GBuffer0));
-            bindTexture(m_gFramebuffer->depthStencilAttachment->texture, castFromTextureUnit(TextureUnit::GBuffer0));
+            m_functions.glUniform1i(uniform.second, textureUnit);
+            bindTexture(m_gRenderSurface.first->depthStencilAttachment->texture, textureUnit++);
             break;
         }
         case UniformId::GBufferMap1:
         {
-            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::GBuffer1));
-            bindTexture(m_gFramebuffer->colorAttachments[0]->texture, castFromTextureUnit(TextureUnit::GBuffer1));
+            m_functions.glUniform1i(uniform.second, textureUnit);
+            bindTexture(m_gRenderSurface.first->colorAttachments[0]->texture, textureUnit++);
             break;
         }
         case UniformId::GBufferMap2:
         {
-            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::GBuffer2));
-            bindTexture(m_gFramebuffer->colorAttachments[1]->texture, castFromTextureUnit(TextureUnit::GBuffer2));
+            m_functions.glUniform1i(uniform.second, textureUnit);
+            bindTexture(m_gRenderSurface.first->colorAttachments[1]->texture, textureUnit++);
             break;
         }
         case UniformId::HDRMap:
         {
-            m_functions.glUniform1i(uniform.second, castFromTextureUnit(TextureUnit::BaseColor));
-            bindTexture(m_hdrFramebuffer->colorAttachments[0]->texture, castFromTextureUnit(TextureUnit::BaseColor));
+            m_functions.glUniform1i(uniform.second, textureUnit);
+            bindTexture(m_hdrRenderSurface.first->colorAttachments[0]->texture, textureUnit++);
+            break;
+        }
+        case UniformId::SSAOMap:
+        {
+            m_functions.glUniform1i(uniform.second, textureUnit);
+            bindTexture(m_ssaoRenderSurface.first->colorAttachments[0]->texture, textureUnit++);
+            break;
+        }
+        case UniformId::SSAOContribution:
+        {
+            m_functions.glUniform1f(uniform.second, m_ssaoContribution);
+            break;
+        }
+        case UniformId::BloomMap:
+        {
+            m_functions.glUniform1i(uniform.second, textureUnit);
+            bindTexture(m_bloomRenderSurface.first->colorAttachments[0]->texture, textureUnit++);
+            break;
+        }
+        case UniformId::BlurSourceMap:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                m_functions.glUniform1i(uniform.second, textureUnit);
+                bindTexture(uniformValue->get(), textureUnit++);
+            }
+            break;
+        }
+        case UniformId::BlurOffset:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<glm::vec2>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+                m_functions.glUniform2fv(uniform.second, 1, glm::value_ptr(uniformValue->get()));
+            break;
+        }
+        case UniformId::BlurLevel:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<uint32_t>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+                m_functions.glUniform1i(uniform.second, static_cast<int32_t>(uniformValue->get()));
+            break;
+        }
+        case UniformId::CombineSourceMap0:
+        case UniformId::CombineSourceMap1:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<Texture>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+            {
+                m_functions.glUniform1i(uniform.second, textureUnit);
+                bindTexture(uniformValue->get(), textureUnit++);
+            }
+            break;
+        }
+        case UniformId::CombineLevel0:
+        case UniformId::CombineLevel1:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<uint32_t>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+                m_functions.glUniform1i(uniform.second, static_cast<int32_t>(uniformValue->get()));
             break;
         }
         }
@@ -1502,23 +1722,88 @@ void Renderer::renderMesh(std::shared_ptr<Mesh> mesh)
         m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
 }
 
-void Renderer::resizeHDRFramebuffer(const glm::uvec2& sz)
+void Renderer::resizeRenderSurfaces(const glm::uvec2& size)
 {
-    m_hdrFramebuffer = std::make_shared<Framebuffer>();
-    m_hdrFramebuffer->attachDepthStencil(std::make_shared<Renderbuffer>(GL_DEPTH24_STENCIL8, sz.x, sz.y));
-    m_hdrFramebuffer->attachColor(0, createTexture2D(GL_RGBA16F, sz.x, sz.y, 0, 0, nullptr, false));
+    auto depthStencilTexture = createTexture2D(GL_DEPTH24_STENCIL8, size.x, size.y, 0, 0, nullptr, 1u);
+
+    auto gFramebuffer = std::make_shared<Framebuffer>();
+    gFramebuffer->attachDepthStencil(depthStencilTexture, 0u, 0u);
+    gFramebuffer->attachColor(0, createTexture2D(GL_RGBA8, size.x, size.y, 0, 0, nullptr, 1u), 0u, 0u);
+    gFramebuffer->attachColor(1, createTexture2D(GL_RGB10_A2, size.x, size.y, 0, 0, nullptr, 1u), 0u, 0u);
+    gFramebuffer->drawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1});
+    m_gRenderSurface = { gFramebuffer, size };
+
+    auto hdrFramebuffer = std::make_shared<Framebuffer>();
+    hdrFramebuffer->attachDepthStencil(depthStencilTexture, 0u, 0u);
+    hdrFramebuffer->attachColor(0, createTexture2D(GL_RGB16F, size.x, size.y, 0, 0, nullptr, 1u), 0u, 0u);
+    m_hdrRenderSurface = { hdrFramebuffer, size };
+
+    auto ssaoRenderSurfaceSize = glm::max(size / 2u, glm::uvec2(1u, 1u));
+
+    auto ssaoTexture = createTexture2D(GL_R8, ssaoRenderSurfaceSize.x, ssaoRenderSurfaceSize.y, 0, 0, nullptr, m_ssaoBlurNumPasses);
+    ssaoTexture->setWrap(GL_CLAMP_TO_EDGE);
+    auto ssaoFramebuffer = std::make_shared<Framebuffer>();
+    ssaoFramebuffer->attachColor(0, ssaoTexture, 0u, 0u);
+    m_ssaoRenderSurface = { ssaoFramebuffer, ssaoRenderSurfaceSize };
+
+    auto ssaoCombineTexture = createTexture2D(GL_R8, ssaoRenderSurfaceSize.x, ssaoRenderSurfaceSize.y, 0, 0, nullptr, m_ssaoBlurNumPasses);
+    m_ssaoCombineDrawable->setTexture0(ssaoTexture);
+    m_ssaoCombineDrawable->setTexture1(ssaoTexture);
+
+    auto ssaoBlurTempTexture = createTexture2D(GL_R8, ssaoRenderSurfaceSize.x, ssaoRenderSurfaceSize.y, 0, 0, nullptr, m_ssaoBlurNumPasses);
+    ssaoBlurTempTexture->setWrap(GL_CLAMP_TO_EDGE);
+    m_ssaoBlurDrawable->setTextures(ssaoCombineTexture, ssaoBlurTempTexture);
+
+    m_ssaoBlurRenderSurface.resize(m_ssaoBlurNumPasses);
+    m_ssaoCombineRenderSurface.resize(m_ssaoBlurNumPasses);
+    for (uint32_t pass = 0; pass < m_ssaoBlurNumPasses; ++pass)
+    {
+        auto ssaoCombineFramebuffer = std::make_shared<Framebuffer>();
+        ssaoCombineFramebuffer->attachColor(0, ssaoCombineTexture, pass, 0u);
+        m_ssaoCombineRenderSurface[pass] = {ssaoCombineFramebuffer, ssaoRenderSurfaceSize };
+
+        auto ssaoBlurFramebuffer = std::make_shared<Framebuffer>();
+        ssaoBlurFramebuffer->attachColor(0, ssaoBlurTempTexture, pass, 0u);
+        ssaoBlurFramebuffer->attachColor(1, ssaoTexture, pass, 0u);
+        m_ssaoBlurRenderSurface[pass] = { ssaoBlurFramebuffer, ssaoRenderSurfaceSize };
+
+        ssaoRenderSurfaceSize = glm::max(ssaoRenderSurfaceSize / 2u, glm::uvec2(1u, 1u));
+    }
+
+    auto bloomRenderSurfaceSize = glm::max(size / 2u, glm::uvec2(1u, 1u));
+
+    auto bloomTexture = createTexture2D(GL_RGB16F, bloomRenderSurfaceSize.x, bloomRenderSurfaceSize.y, 0, 0, nullptr, m_bloomBlurNumPasses+1);
+    bloomTexture->setWrap(GL_CLAMP_TO_EDGE);
+    auto bloomFramebuffer = std::make_shared<Framebuffer>();
+    bloomFramebuffer->attachColor(0, bloomTexture, 0u, 0u);
+    m_bloomRenderSurface = { bloomFramebuffer, bloomRenderSurfaceSize };
+
+    auto bloomCombineTexture = createTexture2D(GL_RGB16F, bloomRenderSurfaceSize.x, bloomRenderSurfaceSize.y, 0, 0, nullptr, m_bloomBlurNumPasses);
+    m_bloomCombineDrawable->setTexture0(bloomTexture);
+    m_bloomCombineDrawable->setTexture1(bloomTexture);
+
+    auto bloomBlurTempTexture = createTexture2D(GL_RGB16F, bloomRenderSurfaceSize.x, bloomRenderSurfaceSize.y, 0, 0, nullptr, m_bloomBlurNumPasses);
+    bloomBlurTempTexture->setWrap(GL_CLAMP_TO_EDGE);
+    m_bloomBlurDrawable->setTextures(bloomCombineTexture, bloomBlurTempTexture);
+
+    m_bloomBlurRenderSurface.resize(m_bloomBlurNumPasses);
+    m_bloomCombineRenderSurface.resize(m_bloomBlurNumPasses);
+    for (uint32_t pass = 0; pass < m_bloomBlurNumPasses; ++pass)
+    {
+        auto bloomCombineFramebuffer = std::make_shared<Framebuffer>();
+        bloomCombineFramebuffer->attachColor(0, bloomCombineTexture, pass, 0u);
+        m_bloomCombineRenderSurface[pass] = {bloomCombineFramebuffer, bloomRenderSurfaceSize };
+
+        auto bloomBlurFramebuffer = std::make_shared<Framebuffer>();
+        bloomBlurFramebuffer->attachColor(0, bloomBlurTempTexture, pass, 0u);
+        bloomBlurFramebuffer->attachColor(1, bloomTexture, pass, 0u);
+        m_bloomBlurRenderSurface[pass] = {bloomBlurFramebuffer, bloomRenderSurfaceSize };
+
+        bloomRenderSurfaceSize = glm::max(bloomRenderSurfaceSize / 2u, glm::uvec2(1u, 1u));
+    }
 }
 
-void Renderer::resizeGFramebuffer(const glm::uvec2& sz)
-{
-    m_gFramebuffer = std::make_shared<Framebuffer>();
-    m_gFramebuffer->attachDepthStencil(createTexture2D(GL_DEPTH24_STENCIL8, sz.x, sz.y, 0, 0, nullptr, false));
-    m_gFramebuffer->attachColor(0, createTexture2D(GL_RGBA8, sz.x, sz.y, 0, 0, nullptr, false));
-    m_gFramebuffer->attachColor(1, createTexture2D(GL_RGB10_A2, sz.x, sz.y, 0, 0, nullptr, false));
-    m_gFramebuffer->drawBuffers({GL_COLOR_ATTACHMENT0, GL_COLOR_ATTACHMENT1});
-}
-
-std::string Renderer::precompileShader(const QString &dir, QByteArray &text, const std::set<std::string>& defines)
+std::string Renderer::precompileShader(const QString &dir, QByteArray &text, const std::map<std::string, std::string>& defines)
 {
     static const QString versionString = "#version 330 core";
     static const QString includeString = "#include<";
@@ -1558,7 +1843,9 @@ std::string Renderer::precompileShader(const QString &dir, QByteArray &text, con
 
     // add defines
     for (const auto& define : defines)
-        text.prepend(QByteArray::fromStdString("#define " + define + "\n"));
+    {
+        text.prepend(QByteArray::fromStdString("#define " + define.first + " (" + define.second + ")\n"));
+    }
 
     // add version string
     text.prepend((versionString + "\n").toUtf8());
@@ -1567,10 +1854,9 @@ std::string Renderer::precompileShader(const QString &dir, QByteArray &text, con
     return "";
 }
 
-RenderInfo::RenderInfo(const glm::mat4x4& vm, const glm::mat4x4& pm, const glm::uvec2& vs)
+RenderInfo::RenderInfo(const glm::mat4x4& vm, const glm::mat4x4& pm)
     : m_viewMatrix(vm)
     , m_projMatrix(pm)
-    , m_viewportSize(vs)
     , m_lightsBuffer(nullptr)
     , m_shadowMaps(nullptr)
     , m_IBLDiffuseMap(nullptr)
@@ -1578,6 +1864,7 @@ RenderInfo::RenderInfo(const glm::mat4x4& vm, const glm::mat4x4& pm, const glm::
     , m_maxIBLSpecularMapMipmapLevel(0)
     , m_IBLContribution(0.2f)
 {
+    m_projMatrixInverse = glm::inverse(m_projMatrix);
     m_viewMatrixInverse = glm::inverse(m_viewMatrix);
     m_viewProjMatrix = m_projMatrix * m_viewMatrix;
     m_viewProjMatrixInverse = glm::inverse(m_viewProjMatrix);

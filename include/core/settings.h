@@ -2,6 +2,7 @@
 #define SETTINGS_H
 
 #include <memory>
+#include <string>
 
 #include <utils/noncopyble.h>
 #include <utils/singletoon.h>

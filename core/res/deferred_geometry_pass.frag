@@ -19,7 +19,6 @@ uniform sampler2D u_metallicMap;
 uniform sampler2D u_roughnessMap;
 #endif
 
-
 in vec3 v_normal;
 
 #ifdef HAS_TEXCOORDS
@@ -48,6 +47,10 @@ void main(void)
     baseColor *= toLinearRGB(texture(u_baseColorMap, v_texCoord).rgb);
 #endif
 
+    float intensity = max(max(baseColor.r, baseColor.g), max(baseColor.b, 1.0));
+    baseColor /= intensity;
+    intensity = clamp((intensity - 1.0) / 1023.0, 0.0, 1.0);
+
     float metallic = u_metallicRoughness.x;
 #if defined(HAS_TEXCOORDS) && defined(HAS_METALLICMAPPING)
     metallic *= texture(u_metallicMap, v_texCoord).r;
@@ -66,5 +69,5 @@ void main(void)
 #endif
 
     fragColor1 = vec4(baseColor, roughness);
-    fragColor2 = vec4(N.xy * 0.5 + vec2(0.5), 0.0, metallic);
+    fragColor2 = vec4(N.xy * 0.5 + vec2(0.5), intensity, metallic);
 }

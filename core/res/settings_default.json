@@ -6,7 +6,7 @@
         },
         "Shadow": {
             "ShadowMapSize": 512,
-            "MinZNear": 1.0
+            "MinZNear": 0.05
         },
         "Background": {
             "Roughness": 0.15
@@ -16,6 +16,24 @@
             "SpecularMap": "textures/ibl/specular/specular.json",
             "BrdfLutMap": "textures/ibl/brdf/brdf_lut.json",
             "Contribution": 0.4
+        },
+        "SSAO": {
+            "Contribution": 1.0,
+            "Radius": 0.5,
+            "NumSamples": 16,
+            "Blur":
+            {
+                "Sigma": 1.5,
+                "NumPasses": 3
+            }
+        },
+        "Bloom": {
+            "Enabled": true,
+            "Blur":
+            {
+                "Sigma": 3.0,
+                "NumPasses": 1
+            }
         }
     }
 }

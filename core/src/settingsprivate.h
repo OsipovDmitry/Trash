@@ -1,6 +1,8 @@
 #ifndef SETTINGSPRIVATE_H
 #define SETTINGSPRIVATE_H
 
+#include <string>
+
 #include "rapidjson/document.h"
 
 namespace trash

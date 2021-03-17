@@ -26,5 +26,13 @@
         <file>res/posteffect.vert</file>
         <file>res/posteffect_final.frag</file>
         <file>res/settings_default.json</file>
+        <file>res/ssao.frag</file>
+        <file>res/ssao.vert</file>
+        <file>res/blur.frag</file>
+        <file>res/blur.vert</file>
+        <file>res/bloom.frag</file>
+        <file>res/bloom.vert</file>
+        <file>res/combine.frag</file>
+        <file>res/combine.vert</file>
     </qresource>
 </RCC>

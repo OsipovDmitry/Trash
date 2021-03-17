@@ -1,4 +1,5 @@
 #include <memory>
+#include <unordered_map>
 
 #include <QtCore/QFile>
 #include <QtGui/QOpenGLExtraFunctions>
@@ -6,7 +7,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include <utils/fileinfo.h>
-#include <utils/textureformats.h>
 
 #include "renderer.h"
 #include "image.h"
@@ -18,6 +18,79 @@ namespace trash
 {
 namespace core
 {
+
+bool Texture::stringToInternalFormat(const std::string& str, GLenum& internalFormat)
+{
+    static const std::unordered_map<std::string, GLenum> s_table {
+        {"GL_R8", GL_R8},
+        {"GL_RG8", GL_RG8},
+        {"GL_RGB8", GL_RGB8},
+        {"GL_RGBA8", GL_RGBA8},
+        {"GL_RGB16F", GL_RGB16F},
+        {"GL_RGB32F", GL_RGB32F},
+        {"GL_RGB9_E5", GL_RGB9_E5},
+    };
+
+    auto it = s_table.find(str);
+
+    if (it == s_table.end())
+        return false;
+
+    internalFormat = it->second;
+    return true;
+}
+
+bool Texture::formatAndTypeToInternalFormat(GLenum format, GLenum type, GLenum& internalFormat)
+{
+    switch (format)
+    {
+    case GL_RGB:
+    case GL_BGR:
+    {
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE: { internalFormat = GL_RGB8; return true; }
+        case GL_HALF_FLOAT:
+        case GL_FLOAT: { internalFormat = GL_RGB16F; return true; }
+        default: break;
+        }
+        break;
+    }
+    case GL_RGBA:
+    case GL_BGRA:
+    {
+        switch (type)
+        {
+        case GL_UNSIGNED_BYTE: { internalFormat = GL_RGBA8; return true; }
+        case GL_HALF_FLOAT:
+        case GL_FLOAT: { internalFormat = GL_RGBA16F; return true; }
+        default: break;
+        }
+        break;
+    }
+
+    }
+
+    return false;
+}
+
+bool Texture::stringToWrap(const std::string& str, GLenum& wrap)
+{
+    static const std::unordered_map<std::string, GLenum> s_table {
+        {"GL_CLAMP_TO_EDGE", GL_CLAMP_TO_EDGE},
+        {"GL_CLAMP_TO_BORDER", GL_CLAMP_TO_BORDER},
+        {"GL_MIRRORED_REPEAT", GL_MIRRORED_REPEAT},
+        {"GL_REPEAT", GL_REPEAT}
+    };
+
+    auto it = s_table.find(str);
+
+    if (it == s_table.end())
+        return false;
+
+    wrap = it->second;
+    return true;
+}
 
 std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
 {
@@ -112,12 +185,12 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
             GLenum internalFormat;
             if (document.HasMember("InternalFormat"))
             {
-                if (!utils::stringToInternalFormat(document["InternalFormat"].GetString(), internalFormat))
+                if (!Texture::stringToInternalFormat(document["InternalFormat"].GetString(), internalFormat))
                     return nullptr;
             }
             else
             {
-                if (!utils::formatAndTypeToInternalFormat(images[0]->format(), images[0]->type(), internalFormat))
+                if (!Texture::formatAndTypeToInternalFormat(images[0]->format(), images[0]->type(), internalFormat))
                     return nullptr;
             }
 
@@ -168,7 +241,7 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
             if (document.HasMember("Wrap"))
             {
                 GLenum wrap;
-                if (!utils::stringToWrap(document["Wrap"].GetString(), wrap))
+                if (!Texture::stringToWrap(document["Wrap"].GetString(), wrap))
                     return nullptr;
                 object->setWrap(wrap);
             }
@@ -181,7 +254,7 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
                 return nullptr;
 
             GLenum internalFormat;
-            if (!utils::formatAndTypeToInternalFormat(image->format(), image->type(), internalFormat))
+            if (!Texture::formatAndTypeToInternalFormat(image->format(), image->type(), internalFormat))
                 return nullptr;
 
             int32_t numMipmaps = numberOfMipmaps(image->width(), image->height());
@@ -208,17 +281,16 @@ std::shared_ptr<Texture> Renderer::createTexture2D(GLenum internalFormat,
                                                    GLenum format,
                                                    GLenum type,
                                                    const void *data,
-                                                   bool genMipmaps,
+                                                   uint32_t numMipmaps, // caclulate automatically if it's 0
                                                    const std::string &resourceName)
 {
     auto object = std::dynamic_pointer_cast<Texture>(m_resourceStorage->get(resourceName));
     if (!object)
     {
-        int32_t numMipmaps = 1;
-        if (genMipmaps)
-            numMipmaps = numberOfMipmaps(width, height);
-
         int32_t filter = 1;
+
+        if (numMipmaps == 0)
+            numMipmaps = numberOfMipmaps(width, height);
 
         GLuint id;
         m_functions.glGenTextures(1, &id);
@@ -232,7 +304,7 @@ std::shared_ptr<Texture> Renderer::createTexture2D(GLenum internalFormat,
             filter = 2;
         }
 
-        if (genMipmaps)
+        if (numMipmaps > 1)
         {
             m_functions.glGenerateMipmap(GL_TEXTURE_2D);
             filter = 3;

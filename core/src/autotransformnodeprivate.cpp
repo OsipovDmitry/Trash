@@ -1,7 +1,6 @@
 #include <glm/gtc/quaternion.hpp>
 
 #include <core/scene.h>
-#include <core/camera.h>
 #include <core/node.h>
 
 #include "autotransformnodeprivate.h"
@@ -25,7 +24,7 @@ void AutoTransformNodePrivate::doUpdate(uint64_t dt, uint64_t time)
     if (scene)
     {
         auto thisTransform = thisNode.transform();
-        thisTransform.rotation = glm::inverse(glm::quat(glm::mat3x3(scene->camera()->viewMatrix())) * thisNode.parent()->globalTransform().rotation);
+        thisTransform.rotation = glm::inverse(glm::quat(glm::mat3x3(scene->viewMatrix())) * thisNode.parent()->globalTransform().rotation);
         thisNode.setTransform(thisTransform);
     }
 }
