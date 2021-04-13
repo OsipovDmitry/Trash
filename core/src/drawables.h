@@ -37,6 +37,21 @@ public:
     virtual void dirtyCache() {}
 };
 
+class ParticleSystemDrawable : public Drawable
+{
+public:
+    ParticleSystemDrawable(std::shared_ptr<Mesh>);
+
+    LayerId layerId() const override;
+    std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
+    std::shared_ptr<Mesh> mesh() const override;
+    //std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
+
+protected:
+    std::shared_ptr<Mesh> m_mesh;
+    mutable std::shared_ptr<RenderProgram> m_renderProgram;
+};
+
 class StandardDrawable : public Drawable
 {
 public:

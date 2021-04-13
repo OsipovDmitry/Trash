@@ -162,9 +162,9 @@ void DrawableNodePrivate::doRender(uint32_t id)
     //renderer.draw(std::make_shared<BoxDrawable>(getLocalBoundingBox(), glm::vec4(.0f, .8f, .0f, 1.0f)), getGlobalTransform());
 }
 
-void DrawableNodePrivate::doUpdate(uint64_t dt, uint64_t time)
+void DrawableNodePrivate::doUpdate(uint64_t time, uint64_t dt)
 {
-    NodePrivate::doUpdate(dt, time);
+    NodePrivate::doUpdate(time, dt);
     doUpdateLightIndices();
 }
 

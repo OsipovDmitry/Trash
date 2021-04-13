@@ -1,4 +1,5 @@
 #include <array>
+#include <functional>
 
 #include <QtGui/QOpenGLExtraFunctions>
 #include <QtGui/QOpenGLFramebufferObject>
@@ -6,6 +7,7 @@
 
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtc/matrix_inverse.hpp>
+#include <glm/gtx/norm.hpp>
 
 #include <utils/fileinfo.h>
 #include <utils/epsilon.h>
@@ -132,6 +134,9 @@ UniformId RenderProgram::uniformIdByName(const std::string& name)
         { "u_normalViewMatrix", UniformId::NormalViewMatrix },
         { "u_modelViewProjMatrix", UniformId::ModelViewProjMatrix },
         { "u_viewPosition", UniformId::ViewPosition },
+        { "u_viewXDirection", UniformId::ViewXDirection },
+        { "u_viewYDirection", UniformId::ViewYDirection },
+        { "u_viewZDirection", UniformId::ViewZDirection },
         { "u_viewportSize", UniformId::ViewportSize },
         { "u_diffuseIBLMap", UniformId::IBLDiffuseMap },
         { "u_specularIBLMap", UniformId::IBLSpecularMap },
@@ -388,6 +393,7 @@ IndexBuffer::IndexBuffer(GLenum primitiveType_, uint32_t numIndices_, const uint
 }
 
 Mesh::Mesh()
+    : numInstances(1u)
 {
     Renderer::instance().functions().glGenVertexArrays(1, &id);
 }
@@ -397,7 +403,7 @@ Mesh::~Mesh()
     Renderer::instance().functions().glDeleteVertexArrays(1, &id);
 }
 
-void Mesh::declareVertexAttribute(VertexAttribute attrib, std::shared_ptr<VertexBuffer> vb)
+void Mesh::declareVertexAttribute(VertexAttribute attrib, std::shared_ptr<VertexBuffer> vb, uint32_t divisor)
 {
     auto& functions = Renderer::instance().functions();
 
@@ -405,18 +411,16 @@ void Mesh::declareVertexAttribute(VertexAttribute attrib, std::shared_ptr<Vertex
     functions.glBindBuffer(GL_ARRAY_BUFFER, vb->id);
     functions.glVertexAttribPointer(castFromVertexAttribute(attrib), static_cast<GLint>(vb->numComponents), GL_FLOAT, GL_FALSE, 0, nullptr);
     functions.glEnableVertexAttribArray(castFromVertexAttribute(attrib));
+    if (divisor)
+        functions.glVertexAttribDivisor(castFromVertexAttribute(attrib), divisor);
     functions.glBindVertexArray(0);
 
     attributesDeclaration[attrib] = vb;
 
     if (attrib == VertexAttribute::Position)
     {
-        assert(vb->numComponents == 2 || vb->numComponents == 3);
         auto *p = vb->map(0, vb->numVertices * vb->numComponents * sizeof(float), GL_MAP_READ_BIT);
-        if (vb->numComponents == 3)
-            boundingBox = utils::BoundingBox(static_cast<glm::vec3*>(p), vb->numVertices);
-        else if (vb->numComponents == 2)
-            boundingBox = utils::BoundingBox(static_cast<glm::vec2*>(p), vb->numVertices);
+        boundingBox = utils::BoundingBox(static_cast<float*>(p), vb->numVertices, vb->numComponents);
         vb->unmap();
     }
 }
@@ -1146,26 +1150,43 @@ void Renderer::renderDeffered(const RenderInfo& renderInfo)
         renderMesh(std::get<0>(drawData)->mesh());
     }
 
-    DrawDataLayerContainer& transparentLayer = m_drawData[castFromLayerId(LayerId::TransparentGeometry)];
-    std::sort(transparentLayer.begin(), transparentLayer.end(), [&renderInfo](const DrawDataLayerContainer::value_type& first, const DrawDataLayerContainer::value_type& second) -> bool
-    {
-        const glm::vec3 v1 = std::get<1>(first).translation - renderInfo.viewPosition();
-        const glm::vec3 v2 = std::get<1>(second).translation - renderInfo.viewPosition();
-        return glm::dot(v1,v1) > glm::dot(v2,v2);
-    });
+    using DistaceToDrawable = std::pair<float, std::reference_wrapper<const DrawDataType>>;
+    std::deque<DistaceToDrawable> transparentDrawablesRefs;
+    for (const auto& layer : { &m_drawData[castFromLayerId(LayerId::TransparentGeometry)], &m_drawData[castFromLayerId(LayerId::Particles)] })
+        for (const auto& drawable : *layer)
+            transparentDrawablesRefs.push_back({glm::length2(std::get<1>(drawable).translation - renderInfo.viewPosition()), std::cref(drawable)});
+
+    static const auto transparentDrawablesComparator = [](const DistaceToDrawable& v1, const DistaceToDrawable& v2) {
+        return v1.first > v2.first;
+    };
+    std::sort(transparentDrawablesRefs.begin(), transparentDrawablesRefs.end(), transparentDrawablesComparator);
 
     m_functions.glDisable(GL_STENCIL_TEST);
     m_functions.glEnable(GL_DEPTH_TEST);
     m_functions.glDepthMask(GL_FALSE);
     m_functions.glEnable(GL_BLEND);
-    m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::TransparentGeometry)])
+    for (const auto& drawDataRef: transparentDrawablesRefs)
     {
-        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
-        m_functions.glCullFace(GL_FRONT);
-        renderMesh(std::get<0>(drawData)->mesh());
-        m_functions.glCullFace(GL_BACK);
-        renderMesh(std::get<0>(drawData)->mesh());
+        const auto& drawData = drawDataRef.second.get();
+        auto drawable = std::get<0>(drawData);
+        auto layerId = drawable->layerId();
+
+        if (layerId == LayerId::TransparentGeometry)
+        {
+            m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+            m_functions.glCullFace(GL_FRONT);
+            renderMesh(drawable->mesh());
+            m_functions.glCullFace(GL_BACK);
+            renderMesh(drawable->mesh());
+        }
+        else if (layerId == LayerId::Particles)
+        {
+            m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+            setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+            m_functions.glCullFace(GL_BACK);
+            renderMesh(drawable->mesh());
+        }
     }
 
     if (m_isBloomEnabled)
@@ -1250,23 +1271,43 @@ void Renderer::renderForward(const RenderInfo& renderInfo)
         renderMesh(std::get<0>(drawData)->mesh());
     }
 
-    DrawDataLayerContainer& transparentLayer = m_drawData[castFromLayerId(LayerId::TransparentGeometry)];
-    std::sort(transparentLayer.begin(), transparentLayer.end(), [&renderInfo](const DrawDataLayerContainer::value_type& first, const DrawDataLayerContainer::value_type& second) -> bool
-    {
-        const glm::vec3 v1 = std::get<1>(first).translation - renderInfo.viewPosition();
-        const glm::vec3 v2 = std::get<1>(second).translation - renderInfo.viewPosition();
-        return glm::dot(v1,v1) > glm::dot(v2,v2);
-    });
+    using DistaceToDrawable = std::pair<float, std::reference_wrapper<const DrawDataType>>;
+    std::deque<DistaceToDrawable> transparentDrawablesRefs;
+    for (const auto& layer : { &m_drawData[castFromLayerId(LayerId::TransparentGeometry)], &m_drawData[castFromLayerId(LayerId::Particles)] })
+        for (const auto& drawable : *layer)
+            transparentDrawablesRefs.push_back({glm::length2(std::get<1>(drawable).translation - renderInfo.viewPosition()), std::cref(drawable)});
 
+    static const auto transparentDrawablesComparator = [](const DistaceToDrawable& v1, const DistaceToDrawable& v2) {
+        return v1.first > v2.first;
+    };
+    std::sort(transparentDrawablesRefs.begin(), transparentDrawablesRefs.end(), transparentDrawablesComparator);
+
+    m_functions.glDisable(GL_STENCIL_TEST);
+    m_functions.glEnable(GL_DEPTH_TEST);
+    m_functions.glDepthMask(GL_FALSE);
     m_functions.glEnable(GL_BLEND);
-    m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-    for (const auto& drawData : m_drawData[castFromLayerId(LayerId::TransparentGeometry)])
+    for (const auto& drawDataRef: transparentDrawablesRefs)
     {
-        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
-        m_functions.glCullFace(GL_FRONT);
-        renderMesh(std::get<0>(drawData)->mesh());
-        m_functions.glCullFace(GL_BACK);
-        renderMesh(std::get<0>(drawData)->mesh());
+        const auto& drawData = drawDataRef.second.get();
+        auto drawable = std::get<0>(drawData);
+        auto layerId = drawable->layerId();
+
+        if (layerId == LayerId::TransparentGeometry)
+        {
+            m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+            setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+            m_functions.glCullFace(GL_FRONT);
+            renderMesh(drawable->mesh());
+            m_functions.glCullFace(GL_BACK);
+            renderMesh(drawable->mesh());
+        }
+        else if (layerId == LayerId::Particles)
+        {
+            m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE);
+            setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+            m_functions.glCullFace(GL_BACK);
+            renderMesh(drawable->mesh());
+        }
     }
 
     if (m_isBloomEnabled)
@@ -1475,6 +1516,21 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
         case UniformId::ViewPosition:
         {
             m_functions.glUniform3fv(uniform.second, 1, glm::value_ptr(renderInfo.viewPosition()));
+            break;
+        }
+        case UniformId::ViewXDirection:
+        {
+            m_functions.glUniform3fv(uniform.second, 1, glm::value_ptr(renderInfo.viewXDirection()));
+            break;
+        }
+        case UniformId::ViewYDirection:
+        {
+            m_functions.glUniform3fv(uniform.second, 1, glm::value_ptr(renderInfo.viewYDirection()));
+            break;
+        }
+        case UniformId::ViewZDirection:
+        {
+            m_functions.glUniform3fv(uniform.second, 1, glm::value_ptr(renderInfo.viewZDirection()));
             break;
         }
         case UniformId::ViewportSize:
@@ -1719,7 +1775,7 @@ void Renderer::renderMesh(std::shared_ptr<Mesh> mesh)
 {
     m_functions.glBindVertexArray(mesh->id);
     for (auto ibo : mesh->indexBuffers)
-        m_functions.glDrawElements(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr);
+        m_functions.glDrawElementsInstanced(ibo->primitiveType, ibo->numIndices, GL_UNSIGNED_INT, nullptr, static_cast<GLsizei>(mesh->numInstances));
 }
 
 void Renderer::resizeRenderSurfaces(const glm::uvec2& size)
@@ -1869,6 +1925,9 @@ RenderInfo::RenderInfo(const glm::mat4x4& vm, const glm::mat4x4& pm)
     m_viewProjMatrix = m_projMatrix * m_viewMatrix;
     m_viewProjMatrixInverse = glm::inverse(m_viewProjMatrix);
     m_viewPosition = glm::vec3(m_viewMatrixInverse * glm::vec4(0.f, 0.f, 0.f, 1.f));
+    m_viewXDirection = glm::vec3(m_viewMatrixInverse * glm::vec4(1.f, 0.f, 0.f, 0.f));
+    m_viewYDirection = glm::vec3(m_viewMatrixInverse * glm::vec4(0.f, 1.f, 0.f, 0.f));
+    m_viewZDirection = glm::vec3(m_viewMatrixInverse * glm::vec4(0.f, 0.f, 1.f, 0.f));
 }
 
 } // namespace

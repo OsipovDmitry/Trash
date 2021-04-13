@@ -22,6 +22,7 @@ class TextNode;
 class ModelNode;
 class TeapotNode;
 class PrimitiveNode;
+class ParticleSystemNode;
 class Camera;
 class Scene;
 class Light;

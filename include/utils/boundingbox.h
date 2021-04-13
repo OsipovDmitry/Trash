@@ -25,19 +25,19 @@ struct BoundingBox
 
     BoundingBox() : minPoint(FLT_MAX, FLT_MAX, FLT_MAX), maxPoint(-FLT_MAX, -FLT_MAX, -FLT_MAX) {}
     BoundingBox(const glm::vec3& minP, const glm::vec3& maxP) : minPoint(minP), maxPoint(maxP) {}
-    BoundingBox(glm::vec3 *p, size_t nv) : minPoint(FLT_MAX, FLT_MAX, FLT_MAX), maxPoint(-FLT_MAX, -FLT_MAX, -FLT_MAX) {
-        if (nv > 0) minPoint = maxPoint = p[0];
+    BoundingBox(float *p, uint32_t nv, uint32_t nc) : minPoint(std::numeric_limits<float>::max()), maxPoint(-std::numeric_limits<float>::max()) {
+        const uint32_t stride = nc;
+        nc = glm::min(nc, 3u);
+        if (nv > 0) {
+            minPoint = maxPoint = glm::vec3(0.0f);
+            for (size_t i = 0; i < nc; ++i) minPoint[i] = maxPoint[i] = p[stride*0 + i];
+        }
         for (size_t i = 1; i < nv; ++i)
-            for (size_t k = 0; k < 3; ++k)
-                if (p[i][k] < minPoint[k]) minPoint[k] = p[i][k];
-                else if (p[i][k] > maxPoint[k]) maxPoint[k] = p[i][k];
-    }
-    BoundingBox(glm::vec2 *p, size_t nv) : minPoint(FLT_MAX, FLT_MAX, FLT_MAX), maxPoint(-FLT_MAX, -FLT_MAX, -FLT_MAX) {
-        if (nv > 0) minPoint = maxPoint = glm::vec3(p[0], 0.0f);
-        for (size_t i = 1; i < nv; ++i)
-            for (size_t k = 0; k < 2; ++k)
-                if (p[i][k] < minPoint[k]) minPoint[k] = p[i][k];
-                else if (p[i][k] > maxPoint[k]) maxPoint[k] = p[i][k];
+            for (size_t k = 0; k < nc; ++k) {
+                const size_t idx = i*stride+k;
+                if (p[idx] < minPoint[k]) minPoint[k] = p[idx];
+                else if (p[idx] > maxPoint[k]) maxPoint[k] = p[idx];
+            }
     }
 
     bool empty() const {

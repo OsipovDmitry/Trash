@@ -11,6 +11,7 @@ namespace core
 {
 
 const std::pair<std::string, std::string> standardRenderProgramName { ":/res/standard.vert", ":/res/standard.frag" };
+const std::pair<std::string, std::string> particlesRenderProgramName { ":/res/particles.vert", ":/res/particles.frag" };
 const std::pair<std::string, std::string> shadowRenderProgramName { ":/res/shadow.vert", ":/res/shadow.frag" };
 const std::pair<std::string, std::string> idRenderProgramName { ":/res/id.vert", ":/res/id.frag" };
 const std::pair<std::string, std::string> deferredGeometryPassRenderProgramName { ":/res/deferred_geometry_pass.vert", ":/res/deferred_geometry_pass.frag" };

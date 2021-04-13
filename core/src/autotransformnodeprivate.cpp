@@ -16,9 +16,9 @@ AutoTransformNodePrivate::AutoTransformNodePrivate(Node& node)
 
 }
 
-void AutoTransformNodePrivate::doUpdate(uint64_t dt, uint64_t time)
+void AutoTransformNodePrivate::doUpdate(uint64_t time, uint64_t dt)
 {
-    NodePrivate::doUpdate(dt, time);
+    NodePrivate::doUpdate(time, dt);
 
     auto scene = getScene();
     if (scene)

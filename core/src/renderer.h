@@ -144,11 +144,12 @@ struct Mesh
     std::unordered_map<VertexAttribute, std::shared_ptr<VertexBuffer>> attributesDeclaration;
     std::unordered_set<std::shared_ptr<IndexBuffer>> indexBuffers;
     utils::BoundingBox boundingBox;
+    uint32_t numInstances;
 
     Mesh();
     ~Mesh();
 
-    void declareVertexAttribute(VertexAttribute, std::shared_ptr<VertexBuffer>);
+    void declareVertexAttribute(VertexAttribute, std::shared_ptr<VertexBuffer>, uint32_t = 0);
     void undeclareVertexAttribute(VertexAttribute);
     std::shared_ptr<VertexBuffer> vertexBuffer(VertexAttribute) const;
 
@@ -300,6 +301,9 @@ public:
     const glm::mat4x4& viewProjMatrix() const { return m_viewProjMatrix; }
     const glm::mat4x4& viewProjMatrixInverse() const { return m_viewProjMatrixInverse; }
     const glm::vec3& viewPosition() const { return m_viewPosition; }
+    const glm::vec3& viewXDirection() const { return m_viewXDirection; }
+    const glm::vec3& viewYDirection() const { return m_viewYDirection; }
+    const glm::vec3& viewZDirection() const { return m_viewZDirection; }
 
     void setLightsBuffer(std::shared_ptr<Buffer> buffer) { m_lightsBuffer = buffer; }
     std::shared_ptr<Buffer> lightsBuffer() const { return m_lightsBuffer; }
@@ -328,6 +332,7 @@ private:
     glm::mat4x4 m_viewProjMatrix;
     glm::mat4x4 m_viewProjMatrixInverse;
     glm::vec3 m_viewPosition;
+    glm::vec3 m_viewXDirection, m_viewYDirection, m_viewZDirection;
 
     std::shared_ptr<Buffer> m_lightsBuffer;
     std::shared_ptr<Texture> m_shadowMaps;

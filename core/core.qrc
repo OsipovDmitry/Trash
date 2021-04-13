@@ -34,5 +34,7 @@
         <file>res/bloom.vert</file>
         <file>res/combine.frag</file>
         <file>res/combine.vert</file>
+        <file>res/particles.frag</file>
+        <file>res/particles.vert</file>
     </qresource>
 </RCC>

@@ -1,10 +1,10 @@
-#include <random>
-
 #include <glm/gtc/type_ptr.hpp>
 #include <glm/gtx/functions.hpp>
 
 #include <utils/frustum.h>
 #include <utils/epsilon.h>
+#include <utils/random.h>
+
 #include <core/types.h>
 
 #include "renderer.h"
@@ -17,6 +17,33 @@ namespace trash
 {
 namespace core
 {
+
+ParticleSystemDrawable::ParticleSystemDrawable(std::shared_ptr<Mesh> m)
+    : Drawable()
+    , m_mesh(m)
+{
+}
+
+LayerId ParticleSystemDrawable::layerId() const
+{
+    return LayerId::Particles;
+}
+
+std::shared_ptr<RenderProgram> ParticleSystemDrawable::renderProgram(DrawableRenderProgramId) const
+{
+    if (!m_renderProgram)
+    {
+        auto& renderer = Renderer::instance();
+        m_renderProgram = renderer.loadRenderProgram(particlesRenderProgramName.first, particlesRenderProgramName.second, {});
+    }
+
+    return m_renderProgram;
+}
+
+std::shared_ptr<Mesh> ParticleSystemDrawable::mesh() const
+{
+    return m_mesh;
+}
 
 StandardDrawable::StandardDrawable(std::shared_ptr<Mesh> mesh,
                                            std::shared_ptr<Buffer> bonesBuffer,
@@ -45,7 +72,7 @@ LayerId StandardDrawable::layerId() const
 {
     LayerId result;
 
-    if (m_baseColorUniform->get().a < .999f || m_opacityTextureUniform)
+    if (m_baseColorUniform->get().a < (1.f-utils::epsilon) || m_opacityTextureUniform)
         result = LayerId::TransparentGeometry;
     else if (m_lightIndicesListUniform && m_lightIndicesListUniform->get()->isEnabled && m_mesh && m_mesh->vertexBuffer(VertexAttribute::Normal))
         result = LayerId::OpaqueGeometry;
@@ -398,20 +425,18 @@ std::shared_ptr<AbstractUniform> BackgroundDrawable::uniform(UniformId id) const
 SSAODrawable::SSAODrawable(float radius, uint32_t numSamples)
     : Drawable()
     , m_radius(radius)
-    , m_numSamples(numSamples)
+    , m_numSamples(glm::min(64u, numSamples))
 {
     const GLsizeiptr bufferSize = 64 * 4 * sizeof(float);
     auto samplesBuffer = std::make_shared<Buffer>(bufferSize, nullptr, GL_STATIC_DRAW);
     auto *bufferData = static_cast<glm::vec4*>(samplesBuffer->map(0, bufferSize, GL_MAP_WRITE_BIT));
-        std::uniform_real_distribution<float> randomFloats(0.3f, 1.0f);
-        std::default_random_engine generator;
-        for (size_t i = 0; i < 64; ++i)
-        {
-            glm::vec3 sample(randomFloats(generator) * 2.0f - 1.0f, randomFloats(generator) * 2.0f - 1.0f, randomFloats(generator));
-            sample = glm::normalize(sample);
-            sample *= randomFloats(generator);
-            bufferData[i] = glm::vec4(sample, randomFloats(generator) * glm::two_pi<float>());
-        }
+    for (size_t i = 0; i < 64; ++i)
+    {
+        glm::vec3 sample(utils::random(0.3f, 1.0f) * 2.0f - 1.0f, utils::random(0.3f, 1.0f) * 2.0f - 1.0f, utils::random());
+        sample = glm::normalize(sample);
+        sample *= utils::random();
+        bufferData[i] = glm::vec4(sample, utils::random(0.0f, glm::two_pi<float>()));
+    }
     samplesBuffer->unmap();
 
     m_samplesBufferUniform = std::make_shared<Uniform<std::shared_ptr<Buffer>>>(samplesBuffer);
@@ -641,7 +666,6 @@ std::map<std::string, std::string> CombineDrawable::renderProgramDefines() const
 
     return result;
 }
-
 
 } // namespace
 } // namespace

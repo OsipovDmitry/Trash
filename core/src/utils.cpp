@@ -302,7 +302,7 @@ std::shared_ptr<Mesh> buildPlaneMesh()
 
     };
     static const std::vector<uint32_t> indices {
-        0, 1, 2, 3
+        0u, 1u, 2u, 3u
     };
 
     auto mesh = std::make_shared<Mesh>();

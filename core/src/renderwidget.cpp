@@ -82,7 +82,7 @@ void RenderWidget::paintGL()
     QPainter painter(this);
     painter.setPen(Qt::red);
     painter.setFont(QFont("Arial", textSize));
-    //painter.drawStaticText(QPoint(textXY, textXY), QStaticText("FPS: " + QString::number(static_cast<double>(m_lastFps), 'f', 1)));
+    painter.drawStaticText(QPoint(textXY, textXY), QStaticText("FPS: " + QString::number(static_cast<double>(m_lastFps), 'f', 1)));
 }
 
 void RenderWidget::mousePressEvent(QMouseEvent *event)

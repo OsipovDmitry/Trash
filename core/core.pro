@@ -37,7 +37,8 @@ HEADERS += \
     src/nodeupdatevisitor.h \
     src/noderendershadowmapvisitor.h \
     src/noderendervisitor.h \
-    src/nodepickvisitor.h
+    src/nodepickvisitor.h \
+    src/particlesystemnodeprivate.h
 
 SOURCES += \
     src/hdrloader/hdrloader.cpp \
@@ -74,7 +75,9 @@ SOURCES += \
     src/settings.cpp \
     src/settingsprivate.cpp \
     src/primitivenode.cpp \
-    src/nodeintersectionvisitor.cpp
+    src/nodeintersectionvisitor.cpp \
+    src/particlesystemnode.cpp \
+    src/particlesystemnodeprivate.cpp
 
 LIBS += \
 #    -lassimp-vc140-mt
