@@ -22,7 +22,6 @@ int main(int argc, char *argv[])
     {
         surfaceFormat.setVersion(3, 3);
         surfaceFormat.setProfile(QSurfaceFormat::CoreProfile);
-        surfaceFormat.setSamples(4);
     }
     else
     {

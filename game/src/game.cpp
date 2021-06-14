@@ -6,7 +6,6 @@
 #include <core/drawablenode.h>
 #include <core/primitivenode.h>
 #include <core/scenerootnode.h>
-#include <core/particlesystemnode.h>
 #include <core/scene.h>
 #include <core/light.h>
 #include <core/nodeintersectionvisitor.h>
@@ -229,11 +228,6 @@ void Game::doInitialize()
         m_->acivePerson = m_->persons[i];
     }
 
-    auto particleSystem = std::make_shared<core::ParticleSystemNode>(core::ParticleSystemNode::AbstractEmitter::buildCircleEmitter(2.f),
-                                                                     core::ParticleSystemNode::AbstractUpdater::buildFireUpdater());
-    particleSystem->setTransform(utils::Transform::fromTranslation(glm::vec3(0.f, 5.f, 0.f)));
-    m_->scene->graphicsScene()->rootNode()->attach(particleSystem);
-
     static const std::vector<glm::vec3> lightColors {
         glm::vec3(1,0,0),
                 glm::vec3(0,1,0),
@@ -292,7 +286,7 @@ void Game::doUpdate(uint64_t time, uint64_t dt)
     m_->scene->update(time, dt);
 
     const float r = 2.2f;
-    const float t = /*3.14f / 4;*/time * 0.00005f + 10.0f;
+    const float t = /*3.14f / 4;*/time * 0.00001f;
     m_->scene->graphicsScene()->setViewMatrix(glm::lookAt(glm::vec3(11 * r * cos(t), 10 * r, -11 * r * sin(t)), glm::vec3(0.f, 0.f, 0.f), glm::vec3(0.0f, 1.0f, 0.0f)));
 
     for (int i = 0; i < lights.size(); ++i)

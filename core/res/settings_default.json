@@ -21,18 +21,26 @@
             "Contribution": 1.0,
             "Radius": 0.5,
             "NumSamples": 16,
-            "Blur":
-            {
+            "Blur": {
                 "Sigma": 1.5,
                 "NumPasses": 3
             }
         },
         "Bloom": {
             "Enabled": true,
-            "Blur":
-            {
-                "Sigma": 3.0,
+            "Blur": {
+                "Sigma": 2.0,
                 "NumPasses": 1
+            }
+        },
+        "Debug": {
+            "NodesAABBs" : {
+                "State": true,
+                "Color": [1.0, 0.0, 0.0]
+            },
+            "GeometryNodesAABBs" : {
+                "State": true,
+                "Color": [0.0, 1.0, 0.0]
             }
         }
     }

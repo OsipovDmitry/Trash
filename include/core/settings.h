@@ -4,6 +4,9 @@
 #include <memory>
 #include <string>
 
+#include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
+
 #include <utils/noncopyble.h>
 #include <utils/singletoon.h>
 #include <utils/pimpl.h>
@@ -29,6 +32,8 @@ public:
     int32_t readInt32(const std::string&, const int32_t = 0);
     uint32_t readUint32(const std::string&, const uint32_t = 0u);
     float readFloat(const std::string&, const float = 0.f);
+    glm::vec3 readVec3(const std::string&, const glm::vec3& = glm::vec3());
+    glm::vec4 readVec4(const std::string&, const glm::vec4& = glm::vec4());
 
 private:
     Settings();

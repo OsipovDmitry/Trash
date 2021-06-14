@@ -20,6 +20,7 @@ SceneRootNodePrivate::SceneRootNodePrivate(Node& node, Scene* s)
 void SceneRootNodePrivate::dirtyLocalBoundingBox()
 {
     isLocalBoundingBoxDirty = true;
+    dirtyBoundingBox();
 }
 
 const utils::BoundingBox &SceneRootNodePrivate::getLocalBoundingBox()

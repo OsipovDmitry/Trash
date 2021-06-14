@@ -3,8 +3,10 @@
 
 #include <glm/vec2.hpp>
 #include <glm/vec3.hpp>
+#include <glm/vec4.hpp>
 
 #include <core/drawablenode.h>
+#include <core/types.h>
 
 namespace trash
 {
@@ -26,32 +28,22 @@ public:
         virtual glm::vec3 operator ()() = 0;
 
         static std::shared_ptr<AbstractEmitter> buildPointEmitter();
-        static std::shared_ptr<AbstractEmitter> buildRectEmitter(const glm::vec2&);
-        static std::shared_ptr<AbstractEmitter> buildCircleEmitter(float);
-        static std::shared_ptr<AbstractEmitter> buildBoxEmitter(const glm::vec3&);
-        static std::shared_ptr<AbstractEmitter> buildSphereEmitter(float);
+        static std::shared_ptr<AbstractEmitter> buildQuadEmitter();
+        static std::shared_ptr<AbstractEmitter> buildCircleEmitter();
+        static std::shared_ptr<AbstractEmitter> buildBoxEmitter();
+        static std::shared_ptr<AbstractEmitter> buildSphereEmitter();
 
     protected:
         AbstractEmitter();
     };
 
-    class AbstractUpdater
-    {
-        NONCOPYBLE(AbstractUpdater)
-    public:
-        virtual ~AbstractUpdater() = default;
-        virtual uint32_t maxNumParticles() const = 0;
-        virtual uint32_t numParticlesPerSecond() const = 0;
+    void setDistanceAttenuation(bool, float);
 
-        virtual const glm::vec3& gravity() const = 0;
+    static std::shared_ptr<ParticleSystemNode> buildFire(std::shared_ptr<AbstractEmitter>);
+    static std::shared_ptr<ParticleSystemNode> buildSmoke(std::shared_ptr<AbstractEmitter>);
 
-        static std::shared_ptr<AbstractUpdater> buildFireUpdater();
-
-    protected:
-        AbstractUpdater();
-    };
-
-    ParticleSystemNode(std::shared_ptr<AbstractEmitter>, std::shared_ptr<AbstractUpdater>);
+protected:
+    ParticleSystemNode(ParticleSystemNodePrivate*);
 
 };
 

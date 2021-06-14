@@ -46,6 +46,11 @@ ScenePrivate::ScenePrivate(Scene *scene)
     shadowMapSize = settings.readInt32("Renderer.Shadow.ShadowMapSize", 512);
     useDeferredTechnique = settings.readBool("Renderer.DeferredTechnique", false);
 
+    renderNodesAABBs = settings.readBool("Renderer.Debug.NodesAABBs.State", false);
+    nodesAABBsColor = glm::vec4(settings.readVec3("Renderer.Debug.NodesAABBs.Color"), 1.f);
+    renderGeometryNodesAABBs = settings.readBool("Renderer.Debug.GeometryNodesAABBs.State", false);
+    geometryNodesAABBsColor = glm::vec4(settings.readVec3("Renderer.Debug.GeometryNodesAABBs.Color"), 1.f);
+
     iblDiffuseMap = renderer.loadTexture(settings.readString("Renderer.IBL.DiffuseMap"));
     iblSpecularMap = renderer.loadTexture(settings.readString("Renderer.IBL.SpecularMap"));
     iblBrdfLutMap = renderer.loadTexture(settings.readString("Renderer.IBL.BrdfLutMap"));

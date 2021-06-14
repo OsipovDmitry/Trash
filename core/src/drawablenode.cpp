@@ -35,9 +35,9 @@ IntersectionMode DrawableNode::intersectionMode() const
 void DrawableNode::enableLighting(bool value)
 {
     auto& nodePrivate = m();
-    if (nodePrivate.lightIndices->isEnabled != value)
+    if (nodePrivate.lightIndices.isEnabled != value)
     {
-        nodePrivate.lightIndices->isEnabled = value;
+        nodePrivate.lightIndices.isEnabled = value;
         nodePrivate.doDirtyLightIndices();
         nodePrivate.dirtyDrawables();
     }
@@ -45,7 +45,7 @@ void DrawableNode::enableLighting(bool value)
 
 bool DrawableNode::isLightingEnabled() const
 {
-    return m().lightIndices->isEnabled;
+    return m().lightIndices.isEnabled;
 }
 
 void DrawableNode::enableShadows(bool value)

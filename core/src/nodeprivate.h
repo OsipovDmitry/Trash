@@ -6,6 +6,7 @@
 
 #include <glm/vec4.hpp>
 
+#include <utils/noncopyble.h>
 #include <utils/transform.h>
 #include <utils/boundingbox.h>
 #include <core/forwarddecl.h>
@@ -18,6 +19,8 @@ namespace core
 class NodePrivate
 {
 public:
+    NONCOPYBLE(NodePrivate)
+
     NodePrivate(Node& node);
     virtual ~NodePrivate();
 

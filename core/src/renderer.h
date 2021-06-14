@@ -76,8 +76,9 @@ struct Texture : public ResourceStorage::Object
 {
     GLenum target;
     GLuint id;
+    glm::uvec3 size;
 
-    Texture(GLuint id_, GLenum target_) : target(target_), id(id_) {}
+    Texture(GLuint id_, GLenum target_, const glm::uvec3& size_) : target(target_), id(id_), size(size_) {}
     ~Texture() override;
 
     void setFilter(int32_t); // 1 - nearest // 2 - linear // 3 - trilinear
@@ -154,6 +155,8 @@ struct Mesh
     std::shared_ptr<VertexBuffer> vertexBuffer(VertexAttribute) const;
 
     void attachIndexBuffer(std::shared_ptr<IndexBuffer>);
+
+    void recalcBoundingBox();
 };
 
 struct Renderbuffer

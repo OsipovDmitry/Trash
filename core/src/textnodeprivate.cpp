@@ -1,6 +1,7 @@
 #include "textnodeprivate.h"
 #include "drawables.h"
 #include "renderer.h"
+#include "utils.h"
 
 namespace trash
 {
@@ -24,7 +25,9 @@ void TextNodePrivate::updateDrawable()
     {
         if (textDrawable)
             removeDrawable(textDrawable);
-        textDrawable = std::make_shared<TextDrawable>(Renderer::instance().loadFont(":/res/PurisaDesc.json"), text, alignX, alignY, color, lineSpacing);
+
+        std::shared_ptr<Font> font = Renderer::instance().loadFont(":/res/PurisaDesc.json");
+        textDrawable = std::make_shared<StandardDrawable>(buildTextMesh(font, text, alignX, alignY, lineSpacing), nullptr, color, glm::vec2(1.f, 1.f), nullptr, font->texture, nullptr, nullptr, nullptr, std::cref(getLightIndices()));
         addDrawable(textDrawable);
 
         drawableIsDyrty = false;

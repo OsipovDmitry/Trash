@@ -1,7 +1,5 @@
 {
-    "Mipmap0" : {
-        "Image" : "PursiaTex.png"
-    },
-    
+    "Image" : "PursiaTex.png",
+
     "AutoGenMipmaps": true
 }

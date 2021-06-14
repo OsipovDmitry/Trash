@@ -45,10 +45,19 @@ ENUMCLASS(VertexAttribute, uint32_t,
 ENUMCLASS(LayerId, uint32_t,
           Undefined,
           OpaqueGeometry,
-          Particles,
           NotLightedGeometry,
           TransparentGeometry,
           Lights)
+
+ENUMCLASS(ParticleType, uint32_t,
+          Quad,
+          Circle,
+          SoftCircle)
+
+ENUMCLASS(BlendingType, uint32_t,
+          NoBlend,
+          Additive,
+          Alpha)
 
 ENUMCLASS(DrawableRenderProgramId, uint32_t,
           ForwardRender,
@@ -109,7 +118,8 @@ ENUMCLASS(UniformId, uint32_t,
           CombineSourceMap0,
           CombineSourceMap1,
           CombineLevel0,
-          CombineLevel1)
+          CombineLevel1,
+          ParticleDistanceAttenuation)
 
 ENUMCLASS(BlurType, uint32_t, Horizontal, Vertical)
 

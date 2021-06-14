@@ -36,5 +36,22 @@
         <file>res/combine.vert</file>
         <file>res/particles.frag</file>
         <file>res/particles.vert</file>
+        <file>res/smoke/0.png</file>
+        <file>res/smoke/1.png</file>
+        <file>res/smoke/2.png</file>
+        <file>res/smoke/3.png</file>
+        <file>res/smoke/smoke.json</file>
+        <file>res/smoke/4.png</file>
+        <file>res/smoke/5.png</file>
+        <file>res/smoke/6.png</file>
+        <file>res/smoke/7.png</file>
+        <file>res/smoke/8.png</file>
+        <file>res/smoke/9.png</file>
+        <file>res/smoke/10.png</file>
+        <file>res/smoke/11.png</file>
+        <file>res/smoke/12.png</file>
+        <file>res/smoke/13.png</file>
+        <file>res/smoke/14.png</file>
+        <file>res/smoke/15.png</file>
     </qresource>
 </RCC>

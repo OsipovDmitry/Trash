@@ -27,6 +27,7 @@ public:
     virtual const void* data() const = 0;
 
     static std::shared_ptr<Image> load(const std::string&);
+    static std::shared_ptr<Image> loadDescription(const std::string&);
 };
 
 } // namespace

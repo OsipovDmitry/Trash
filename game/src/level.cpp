@@ -1,6 +1,8 @@
 #include <queue>
 #include <set>
 
+#include <glm/gtc/color_space.hpp>
+
 #include <utils/transform.h>
 #include <utils/ray.h>
 
@@ -10,6 +12,7 @@
 #include <core/scenerootnode.h>
 #include <core/modelnode.h>
 #include <core/primitivenode.h>
+#include <core/particlesystemnode.h>
 #include <core/nodevisitor.h>
 #include <core/nodeintersectionvisitor.h>
 #include <core/light.h>
@@ -43,20 +46,38 @@ Level::Level()
                       false);
     rootNode->attach(bloomNode);
 
-    auto light = std::make_shared<core::Light>(core::LightType::Point);
-    light->setPosition(glm::vec3(-4.1f, 4.0f, -3.0f));
-    light->setDirection(glm::vec3(0.0f, -1.0f, 0.0f));
-    light->setSpotAngles(glm::vec2(2.4f));
-    light->setColor(glm::vec3(0.15f, 0.15f, 1.f) * 15.f);
-    light->setRadiuses(glm::vec2(6.0f, 4.0f));
-    light->enableShadowOutside(true);
-    graphicsScene()->attachLight(light);
+    auto fireSystem = core::ParticleSystemNode::buildFire(core::ParticleSystemNode::AbstractEmitter::buildCircleEmitter());
+    fireSystem->setTransform(utils::Transform::fromTranslation(glm::vec3(6.f, 0.f, 0.f)) /**
+                                 utils::Transform::fromScale(5.5f)*/);
+    rootNode->attach(fireSystem);
+
+    auto smokeSystem = core::ParticleSystemNode::buildSmoke(core::ParticleSystemNode::AbstractEmitter::buildCircleEmitter());
+    smokeSystem->setTransform(utils::Transform::fromTranslation(glm::vec3(6.0f, 0.f, 0.f)) /**
+                                 utils::Transform::fromScale(5.5f)*/);
+    //rootNode->attach(smokeSystem);
+
+    auto bloomLight = std::make_shared<core::Light>(core::LightType::Point);
+    bloomLight->setPosition(glm::vec3(-4.1f, 4.0f, -3.0f));
+    bloomLight->setDirection(glm::vec3(0.0f, -1.0f, 0.0f));
+    bloomLight->setSpotAngles(glm::vec2(2.4f));
+    bloomLight->setColor(glm::convertSRGBToLinear(glm::vec3(.5f, .5f, 1.f)) * 15.f);
+    bloomLight->setRadiuses(glm::vec2(6.0f, 4.0f));
+    bloomLight->enableShadowOutside(true);
+    graphicsScene()->attachLight(bloomLight);
+
+    auto fireLight = std::make_shared<core::Light>(core::LightType::Point);
+    fireLight->setPosition(glm::vec3(6.0f, 3.9f, 0.0f));
+    fireLight->setDirection(glm::vec3(0.0f, -1.0f, 0.0f));
+    fireLight->setSpotAngles(glm::vec2(2.4f));
+    fireLight->setColor(glm::convertSRGBToLinear(glm::vec3(1.0f, 0.2f, 0.05f)) * 5.f);
+    fireLight->setRadiuses(glm::vec2(6.0f, 4.0f));
+    fireLight->enableShadowOutside(true);
+    graphicsScene()->attachLight(fireLight);
 
     core::NodeSimpleVisitor nv([](std::shared_ptr<core::Node> node) {
         if (auto drawableNode = std::dynamic_pointer_cast<core::DrawableNode>(node))
             drawableNode->setIntersectionMode(core::IntersectionMode::UseGeometry);
     });
-
     m_wallsNode->accept(nv);
     m_floorNode->accept(nv);
 }

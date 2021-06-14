@@ -15,7 +15,7 @@ PrimitiveNode::PrimitiveNode()
     setIntersectionMode(IntersectionMode::None);
 
     auto& primitiveNodePrivate = m();
-    primitiveNodePrivate.lightIndices->isEnabled = false;
+    primitiveNodePrivate.lightIndices.isEnabled = false;
     primitiveNodePrivate.areShadowsEnabled = false;
 }
 

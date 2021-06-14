@@ -23,9 +23,10 @@ public:
     void removeDrawable(std::shared_ptr<Drawable>);
     void removeAllDrawables();
     void dirtyDrawables();
+    void dirtyLocalBoundingBox();
 
     const utils::BoundingBox& getLocalBoundingBox() override;
-    std::shared_ptr<LightIndicesList> getLightIndices();
+    const LightIndicesList& getLightIndices();
 
     virtual void doUpdateLightIndices();
     virtual void doDirtyLightIndices();
@@ -38,7 +39,7 @@ public:
     void doAfterChangingTransformation() override;
 
     std::unordered_set<std::shared_ptr<Drawable>> drawables;
-    std::shared_ptr<LightIndicesList> lightIndices;
+    LightIndicesList lightIndices;
     utils::BoundingBox localBoundingBox;
     IntersectionMode intersectionMode;
     bool isLightIndicesDirty;

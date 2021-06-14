@@ -170,6 +170,7 @@ UniformId RenderProgram::uniformIdByName(const std::string& name)
         { "u_combineSourceMap1", UniformId::CombineSourceMap1 },
         { "u_combineLevel0", UniformId::CombineLevel0 },
         { "u_combineLevel1", UniformId::CombineLevel1 },
+        { "u_particleDistanceAttenuation", UniformId::ParticleDistanceAttenuation }
     };
 
     auto it = s_names.find(name);
@@ -418,11 +419,7 @@ void Mesh::declareVertexAttribute(VertexAttribute attrib, std::shared_ptr<Vertex
     attributesDeclaration[attrib] = vb;
 
     if (attrib == VertexAttribute::Position)
-    {
-        auto *p = vb->map(0, vb->numVertices * vb->numComponents * sizeof(float), GL_MAP_READ_BIT);
-        boundingBox = utils::BoundingBox(static_cast<float*>(p), vb->numVertices, vb->numComponents);
-        vb->unmap();
-    }
+        recalcBoundingBox();
 }
 
 void Mesh::undeclareVertexAttribute(VertexAttribute attrib)
@@ -454,6 +451,16 @@ void Mesh::attachIndexBuffer(std::shared_ptr<IndexBuffer> b)
     functions.glBindVertexArray(0);
 
     indexBuffers.insert(b);
+}
+
+void Mesh::recalcBoundingBox()
+{
+    if (auto vb = vertexBuffer(VertexAttribute::Position))
+    {
+        auto *p = vb->map(0, vb->numVertices * vb->numComponents * sizeof(float), GL_MAP_READ_BIT);
+        boundingBox = utils::BoundingBox(static_cast<float*>(p), vb->numVertices, vb->numComponents);
+        vb->unmap();
+    }
 }
 
 Renderbuffer::Renderbuffer(GLenum internalFormat, GLsizei width, GLsizei height)
@@ -749,34 +756,6 @@ void Renderer::initialize()
 //        push(file, mdl);
 //        file.close();
 //    }
-
-
-
-//    auto model = loadModel("teeth.dae");
-//    model->rootNode->children().at(1)->meshes.at(0)->material->baseColorMap.first = "textures/teeth_basecolor.png";
-//    model->rootNode->children().at(1)->meshes.at(0)->material->normalMap.first = "textures/teeth_normal.png";
-//    model->rootNode->children().at(1)->meshes.at(0)->material->metallicMap.first = "textures/teeth_metallic.png";
-//    model->rootNode->children().at(1)->meshes.at(0)->material->roughnessMap.first = "textures/teeth_roughness.png";
-
-//    model->rootNode->children().at(2)->meshes.at(0)->material->baseColorMap.first = "textures/teeth_basecolor.png";
-//    model->rootNode->children().at(2)->meshes.at(0)->material->normalMap.first = "textures/teeth_normal.png";
-//    model->rootNode->children().at(2)->meshes.at(0)->material->metallicMap.first = "textures/teeth_metallic.png";
-//    model->rootNode->children().at(2)->meshes.at(0)->material->roughnessMap.first = "textures/teeth_roughness.png";
-
-//    std::ofstream f("teeth.mdl", std::ios_base::binary);
-//    push(f, model);
-//    f.close();
-
-//    QImage diffuse("Mrm_Albedo_LP_merged.1001.png");
-//    QImage specular("Mrm_Specular_LP_merged.1001.png");
-//    QImage glossiness("Mrm_Gloss_LP_merged.1001.png");
-//    QImage baseColor, metallic, roughness;
-
-//    diffuseSpecularGlossinessToBaseColorMetallicRoughness(diffuse, specular, glossiness, QImage(), baseColor, metallic, roughness);
-
-//    baseColor.save("teeth_basecolor.png");
-//    metallic.save("teeth_metallic.png");
-//    roughness.save("teeth_roughness.png");
 
 }
 
@@ -1151,42 +1130,44 @@ void Renderer::renderDeffered(const RenderInfo& renderInfo)
     }
 
     using DistaceToDrawable = std::pair<float, std::reference_wrapper<const DrawDataType>>;
-    std::deque<DistaceToDrawable> transparentDrawablesRefs;
-    for (const auto& layer : { &m_drawData[castFromLayerId(LayerId::TransparentGeometry)], &m_drawData[castFromLayerId(LayerId::Particles)] })
-        for (const auto& drawable : *layer)
-            transparentDrawablesRefs.push_back({glm::length2(std::get<1>(drawable).translation - renderInfo.viewPosition()), std::cref(drawable)});
-
     static const auto transparentDrawablesComparator = [](const DistaceToDrawable& v1, const DistaceToDrawable& v2) {
         return v1.first > v2.first;
     };
+
+    std::deque<DistaceToDrawable> transparentDrawablesRefs;
+    for (const auto& drawable : m_drawData[castFromLayerId(LayerId::TransparentGeometry)])
+        transparentDrawablesRefs.push_back({glm::length2(std::get<1>(drawable).translation - renderInfo.viewPosition()), std::cref(drawable)});
     std::sort(transparentDrawablesRefs.begin(), transparentDrawablesRefs.end(), transparentDrawablesComparator);
 
     m_functions.glDisable(GL_STENCIL_TEST);
     m_functions.glEnable(GL_DEPTH_TEST);
     m_functions.glDepthMask(GL_FALSE);
+    m_functions.glEnable(GL_CULL_FACE);
+    m_functions.glCullFace(GL_BACK);
     m_functions.glEnable(GL_BLEND);
     for (const auto& drawDataRef: transparentDrawablesRefs)
     {
         const auto& drawData = drawDataRef.second.get();
         auto drawable = std::get<0>(drawData);
-        auto layerId = drawable->layerId();
 
-        if (layerId == LayerId::TransparentGeometry)
+        auto blendingType = drawable->blendingType();
+        switch (blendingType)
         {
+        case BlendingType::NoBlend:
+            m_functions.glDisable(GL_BLEND);
+            break;
+        case BlendingType::Alpha:
+            m_functions.glEnable(GL_BLEND);
             m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
-            m_functions.glCullFace(GL_FRONT);
-            renderMesh(drawable->mesh());
-            m_functions.glCullFace(GL_BACK);
-            renderMesh(drawable->mesh());
-        }
-        else if (layerId == LayerId::Particles)
-        {
+            break;
+        case BlendingType::Additive:
+            m_functions.glEnable(GL_BLEND);
             m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-            setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
-            m_functions.glCullFace(GL_BACK);
-            renderMesh(drawable->mesh());
+            break;
         }
+
+        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+        renderMesh(drawable->mesh());
     }
 
     if (m_isBloomEnabled)
@@ -1272,42 +1253,44 @@ void Renderer::renderForward(const RenderInfo& renderInfo)
     }
 
     using DistaceToDrawable = std::pair<float, std::reference_wrapper<const DrawDataType>>;
-    std::deque<DistaceToDrawable> transparentDrawablesRefs;
-    for (const auto& layer : { &m_drawData[castFromLayerId(LayerId::TransparentGeometry)], &m_drawData[castFromLayerId(LayerId::Particles)] })
-        for (const auto& drawable : *layer)
-            transparentDrawablesRefs.push_back({glm::length2(std::get<1>(drawable).translation - renderInfo.viewPosition()), std::cref(drawable)});
-
     static const auto transparentDrawablesComparator = [](const DistaceToDrawable& v1, const DistaceToDrawable& v2) {
         return v1.first > v2.first;
     };
+
+    std::deque<DistaceToDrawable> transparentDrawablesRefs;
+    for (const auto& drawable : m_drawData[castFromLayerId(LayerId::TransparentGeometry)])
+        transparentDrawablesRefs.push_back({glm::length2(std::get<1>(drawable).translation - renderInfo.viewPosition()), std::cref(drawable)});
     std::sort(transparentDrawablesRefs.begin(), transparentDrawablesRefs.end(), transparentDrawablesComparator);
 
     m_functions.glDisable(GL_STENCIL_TEST);
     m_functions.glEnable(GL_DEPTH_TEST);
     m_functions.glDepthMask(GL_FALSE);
+    m_functions.glEnable(GL_CULL_FACE);
+    m_functions.glCullFace(GL_BACK);
     m_functions.glEnable(GL_BLEND);
     for (const auto& drawDataRef: transparentDrawablesRefs)
     {
         const auto& drawData = drawDataRef.second.get();
         auto drawable = std::get<0>(drawData);
-        auto layerId = drawable->layerId();
 
-        if (layerId == LayerId::TransparentGeometry)
+        auto blendingType = drawable->blendingType();
+        switch (blendingType)
         {
+        case BlendingType::NoBlend:
+            m_functions.glDisable(GL_BLEND);
+            break;
+        case BlendingType::Alpha:
+            m_functions.glEnable(GL_BLEND);
             m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-            setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
-            m_functions.glCullFace(GL_FRONT);
-            renderMesh(drawable->mesh());
-            m_functions.glCullFace(GL_BACK);
-            renderMesh(drawable->mesh());
-        }
-        else if (layerId == LayerId::Particles)
-        {
+            break;
+        case BlendingType::Additive:
+            m_functions.glEnable(GL_BLEND);
             m_functions.glBlendFunc(GL_SRC_ALPHA, GL_ONE);
-            setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
-            m_functions.glCullFace(GL_BACK);
-            renderMesh(drawable->mesh());
+            break;
         }
+
+        setupUniforms(drawData, DrawableRenderProgramId::ForwardRender, renderInfo);
+        renderMesh(drawable->mesh());
     }
 
     if (m_isBloomEnabled)
@@ -1674,12 +1657,12 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
         }
         case UniformId::LightIndicesList:
         {
-            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::shared_ptr<LightIndicesList>>>(drawable->uniform(uniform.first));
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::reference_wrapper<const LightIndicesList>>>(drawable->uniform(uniform.first));
             if (uniformValue)
             {
-                std::shared_ptr<LightIndicesList> lightIndices = uniformValue->get();
-                for (size_t i = 0; i < lightIndices->size(); ++i)
-                    m_functions.glUniform1i(uniform.second + i, lightIndices->at(i));
+                const LightIndicesList& lightIndices = uniformValue->get().get();
+                for (size_t i = 0; i < lightIndices.size(); ++i)
+                    m_functions.glUniform1i(uniform.second + i, lightIndices.at(i));
             }
             break;
         }
@@ -1765,6 +1748,13 @@ void Renderer::setupUniforms(const DrawDataType& data, DrawableRenderProgramId p
             auto uniformValue = std::dynamic_pointer_cast<Uniform<uint32_t>>(drawable->uniform(uniform.first));
             if (uniformValue)
                 m_functions.glUniform1i(uniform.second, static_cast<int32_t>(uniformValue->get()));
+            break;
+        }
+        case UniformId::ParticleDistanceAttenuation:
+        {
+            auto uniformValue = std::dynamic_pointer_cast<Uniform<std::reference_wrapper<const float>>>(drawable->uniform(uniform.first));
+            if (uniformValue)
+                m_functions.glUniform1f(uniform.second, uniformValue->get().get());
             break;
         }
         }

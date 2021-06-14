@@ -4,8 +4,6 @@
 #include <QtCore/QFile>
 #include <QtGui/QOpenGLExtraFunctions>
 
-#include <glm/gtc/type_ptr.hpp>
-
 #include <utils/fileinfo.h>
 
 #include "renderer.h"
@@ -98,61 +96,54 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
     if (!object)
     {
         GLuint id;
-        m_functions.glGenTextures(1, &id);
 
         if (utils::fileExt(filename) == "json")
         {
+            static const std::vector<std::string> s_2dFields { "Image" };
+            static const std::vector<std::string> s_cubemapFields { "Right", "Left", "Top", "Bottom", "Front", "Back" };
+
             const std::string dir = utils::fileDir(filename);
 
-            static const auto isImage = [](const rapidjson::Document::ValueType& object)
+            static const auto is2D = [](const rapidjson::Document::ValueType& object)
             {
-                return object.HasMember("Image");
+                bool flag = true;
+                for (const auto& s : s_2dFields)
+                    flag = flag && object.HasMember(s.c_str());
+                return flag;
             };
 
             static const auto isCubemap = [](const rapidjson::Document::ValueType& object)
             {
-                return
-                        object.HasMember("Right") &&
-                        object.HasMember("Left") &&
-                        object.HasMember("Top") &&
-                        object.HasMember("Bottom") &&
-                        object.HasMember("Front") &&
-                        object.HasMember("Back");
+                bool flag = true;
+                for (const auto& s : s_cubemapFields)
+                    flag = flag && object.HasMember(s.c_str());
+                return flag;
             };
 
-            static const auto readImages = [](const rapidjson::Document::ValueType& object, GLenum target, const std::string& dir, std::array<std::shared_ptr<Image>, 6>& images) -> bool
+            static const auto readImageMipmaps = [](const rapidjson::Document::ValueType& object, std::vector<std::string>& mipmaps)
             {
-                if (target == GL_TEXTURE_2D)
-                {
-                    images[0] = Image::load(dir + object["Image"].GetString());
-                    if (images[0] == nullptr)
-                        return false;
-                }
-                else if (target == GL_TEXTURE_CUBE_MAP)
-                {
-                    images[0] = Image::load(dir + object["Right"].GetString());
-                    images[1] = Image::load(dir + object["Left"].GetString());
-                    images[2] = Image::load(dir + object["Top"].GetString());
-                    images[3] = Image::load(dir + object["Bottom"].GetString());
-                    images[4] = Image::load(dir + object["Front"].GetString());
-                    images[5] = Image::load(dir + object["Back"].GetString());
+                mipmaps.clear();
 
-                    for (size_t i = 0; i < 6; ++i)
+                if (object.IsString())
+                {
+                    mipmaps.push_back(object.GetString());
+                }
+                else if (object.IsArray())
+                {
+                    auto array = object.GetArray();
+                    mipmaps.reserve(array.Size());
+                    for (size_t i = 0; i < array.Size(); ++i)
                     {
-                        if (images[i] == nullptr)
+                        if (!array[i].IsString())
                             return false;
+
+                        mipmaps.push_back(array[i].GetString());
                     }
                 }
-                return true;
-            };
-
-            static const auto loadImages = [](QOpenGLExtraFunctions& f, GLenum target, GLint level, const std::array<std::shared_ptr<Image>, 6>& images)
-            {
-                if (target == GL_TEXTURE_2D)
-                    f.glTexSubImage2D(GL_TEXTURE_2D, level, 0, 0, images[0]->width(), images[0]->height(), images[0]->format(), images[0]->type(), images[0]->data());
                 else
-                    for (size_t i = 0; i < 6; ++i)
-                        f.glTexSubImage2D(GL_TEXTURE_CUBE_MAP_POSITIVE_X + static_cast<uint32_t>(i), level, 0, 0, images[i]->width(), images[i]->height(), images[i]->format(), images[i]->type(), images[i]->data());
+                    return false;
+
+                return true;
             };
 
             QFile file(QString::fromStdString(filename));
@@ -165,32 +156,76 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
             rapidjson::Document document;
             document.Parse(byteArray);
 
-            int32_t numMipmaps = 0;
-            while (document.HasMember(("Mipmap" + std::to_string(numMipmaps)).c_str()))
-                ++numMipmaps;
+            uint32_t numLayers = 0;
+            std::vector<std::reference_wrapper<const rapidjson::Document::ValueType>> layerFields;
+            while (document.HasMember(("Layer" + std::to_string(numLayers)).c_str()))
+                layerFields.push_back(document[("Layer" + std::to_string(numLayers++)).c_str()]);
+            if (!numLayers)
+                layerFields.push_back(document);
 
-            if (numMipmaps < 1)
+            bool firstLayerIs2D;
+            if (is2D(layerFields.front()))
+                firstLayerIs2D = true;
+            else if (isCubemap(layerFields.front()))
+                firstLayerIs2D = false;
+            else
                 return nullptr;
 
-            auto& mipmap0 = document["Mipmap0"];
-            if (!isImage(mipmap0) && !isCubemap(mipmap0))
+            const auto& imageFields = firstLayerIs2D ? s_2dFields : s_cubemapFields;
+
+            std::vector<std::vector<std::vector<std::string>>> imageFilenames; // layer/side/mipmap
+            imageFilenames.resize(layerFields.size());
+
+            for (size_t layer = 0 ; layer < layerFields.size(); ++layer)
+            {
+                imageFilenames[layer].resize(imageFields.size());
+                for (size_t image = 0; image < imageFields.size(); ++image)
+                {
+                    if (!layerFields[layer].get().HasMember(imageFields[image].c_str()))
+                        return nullptr;
+
+                    if (!readImageMipmaps((layerFields[layer].get())[imageFields[image].c_str()], imageFilenames[layer][image]))
+                         return nullptr;
+
+                    if (imageFilenames[layer][image].front().empty()) // zero-mipmap can't be empty
+                        return nullptr;
+                }
+            }
+
+            size_t numMipmaps = 0;
+            for (const auto& l : imageFilenames)
+                for (const auto& s : l)
+                    numMipmaps = std::max(numMipmaps, s.size());
+
+            if (numMipmaps == 0) // it can't be true but if any...
                 return nullptr;
 
-            GLenum target = isImage(mipmap0) ? GL_TEXTURE_2D : GL_TEXTURE_CUBE_MAP;
-
-            std::array<std::shared_ptr<Image>, 6> images;
-            if (!readImages(mipmap0, target, dir, images))
+            std::shared_ptr<Image> imageDesc;
+            for (const auto& l : imageFilenames) {
+                for (const auto& s : l) {
+                    imageDesc = Image::loadDescription(dir + s.front());
+                    break;
+                }
+                if (imageDesc) break;
+            }
+            if (!imageDesc)
                 return nullptr;
+
 
             GLenum internalFormat;
             if (document.HasMember("InternalFormat"))
             {
-                if (!Texture::stringToInternalFormat(document["InternalFormat"].GetString(), internalFormat))
+                auto& internalFormatField = document["InternalFormat"];
+
+                if (!internalFormatField.IsString())
+                    return nullptr;
+
+                if (!Texture::stringToInternalFormat(internalFormatField.GetString(), internalFormat))
                     return nullptr;
             }
             else
             {
-                if (!Texture::formatAndTypeToInternalFormat(images[0]->format(), images[0]->type(), internalFormat))
+                if (!Texture::formatAndTypeToInternalFormat(imageDesc->format(), imageDesc->type(), internalFormat))
                     return nullptr;
             }
 
@@ -200,51 +235,66 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
 
             if (document.HasMember("AutoGenMipmaps"))
             {
+                auto& autoGenMipmapsField = document["AutoGenMipmaps"];
+                if (!autoGenMipmapsField.IsBool())
+                    return false;
+
                 autoGenMipmaps = document["AutoGenMipmaps"].GetBool();
                 if (autoGenMipmaps)
                 {
                     filter = 3;
-                    numGeneratedMipmaps = numberOfMipmaps(images[0]->width(), images[0]->height());
+                    numGeneratedMipmaps = numberOfMipmaps(imageDesc->width(), imageDesc->height());
                 }
             }
 
             if (document.HasMember("Filter"))
-                filter = document["Filter"].GetInt();
-
-
-            m_functions.glBindTexture(target, id);
-            m_functions.glTexStorage2D(target, numGeneratedMipmaps, internalFormat, images[0]->width(), images[0]->height());
-            m_functions.glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, numGeneratedMipmaps-1);
-
-            loadImages(m_functions, target, 0, images);
-
-            for (int n = 1; n < numMipmaps; ++n)
             {
-                auto& mipmap = document[("Mipmap" + std::to_string(n)).c_str()];
+                auto& filterField = document["Filter"];
+                if (!filterField.IsInt())
+                    return false;
 
-                if (((target == GL_TEXTURE_2D) && !isImage(mipmap)) ||
-                    ((target == GL_TEXTURE_CUBE_MAP) && !isCubemap(mipmap)))
-                        return nullptr;
-
-                if (!readImages(mipmap, target, dir, images))
-                    return nullptr;
-
-                loadImages(m_functions, target, n, images);
+                filter = document["Filter"].GetInt();
             }
 
-            object = std::make_shared<Texture>(id, target);
+            GLenum wrap = GL_REPEAT;
+            if (document.HasMember("Wrap"))
+            {
+                auto& wrapField = document["Wrap"];
+                if (!wrapField.IsString())
+                    return nullptr;
+
+                if (!Texture::stringToWrap(wrapField.GetString(), wrap))
+                    return nullptr;
+            }
+
+            GLenum target = numLayers ? (firstLayerIs2D ? GL_TEXTURE_2D_ARRAY : GL_TEXTURE_CUBE_MAP_ARRAY) :
+                                        (firstLayerIs2D ? GL_TEXTURE_2D : GL_TEXTURE_CUBE_MAP);
+
+            m_functions.glGenTextures(1, &id);
+            m_functions.glBindTexture(target, id);
+            numLayers ? m_functions.glTexStorage3D(target, numGeneratedMipmaps, internalFormat, imageDesc->width(), imageDesc->height(), numLayers) :
+                        m_functions.glTexStorage2D(target, numGeneratedMipmaps, internalFormat, imageDesc->width(), imageDesc->height());
+            m_functions.glTexParameteri(target, GL_TEXTURE_MAX_LEVEL, numGeneratedMipmaps-1);
+
+            for (size_t layer = 0; layer < layerFields.size(); ++layer)
+                for (size_t i = 0; i < imageFields.size(); ++i)
+                    for (size_t level = 0; level < imageFilenames[layer][i].size(); ++level)
+                    {
+                        auto image = Image::load(dir + imageFilenames[layer][i][level]);
+                        if (image)
+                        {
+                            numLayers ?
+                                m_functions.glTexSubImage3D(firstLayerIs2D ? GL_TEXTURE_2D_ARRAY : (GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), level, 0, 0, layer, image->width(), image->height(), 1u, image->format(), image->type(), image->data()) :
+                                m_functions.glTexSubImage2D(firstLayerIs2D ? GL_TEXTURE_2D : (GL_TEXTURE_CUBE_MAP_POSITIVE_X + i), level, 0, 0, image->width(), image->height(), image->format(), image->type(), image->data());
+                        }
+                    }
+
+            object = std::make_shared<Texture>(id, target, glm::uvec3(imageDesc->width(), imageDesc->height(), numLayers));
             object->setFilter(filter);
+            object->setWrap(wrap);
 
             if (autoGenMipmaps)
                 m_functions.glGenerateMipmap(target);
-
-            if (document.HasMember("Wrap"))
-            {
-                GLenum wrap;
-                if (!Texture::stringToWrap(document["Wrap"].GetString(), wrap))
-                    return nullptr;
-                object->setWrap(wrap);
-            }
         }
         else
         {
@@ -259,13 +309,14 @@ std::shared_ptr<Texture> Renderer::loadTexture(const std::string& filename)
 
             int32_t numMipmaps = numberOfMipmaps(image->width(), image->height());
 
+            m_functions.glGenTextures(1, &id);
             m_functions.glBindTexture(GL_TEXTURE_2D, id);
             m_functions.glTexStorage2D(GL_TEXTURE_2D, numMipmaps, internalFormat, image->width(), image->height());
             m_functions.glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, numMipmaps-1);
             m_functions.glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, image->width(), image->height(), image->format(), image->type(), image->data());
             m_functions.glGenerateMipmap(GL_TEXTURE_2D);
 
-            object = std::make_shared<Texture>(id, GL_TEXTURE_2D);
+            object = std::make_shared<Texture>(id, GL_TEXTURE_2D, glm::uvec3(image->width(), image->height(), 0u));
             object->setFilter(3);
         }
 
@@ -310,7 +361,7 @@ std::shared_ptr<Texture> Renderer::createTexture2D(GLenum internalFormat,
             filter = 3;
         }
 
-        object = std::make_shared<Texture>(id, GL_TEXTURE_2D);
+        object = std::make_shared<Texture>(id, GL_TEXTURE_2D, glm::uvec3(width, height, 0u));
         object->setFilter(filter);
 
         if (!resourceName.empty())
@@ -339,7 +390,7 @@ std::shared_ptr<Texture> Renderer::createTexture2DArray(GLenum internalFormat,
         m_functions.glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
         m_functions.glTexParameteri(GL_TEXTURE_2D_ARRAY, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
 
-        object = std::make_shared<Texture>(id, GL_TEXTURE_2D_ARRAY);
+        object = std::make_shared<Texture>(id, GL_TEXTURE_2D_ARRAY, glm::uvec3(width, height, numLayers));
 
         if (!resourceName.empty())
             m_resourceStorage->store(resourceName, object);

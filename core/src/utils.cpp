@@ -314,7 +314,7 @@ std::shared_ptr<Mesh> buildPlaneMesh()
 
 std::shared_ptr<Mesh> buildTextMesh(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, float lineSpacing)
 {
-    std::vector<glm::vec3> vertices(4*str.length());
+    std::vector<glm::vec2> vertices(4*str.length());
     std::vector<glm::vec2> texCoords(4*str.length());
     std::vector<uint32_t> indices(6*str.length());
 
@@ -344,10 +344,10 @@ std::shared_ptr<Mesh> buildTextMesh(std::shared_ptr<Font> font, const std::strin
 
         const glm::vec2 tmpPos = pos + glm::vec2(chInfo->originX, chInfo->originY) * texInvSize * symbolTexInvHeight;
 
-        vertices.at(4 * i + 0) = glm::vec3(tmpPos, 0.f);
-        vertices.at(4 * i + 1) = glm::vec3(tmpPos + glm::vec2(0.f, -chInfo->height) * texInvSize * symbolTexInvHeight, 0.f);
-        vertices.at(4 * i + 2) = glm::vec3(tmpPos + glm::vec2(chInfo->width, -chInfo->height) * texInvSize * symbolTexInvHeight, 0.f);
-        vertices.at(4 * i + 3) = glm::vec3(tmpPos + glm::vec2(chInfo->width, 0.f) * texInvSize * symbolTexInvHeight, 0.f);
+        vertices.at(4 * i + 0) = tmpPos;
+        vertices.at(4 * i + 1) = glm::vec2(tmpPos + glm::vec2(0.f, -chInfo->height) * texInvSize * symbolTexInvHeight);
+        vertices.at(4 * i + 2) = glm::vec2(tmpPos + glm::vec2(chInfo->width, -chInfo->height) * texInvSize * symbolTexInvHeight);
+        vertices.at(4 * i + 3) = glm::vec2(tmpPos + glm::vec2(chInfo->width, 0.f) * texInvSize * symbolTexInvHeight);
 
         texCoords.at(4 * i + 0) = glm::vec2(chInfo->x, chInfo->y) * texInvSize;
         texCoords.at(4 * i + 1) = glm::vec2(chInfo->x, chInfo->y + chInfo->height) * texInvSize;
@@ -379,10 +379,10 @@ std::shared_ptr<Mesh> buildTextMesh(std::shared_ptr<Font> font, const std::strin
     else if (alignY == TextNodeAlignment::Negative) delta.y = size.y;
 
     for (auto& v : vertices)
-        v += glm::vec3(delta, 0.f);
+        v += delta;
 
     auto mesh = std::make_shared<Mesh>();
-    mesh->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 3, glm::value_ptr(*vertices.data()), GL_STATIC_DRAW));
+    mesh->declareVertexAttribute(VertexAttribute::Position, std::make_shared<VertexBuffer>(vertices.size(), 2, glm::value_ptr(*vertices.data()), GL_STATIC_DRAW));
     mesh->declareVertexAttribute(VertexAttribute::TexCoord, std::make_shared<VertexBuffer>(texCoords.size(), 2, glm::value_ptr(*texCoords.data()), GL_STATIC_DRAW));
     mesh->attachIndexBuffer(std::make_shared<IndexBuffer>(GL_TRIANGLES, indices.size(), indices.data(), GL_STATIC_DRAW));
 

@@ -88,5 +88,10 @@ std::shared_ptr<Image> Image::load(const std::string& filename)
     return result;
 }
 
+std::shared_ptr<Image> Image::loadDescription(const std::string& filename)
+{
+    return load(filename);
+}
+
 } // namespace
 } // namespace

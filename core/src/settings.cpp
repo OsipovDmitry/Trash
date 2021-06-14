@@ -39,6 +39,36 @@ float Settings::readFloat(const std::string& path, const float defaultValue)
     return obj ? obj->GetFloat() : defaultValue;
 }
 
+glm::vec3 Settings::readVec3(const std::string& path, const glm::vec3& defaultValue)
+{
+    glm::vec3 result = defaultValue;
+
+    if (auto obj = m_->read(path))
+    {
+        auto array = obj->GetArray();
+        if (array.Size() == result.length())
+            for (size_t i = 0; i < array.Size(); ++i)
+                result[i] = array[i].GetFloat();
+    }
+
+    return result;
+}
+
+glm::vec4 Settings::readVec4(const std::string& path, const glm::vec4& defaultValue)
+{
+    glm::vec4 result = defaultValue;
+
+    if (auto obj = m_->read(path))
+    {
+        auto array = obj->GetArray();
+        if (array.Size() == result.length())
+            for (size_t i = 0; i < array.Size(); ++i)
+                result[i] = array[i].GetFloat();
+    }
+
+    return result;
+}
+
 Settings::Settings()
     : m_(std::make_unique<SettingsPrivate>())
 {

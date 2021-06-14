@@ -67,6 +67,8 @@ public:
     float cameraMinZNear, cameraMaxZFar;
     float shadowMapMinZNear, shadowMapMaxZFar;
     int32_t shadowMapSize;
+    bool renderNodesAABBs, renderGeometryNodesAABBs;
+    glm::vec4 nodesAABBsColor, geometryNodesAABBsColor;
 
     std::set<uint32_t> freeLightIndices;
     std::set<uint32_t> dirtyLights, dirtyShadowMaps;

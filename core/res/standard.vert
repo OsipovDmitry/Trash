@@ -10,7 +10,7 @@ uniform mat3 u_normalMatrix;
 #endif
 
 #ifdef HAS_TEXCOORDS
-layout (location = 2) in vec3 a_texCoord;
+layout (location = 2) in vec2 a_texCoord;
 #endif
 
 #ifdef HAS_BONES
@@ -85,7 +85,7 @@ void main(void)
 #endif
 
 #ifdef HAS_TEXCOORDS
-    v_texCoord = a_texCoord.xy;
+    v_texCoord = a_texCoord;
 #endif
 
 #if defined(HAS_NORMALS) && defined(HAS_TANGENTS)

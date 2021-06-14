@@ -18,15 +18,30 @@ namespace trash
 namespace core
 {
 
-ParticleSystemDrawable::ParticleSystemDrawable(std::shared_ptr<Mesh> m)
+ParticleSystemDrawable::ParticleSystemDrawable(std::shared_ptr<Mesh> m,
+                                               std::reference_wrapper<const ParticleType> particleType,
+                                               std::reference_wrapper<const BlendingType> blendingType,
+                                               std::reference_wrapper<const bool> distanceAttenuationState,
+                                               std::reference_wrapper<const float> distanceAttenuationValue,
+                                               std::shared_ptr<Texture> opacityTexture)
     : Drawable()
     , m_mesh(m)
+    , m_particleType(particleType)
+    , m_blendingType(blendingType)
+    , m_distanceAttenuationState(distanceAttenuationState)
+    , m_distanceAttenuationValueUniform(std::make_shared<Uniform<std::reference_wrapper<const float>>>(distanceAttenuationValue))
+    , m_opacityTextureUniform(opacityTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(opacityTexture) : nullptr)
 {
 }
 
 LayerId ParticleSystemDrawable::layerId() const
 {
-    return LayerId::Particles;
+    return LayerId::TransparentGeometry;
+}
+
+BlendingType ParticleSystemDrawable::blendingType() const
+{
+    return m_blendingType;
 }
 
 std::shared_ptr<RenderProgram> ParticleSystemDrawable::renderProgram(DrawableRenderProgramId) const
@@ -34,7 +49,7 @@ std::shared_ptr<RenderProgram> ParticleSystemDrawable::renderProgram(DrawableRen
     if (!m_renderProgram)
     {
         auto& renderer = Renderer::instance();
-        m_renderProgram = renderer.loadRenderProgram(particlesRenderProgramName.first, particlesRenderProgramName.second, {});
+        m_renderProgram = renderer.loadRenderProgram(particlesRenderProgramName.first, particlesRenderProgramName.second, renderProgramDefines());
     }
 
     return m_renderProgram;
@@ -43,6 +58,59 @@ std::shared_ptr<RenderProgram> ParticleSystemDrawable::renderProgram(DrawableRen
 std::shared_ptr<Mesh> ParticleSystemDrawable::mesh() const
 {
     return m_mesh;
+}
+
+std::shared_ptr<AbstractUniform> ParticleSystemDrawable::uniform(UniformId id) const
+{
+    std::shared_ptr<AbstractUniform> result = Drawable::uniform(id);
+
+    switch (id)
+    {
+    case UniformId::ParticleDistanceAttenuation:
+    {
+        result = m_distanceAttenuationValueUniform;
+        break;
+    }
+    case UniformId::OpacityMap:
+    {
+        result = m_opacityTextureUniform;
+        break;
+    }
+    }
+
+    return result;
+}
+
+void ParticleSystemDrawable::dirtyCache()
+{
+    m_renderProgram = nullptr;
+}
+
+std::map<std::string, std::string> ParticleSystemDrawable::renderProgramDefines() const
+{
+    std::map<std::string, std::string> result;
+
+    switch (m_particleType.get()) {
+    case ParticleType::Quad:
+        result.insert({"PARTICLE_TYPE_QUAD", ""});
+        break;
+    case ParticleType::Circle:
+        result.insert({"PARTICLE_TYPE_CIRCLE", ""});
+        break;
+    case ParticleType::SoftCircle:
+        result.insert({"PARTICLE_TYPE_SOFT_CIRCLE", ""});
+        break;
+    default:
+        break;
+    }
+
+    if (m_distanceAttenuationState.get())
+        result.insert({"PARTICLE_DISTANCE_ATTENUATION", ""});
+
+    if (m_opacityTextureUniform)
+        result.insert({"HAS_OPACITYMAPPING", ""});
+
+    return result;
 }
 
 StandardDrawable::StandardDrawable(std::shared_ptr<Mesh> mesh,
@@ -54,7 +122,7 @@ StandardDrawable::StandardDrawable(std::shared_ptr<Mesh> mesh,
                                            std::shared_ptr<Texture> normalTexture,
                                            std::shared_ptr<Texture> metallicTexture,
                                            std::shared_ptr<Texture> roughnessTexture,
-                                           std::shared_ptr<LightIndicesList> lightIndicesList)
+                                           std::reference_wrapper<const LightIndicesList> lightIndicesList)
     : m_mesh(mesh)
     , m_bonesBufferUniform(bonesBuffer ? std::make_shared<Uniform<std::shared_ptr<Buffer>>>(bonesBuffer) : nullptr)
     , m_baseColorUniform(std::make_shared<Uniform<glm::vec4>>(color))
@@ -64,7 +132,7 @@ StandardDrawable::StandardDrawable(std::shared_ptr<Mesh> mesh,
     , m_normalTextureUniform(normalTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(normalTexture) : nullptr)
     , m_metallicTextureUniform(metallicTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(metallicTexture) : nullptr)
     , m_roughnessTextureUniform(roughnessTexture ? std::make_shared<Uniform<std::shared_ptr<Texture>>>(roughnessTexture) : nullptr)
-    , m_lightIndicesListUniform(lightIndicesList ? std::make_shared<Uniform<std::shared_ptr<LightIndicesList>>>(lightIndicesList) : nullptr)
+    , m_lightIndicesListUniform(std::make_shared<Uniform<std::reference_wrapper<const LightIndicesList>>>(lightIndicesList))
 {
 }
 
@@ -74,12 +142,17 @@ LayerId StandardDrawable::layerId() const
 
     if (m_baseColorUniform->get().a < (1.f-utils::epsilon) || m_opacityTextureUniform)
         result = LayerId::TransparentGeometry;
-    else if (m_lightIndicesListUniform && m_lightIndicesListUniform->get()->isEnabled && m_mesh && m_mesh->vertexBuffer(VertexAttribute::Normal))
+    else if (m_lightIndicesListUniform->get().get().isEnabled && m_mesh && m_mesh->vertexBuffer(VertexAttribute::Normal))
         result = LayerId::OpaqueGeometry;
     else
         result = LayerId::NotLightedGeometry;
 
     return result;
+}
+
+BlendingType StandardDrawable::blendingType() const
+{
+    return BlendingType::Alpha; // Alpha is always returned because Alpha should be for transparent geometry and it isn't used for opaque one.
 }
 
 std::shared_ptr<RenderProgram> StandardDrawable::renderProgram(DrawableRenderProgramId id) const
@@ -221,7 +294,7 @@ std::map<std::string, std::string> StandardDrawable::renderProgramDefines() cons
     if (m_mesh->vertexBuffer(VertexAttribute::Color))
         defines.insert({"HAS_COLORS", ""});
 
-    if (m_lightIndicesListUniform && m_lightIndicesListUniform->get()->isEnabled)
+    if (m_lightIndicesListUniform->get().get().isEnabled)
         defines.insert({"HAS_LIGHTING", ""});
 
     if (m_baseColorTextureUniform)
@@ -240,32 +313,6 @@ std::map<std::string, std::string> StandardDrawable::renderProgramDefines() cons
         defines.insert({"HAS_ROUGHNESSMAPPING", ""});
 
     return defines;
-}
-
-SphereDrawable::SphereDrawable(uint32_t segs, const utils::BoundingSphere &bs, const glm::vec4& c)
-    : StandardDrawable(buildSphereMesh(segs, bs, true), nullptr, c, glm::vec2(1.f, 1.f), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
-{   
-}
-
-BoxDrawable::BoxDrawable(const utils::BoundingBox& box, const glm::vec4& c)
-    : StandardDrawable(buildBoxMesh(box, true), nullptr, c, glm::vec2(1.f, 1.f), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
-{
-
-}
-
-FrustumDrawable::FrustumDrawable(const utils::Frustum &frustum, const glm::vec4& c)
-    : StandardDrawable(buildFrustumMesh(frustum), nullptr, c, glm::vec2(1.f, 1.f), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
-{
-}
-
-ConeDrawable::ConeDrawable(uint32_t segs, float r, float l, const glm::vec4& c)
-    : StandardDrawable(buildConeMesh(segs, r, l, true), nullptr, c, glm::vec2(1.f, 1.f), nullptr, nullptr, nullptr, nullptr, nullptr, nullptr)
-{
-}
-
-TextDrawable::TextDrawable(std::shared_ptr<Font> font, const std::string& str, TextNodeAlignment alignX, TextNodeAlignment alignY, const glm::vec4& c, float lineSpacing)
-    : StandardDrawable(buildTextMesh(font, str, alignX, alignY, lineSpacing), nullptr, c, glm::vec2(1.f, 1.f), nullptr, font->texture, nullptr, nullptr, nullptr, nullptr)
-{
 }
 
 LightDrawable::LightDrawable(LightType type)
@@ -432,9 +479,15 @@ SSAODrawable::SSAODrawable(float radius, uint32_t numSamples)
     auto *bufferData = static_cast<glm::vec4*>(samplesBuffer->map(0, bufferSize, GL_MAP_WRITE_BIT));
     for (size_t i = 0; i < 64; ++i)
     {
-        glm::vec3 sample(utils::random(0.3f, 1.0f) * 2.0f - 1.0f, utils::random(0.3f, 1.0f) * 2.0f - 1.0f, utils::random());
+        glm::vec3 sample(utils::random(-1.f, +1.f), utils::random(-1.f, +1.f), utils::random(.3f, 1.f));
         sample = glm::normalize(sample);
+#if 1
         sample *= utils::random();
+#else
+        float scale = i / 63.f;
+        scale = glm::mix(0.1f, 1.0f, scale * scale);
+        sample *= scale;
+#endif
         bufferData[i] = glm::vec4(sample, utils::random(0.0f, glm::two_pi<float>()));
     }
     samplesBuffer->unmap();

@@ -4,9 +4,6 @@
 #include "nodeprivate.h"
 
 #include "renderer.h"
-#include "drawables.h"
-
-#include <utils/frustum.h>
 
 namespace trash
 {

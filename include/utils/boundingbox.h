@@ -2,7 +2,6 @@
 #define BOUNDINGBOX_H
 
 #include <vector>
-#include <cfloat>
 
 #include "../glm/vec3.hpp"
 
@@ -23,7 +22,7 @@ struct BoundingBox
 {
     glm::vec3 minPoint, maxPoint;
 
-    BoundingBox() : minPoint(FLT_MAX, FLT_MAX, FLT_MAX), maxPoint(-FLT_MAX, -FLT_MAX, -FLT_MAX) {}
+    BoundingBox() : minPoint(std::numeric_limits<float>::max()), maxPoint(-std::numeric_limits<float>::max()) {}
     BoundingBox(const glm::vec3& minP, const glm::vec3& maxP) : minPoint(minP), maxPoint(maxP) {}
     BoundingBox(float *p, uint32_t nv, uint32_t nc) : minPoint(std::numeric_limits<float>::max()), maxPoint(-std::numeric_limits<float>::max()) {
         const uint32_t stride = nc;
@@ -75,6 +74,9 @@ struct BoundingBox
 
     BoundingBox& operator += (const BoundingBox& b) { *this = *this + b; return *this; }
     BoundingBox& operator += (const BoundingSphere& s) { *this = *this + s; return *this; }
+
+    static BoundingBox fromMinMax(const glm::vec3& minP, const glm::vec3& maxP) { return BoundingBox(minP, maxP); }
+    static BoundingBox fromCenterHalfSize(const glm::vec3& cP, const glm::vec3& hz) { return BoundingBox(cP-hz, cP+hz); }
 };
 
 inline BoundingBox operator +(const BoundingBox& b1, const BoundingBox& b2)

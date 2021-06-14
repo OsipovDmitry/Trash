@@ -2,6 +2,7 @@
 #define DRAWABLES_H
 
 #include <map>
+#include <functional>
 
 #include <glm/vec2.hpp>
 #include <glm/vec4.hpp>
@@ -30,6 +31,7 @@ public:
     virtual ~Drawable() = default;
 
     virtual LayerId layerId() const = 0;
+    virtual BlendingType blendingType() const { return BlendingType::NoBlend; }
     virtual std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const = 0;
     virtual std::shared_ptr<Mesh> mesh() const = 0;
     virtual std::shared_ptr<AbstractUniform> uniform(UniformId) const { return nullptr; }
@@ -40,16 +42,32 @@ public:
 class ParticleSystemDrawable : public Drawable
 {
 public:
-    ParticleSystemDrawable(std::shared_ptr<Mesh>);
+    ParticleSystemDrawable(std::shared_ptr<Mesh>,
+                           std::reference_wrapper<const ParticleType>,
+                           std::reference_wrapper<const BlendingType>,
+                           std::reference_wrapper<const bool>,
+                           std::reference_wrapper<const float>,
+                           std::shared_ptr<Texture>);
 
     LayerId layerId() const override;
+    BlendingType blendingType() const override;
     std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
     std::shared_ptr<Mesh> mesh() const override;
-    //std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
+    std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
+
+    void dirtyCache() override;
 
 protected:
+    std::map<std::string, std::string> renderProgramDefines() const;
+
     std::shared_ptr<Mesh> m_mesh;
     mutable std::shared_ptr<RenderProgram> m_renderProgram;
+
+    std::reference_wrapper<const ParticleType> m_particleType;
+    std::reference_wrapper<const BlendingType> m_blendingType;
+    std::reference_wrapper<const bool> m_distanceAttenuationState;
+    std::shared_ptr<AbstractUniform> m_distanceAttenuationValueUniform;
+    std::shared_ptr<AbstractUniform> m_opacityTextureUniform;
 };
 
 class StandardDrawable : public Drawable
@@ -64,9 +82,10 @@ public:
                          std::shared_ptr<Texture>,
                          std::shared_ptr<Texture>,
                          std::shared_ptr<Texture>,
-                         std::shared_ptr<LightIndicesList>);
+                         std::reference_wrapper<const LightIndicesList>);
 
     LayerId layerId() const override;
+    BlendingType blendingType() const override;
     std::shared_ptr<RenderProgram> renderProgram(DrawableRenderProgramId) const override;
     std::shared_ptr<Mesh> mesh() const override;
     std::shared_ptr<AbstractUniform> uniform(UniformId) const override;
@@ -87,39 +106,7 @@ protected:
     std::shared_ptr<AbstractUniform> m_normalTextureUniform;
     std::shared_ptr<AbstractUniform> m_metallicTextureUniform;
     std::shared_ptr<AbstractUniform> m_roughnessTextureUniform;
-    std::shared_ptr<Uniform<std::shared_ptr<LightIndicesList>>> m_lightIndicesListUniform;
-};
-
-class SphereDrawable : public StandardDrawable
-{
-public:
-    SphereDrawable(uint32_t, const utils::BoundingSphere&, const glm::vec4&);
-};
-
-class BoxDrawable : public StandardDrawable
-{
-public:
-    BoxDrawable(const utils::BoundingBox&, const glm::vec4&);
-};
-
-class FrustumDrawable : public StandardDrawable
-{
-public:
-    FrustumDrawable(const utils::Frustum&, const glm::vec4&);
-};
-
-class ConeDrawable : public StandardDrawable
-{
-public:
-    ConeDrawable(uint32_t, float, float, const glm::vec4&);
-};
-
-class TextDrawable : public StandardDrawable
-{
-public:
-    TextDrawable(std::shared_ptr<Font>, const std::string&, TextNodeAlignment, TextNodeAlignment, const glm::vec4&, float);
-
-    LayerId layerId() const override { return LayerId::TransparentGeometry; }
+    std::shared_ptr<Uniform<std::reference_wrapper<const LightIndicesList>>> m_lightIndicesListUniform;
 };
 
 class LightDrawable : public Drawable

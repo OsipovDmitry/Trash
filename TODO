@@ -6,15 +6,16 @@ done 5) Use current file path for pre-compile shaders
 done 6) develop shadow maps
 7) change Model::Animation representation
 decline 8) remove scale from utils::Transform
-9) add supporting viewProjection and modelViewProjection matrices in shaders
-10) improve rendering pipline in Renderer class. Now we have a conflict when we are trying to render shadow maps and common scene
+done 9) add supporting viewProjection and modelViewProjection matrices in shaders
+done 10) improve rendering pipline in Renderer class. Now we have a conflict when we are trying to render shadow maps and common scene
 11) ScenePrivate::renderScene updates all dirty shadow maps. It should update shadow maps that are needed in this frame
 done 12) develop BackgroundDrawable
 done 13) develop TextNode, loading fonts (https://evanw.github.io/font-texture-generator/)
 14) why is base color black when there are no lighting ?
 done 15) develop AutoTransformNode that is always oriented to camera
 done 16) replace bounding spheres to bounding boxes for scene graph
-17) sometimes shading jumps on static models (it depends with autocalculating z-planes for frusum of light)
-18) textdrawable is based on texturedmeshdrawable now. That's why it has vec3 positions instead of vec2. texturedmeshdrawable has to support any-dims positions.
+17) sometimes shading jumps on static models (it depends with autocalculating z-planes for frustum of light)
+done 18) textdrawable is based on texturedmeshdrawable now. That's why it has vec3 positions instead of vec2. texturedmeshdrawable has to support any-dims positions.
 19) Renderer::loadTexture calls glGenTexture. If smth is wrong loadTexture'll return nullptr without glDeleteTexture. texId will be broken.
-'' 
+20) move SSAO radius from defines to uniforms.
+21) Implement Image::loadDescription method.

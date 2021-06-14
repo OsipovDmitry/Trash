@@ -5,8 +5,6 @@
 
 #include <glm/vec4.hpp>
 
-#include <utils/enumclass.h>
-
 #include <core/drawablenode.h>
 #include <core/types.h>
 

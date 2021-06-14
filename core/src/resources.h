@@ -26,6 +26,7 @@ const std::pair<std::string, std::string> postEffectRenderProgramName { ":/res/p
 
 const std::string teapotModelName(":/res/teapot.fbx");
 const std::string standardDiffuseTextureName(":/res/chess.png");
+const std::string smokeOpacityMapName(":/res/smoke/smoke.json");
 
 } // namespace
 } // namespace
